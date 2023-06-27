@@ -11,11 +11,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::time::timer_handle::TimerHandle;
 use crate::time::wheel::Wheel;
+use crate::time::Clock;
 use std::convert::TryInto;
 use std::fmt::Error;
 use std::mem::MaybeUninit;
+use std::ptr::NonNull;
 use std::sync::{Mutex, Once};
 use std::task::Waker;
 use std::time::Instant;
@@ -47,9 +48,9 @@ impl Driver {
         self.start_time
     }
 
-    pub(crate) fn insert(&self, timer_handle: TimerHandle) -> Result<u64, Error> {
+    pub(crate) fn insert(&self, clock_entry: NonNull<Clock>) -> Result<u64, Error> {
         let mut lock = self.wheel.lock().unwrap();
-        lock.insert(timer_handle)
+        lock.insert(clock_entry)
     }
 
     pub(crate) fn run(&self) {
@@ -66,17 +67,17 @@ impl Driver {
 
         let mut lock = self.wheel.lock().unwrap();
 
-        while let Some(timer_handle) = lock.poll(now) {
+        while let Some(mut clock_entry) = lock.poll(now) {
             let elapsed = lock.elapsed();
             lock.set_last_elapsed(elapsed);
 
-            // Unsafe access to timer_handle is only unsafe when Sleep Drop,
-            // but does not let `Sleep` go to `Ready` before access to timer_handle fetched by poll.
-            let timer_handle = unsafe { timer_handle.inner().as_mut() };
-            waker_list[waker_idx] = timer_handle.take_waker();
+            // Unsafe access to clock_entry is only unsafe when Sleep Drop,
+            // but does not let `Sleep` go to `Ready` before access to clock_entry fetched by poll.
+            let clock_handle = unsafe { clock_entry.as_mut() };
+            waker_list[waker_idx] = clock_handle.take_waker();
             waker_idx += 1;
 
-            timer_handle.set_result(true);
+            clock_handle.set_result(true);
 
             if waker_idx == waker_list.len() {
                 for waker in waker_list.iter_mut() {

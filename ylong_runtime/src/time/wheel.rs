@@ -11,10 +11,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::time::timer_handle::TimerHandle;
-use std::collections::VecDeque;
+use crate::time::Clock;
+use crate::util::link_list::LinkedList;
 use std::fmt::Error;
+use std::mem;
 use std::mem::MaybeUninit;
+use std::ptr::NonNull;
 
 // In a slots, the number of slot.
 const SLOTS_NUM: usize = 64;
@@ -49,7 +51,7 @@ pub(crate) struct Wheel {
 
     // These corresponding timers have expired,
     // and are ready to be triggered.
-    trigger: VecDeque<TimerHandle>,
+    trigger: LinkedList<Clock>,
 }
 
 impl Wheel {
@@ -109,8 +111,8 @@ impl Wheel {
     }
 
     // Insert the corresponding TimerHandle into the specified position in the timing wheel.
-    pub(crate) fn insert(&mut self, timer_handle: TimerHandle) -> Result<u64, Error> {
-        let expiration = unsafe { timer_handle.inner().as_ref().expiration() };
+    pub(crate) fn insert(&mut self, mut clock_entry: NonNull<Clock>) -> Result<u64, Error> {
+        let expiration = unsafe { clock_entry.as_ref().expiration() };
 
         if expiration <= self.elapsed() {
             // This means that the timeout period has passed,
@@ -119,25 +121,24 @@ impl Wheel {
         }
 
         let level = self.find_level(expiration);
-        // Unsafe access to timer_handle is only unsafe when Sleep Drop,
+        // Unsafe access to clock_entry is only unsafe when Sleep Drop,
         // `Sleep` here does not go into `Ready`.
-        unsafe { timer_handle.inner().as_mut().set_level(level) };
+        unsafe { clock_entry.as_mut().set_level(level) };
 
-        self.levels[level].insert(timer_handle, self.elapsed);
+        self.levels[level].insert(clock_entry, self.elapsed);
 
         Ok(expiration)
     }
 
-    pub(crate) fn cancel(&mut self, timer_handle: &TimerHandle) {
-        // Unsafe access to timer_handle is only unsafe when Sleep Drop,
+    pub(crate) fn cancel(&mut self, clock_entry: NonNull<Clock>) {
+        // Unsafe access to clock_entry is only unsafe when Sleep Drop,
         // `Sleep` here does not go into `Ready`.
-        let level = unsafe { timer_handle.inner().as_ref().level() };
-        self.levels[level].cancel(timer_handle);
-        for (index, handle) in self.trigger.iter().enumerate() {
-            if handle == timer_handle {
-                self.trigger.remove(index).unwrap();
-                break;
-            }
+        let level = unsafe { clock_entry.as_ref().level() };
+        self.levels[level].cancel(clock_entry);
+
+        // Caller has unique access to the linked list and the node is not in any other linked list.
+        unsafe {
+            LinkedList::remove(clock_entry);
         }
     }
 
@@ -163,7 +164,7 @@ impl Wheel {
     }
 
     // Determine which timers have timed out at the current time.
-    pub(crate) fn poll(&mut self, now: u64) -> Option<TimerHandle> {
+    pub(crate) fn poll(&mut self, now: u64) -> Option<NonNull<Clock>> {
         loop {
             if let Some(handle) = self.trigger.pop_back() {
                 return Some(handle);
@@ -204,13 +205,13 @@ pub struct Level {
     occupied: u64,
 
     // slots in a level.
-    slots: [VecDeque<TimerHandle>; SLOTS_NUM],
+    slots: [LinkedList<Clock>; SLOTS_NUM],
 }
 
 impl Level {
     // Specify the level and create a Level structure.
     pub(crate) fn new(level: usize) -> Self {
-        let mut slots: [MaybeUninit<VecDeque<TimerHandle>>; SLOTS_NUM] =
+        let mut slots: [MaybeUninit<LinkedList<Clock>>; SLOTS_NUM] =
             unsafe { MaybeUninit::uninit().assume_init() };
 
         for slot in slots.iter_mut() {
@@ -218,7 +219,7 @@ impl Level {
         }
 
         unsafe {
-            let slots = std::mem::transmute::<_, [VecDeque<TimerHandle>; SLOTS_NUM]>(slots);
+            let slots = mem::transmute::<_, [LinkedList<Clock>; SLOTS_NUM]>(slots);
             Self {
                 level,
                 occupied: 0,
@@ -228,33 +229,31 @@ impl Level {
     }
 
     // Based on the elapsed which the current time wheel is running,
-    // and the expected expiration time of the timer_handle,
+    // and the expected expiration time of the clock_entry,
     // find the corresponding slot and insert it.
-    pub(crate) fn insert(&mut self, timer_handle: TimerHandle, elapsed: u64) {
-        let duration = unsafe { timer_handle.inner().as_ref().expiration() } - elapsed;
-        // Unsafe access to timer_handle is only unsafe when Sleep Drop,
+    pub(crate) fn insert(&mut self, mut clock_entry: NonNull<Clock>, elapsed: u64) {
+        let duration = unsafe { clock_entry.as_ref().expiration() } - elapsed;
+        // Unsafe access to clock_entry is only unsafe when Sleep Drop,
         // `Sleep` here does not go into `Ready`.
-        unsafe { timer_handle.inner().as_mut().set_duration(duration) };
+        unsafe { clock_entry.as_mut().set_duration(duration) };
 
         let slot = ((duration >> (self.level * LEVELS_NUM)) % SLOTS_NUM as u64) as usize;
 
-        self.slots[slot].push_front(timer_handle);
+        self.slots[slot].push_front(clock_entry);
 
         self.occupied |= 1 << slot;
     }
 
-    pub(crate) fn cancel(&mut self, timer_handle: &TimerHandle) {
-        // Unsafe access to timer_handle is only unsafe when Sleep Drop,
+    pub(crate) fn cancel(&mut self, clock_entry: NonNull<Clock>) {
+        // Unsafe access to clock_entry is only unsafe when Sleep Drop,
         // `Sleep` here does not go into `Ready`.
-        let duration = unsafe { timer_handle.inner().as_ref().duration() };
+        let duration = unsafe { clock_entry.as_ref().duration() };
 
         let slot = ((duration >> (self.level * LEVELS_NUM)) % SLOTS_NUM as u64) as usize;
 
-        for (index, handle) in self.slots[slot].iter().enumerate() {
-            if handle == timer_handle {
-                self.slots[slot].remove(index).unwrap();
-                break;
-            }
+        // Caller has unique access to the linked list and the node is not in any other linked list.
+        unsafe {
+            LinkedList::remove(clock_entry);
         }
 
         if self.slots[slot].is_empty() {
@@ -293,9 +292,9 @@ impl Level {
     }
 
     // Fetch all timers in a slot of the corresponding level.
-    pub(crate) fn take_slot(&mut self, slot: usize) -> VecDeque<TimerHandle> {
+    pub(crate) fn take_slot(&mut self, slot: usize) -> LinkedList<Clock> {
         self.occupied &= !(1 << slot);
-        std::mem::take(&mut self.slots[slot])
+        mem::take(&mut self.slots[slot])
     }
 }
 

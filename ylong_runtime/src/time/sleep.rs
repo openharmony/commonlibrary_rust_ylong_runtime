@@ -16,6 +16,7 @@ use crate::time::Driver;
 use std::convert::TryInto;
 use std::future::Future;
 use std::pin::Pin;
+use std::ptr::NonNull;
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
 
@@ -95,7 +96,7 @@ impl Sleep {
     fn cancel(&mut self) {
         let driver = Driver::get_ref();
         let mut lock = driver.wheel.lock().unwrap();
-        lock.cancel(&self.timer.handle());
+        lock.cancel(NonNull::from(&self.timer));
     }
 }
 
@@ -115,7 +116,7 @@ impl Future for Sleep {
             self.timer.set_expiration(ms);
             self.timer.set_waker(cx.waker().clone());
 
-            match driver.insert(self.timer.handle()) {
+            match driver.insert(NonNull::from(&self.timer)) {
                 Ok(_) => self.need_insert = false,
                 Err(_) => {
                     // Even if the insertion fails, there is no need to insert again here,
