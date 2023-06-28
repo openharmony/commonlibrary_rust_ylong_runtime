@@ -16,6 +16,8 @@ use std::future::Future;
 use std::mem;
 use std::pin::Pin;
 use std::sync::atomic::AtomicBool;
+#[cfg(feature = "metrics")]
+use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{Acquire, Release};
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
@@ -31,7 +33,7 @@ cfg_io!(
 
 pub(crate) struct CurrentThreadSpawner {
     pub(crate) scheduler: Arc<CurrentThreadScheduler>,
-    parker: Arc<Parker>,
+    pub(crate) parker: Arc<Parker>,
     #[cfg(feature = "net")]
     pub(crate) handle: Arc<Handle>,
 }
@@ -39,6 +41,8 @@ pub(crate) struct CurrentThreadSpawner {
 #[derive(Default)]
 pub(crate) struct CurrentThreadScheduler {
     pub(crate) inner: Mutex<VecDeque<Task>>,
+    #[cfg(feature = "metrics")]
+    pub(crate) count: AtomicUsize,
 }
 
 unsafe impl Sync for CurrentThreadScheduler {}
@@ -47,6 +51,8 @@ impl Schedule for CurrentThreadScheduler {
     #[inline]
     fn schedule(&self, task: Task, _lifo: bool) {
         let mut queue = self.inner.lock().unwrap();
+        #[cfg(feature = "metrics")]
+        self.count.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
         queue.push_back(task);
     }
 }
@@ -146,6 +152,10 @@ impl CurrentThreadSpawner {
 
         let mut queue = self.scheduler.inner.lock().unwrap();
         queue.push_back(task);
+        #[cfg(feature = "metrics")]
+        self.scheduler
+            .count
+            .fetch_add(1, std::sync::atomic::Ordering::AcqRel);
 
         handle
     }

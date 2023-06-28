@@ -12,7 +12,6 @@
 // limitations under the License.
 
 use std::cell::RefCell;
-use std::collections::LinkedList;
 use std::future::Future;
 use std::sync::atomic::Ordering::{Acquire, SeqCst};
 use std::sync::atomic::{AtomicBool, AtomicUsize};
@@ -56,6 +55,8 @@ pub(crate) struct MultiThreadScheduler {
     locals: Vec<LocalQueue>,
     #[cfg(feature = "net")]
     pub(crate) io_handle: Arc<Handle>,
+    #[cfg(feature = "metrics")]
+    steal_count: AtomicUsize,
 }
 
 const ACTIVE_WORKER_SHIFT: usize = 16;
@@ -136,6 +137,8 @@ impl MultiThreadScheduler {
             locals,
             #[cfg(feature = "net")]
             io_handle,
+            #[cfg(feature = "metrics")]
+            steal_count: AtomicUsize::new(0),
         }
     }
 
@@ -318,6 +321,9 @@ impl MultiThreadScheduler {
             }
             let target = self.locals.get(i).unwrap();
             if let Some(task) = target.steal_into(local_run_queue) {
+                #[cfg(feature = "metrics")]
+                self.steal_count
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 return Some(task);
             }
         }
@@ -325,9 +331,19 @@ impl MultiThreadScheduler {
         self.global.pop_front()
     }
 
-    pub(crate) fn get_global(&self) -> &Mutex<LinkedList<Task>> {
-        self.global.get_global()
+    pub(crate) fn get_global(&self) -> &GlobalQueue {
+        &self.global
     }
+
+    cfg_metrics!(
+        pub(crate) fn get_handles(&self) -> &RwLock<Vec<Parker>> {
+            &self.handles
+        }
+
+        pub(crate) fn get_steal_count(&self) -> usize {
+            self.steal_count.load(Acquire)
+        }
+    );
 }
 
 #[derive(Clone)]
@@ -358,6 +374,9 @@ pub(crate) struct Inner {
     worker_name: Option<String>,
     /// Stack size of each thread
     stack_size: Option<usize>,
+    /// Workers
+    #[cfg(feature = "metrics")]
+    workers: Mutex<Vec<Arc<Worker>>>,
 }
 
 fn get_cpu_core() -> u8 {
@@ -407,6 +426,8 @@ impl AsyncPoolSpawner {
                 before_stop: builder.common.before_stop.clone(),
                 worker_name: builder.common.worker_name.clone(),
                 stack_size: builder.common.stack_size,
+                #[cfg(feature = "metrics")]
+                workers: Mutex::new(Vec::with_capacity(thread_num.into())),
             }),
             exe_mng_info: Arc::new(MultiThreadScheduler::new(
                 thread_num as usize,
@@ -445,6 +466,8 @@ impl AsyncPoolSpawner {
         }
 
         for (worker_id, worker) in workers.drain(..).enumerate() {
+            #[cfg(feature = "metrics")]
+            self.inner.workers.lock().unwrap().push(worker.clone());
             #[cfg(feature = "net")]
             let work_arc_handle = self.exe_mng_info.io_handle.clone();
             // set up thread attributes
@@ -527,7 +550,7 @@ impl AsyncPoolSpawner {
     /// on a dangled pointer.
     ///
     /// ```no run
-    /// fn err_example(runtime: &Runtime) -> JoinHandle<()> {
+    ///  fn err_example(runtime: &Runtime) -> JoinHandle<()> {
     ///     let builder = TaskBuilder::default();
     ///     let mut slice = [1, 2, 3, 4, 5];
     ///     let borrow = &mut slice;
@@ -602,9 +625,21 @@ impl AsyncPoolSpawner {
             }
         }
     }
+
+    #[cfg(feature = "metrics")]
+    pub(crate) fn get_worker(&self, index: u8) -> Result<Arc<Worker>, ()> {
+        let vec = self.inner.workers.lock().unwrap();
+        for i in 0..vec.len() {
+            let worker = vec.get(i).expect("worker index out of range");
+            if worker.index == index {
+                return Ok(worker.clone());
+            }
+        }
+        Err(())
+    }
 }
 
-#[cfg(test)]
+#[cfg(all(test))]
 mod test {
     use std::future::Future;
     use std::pin::Pin;

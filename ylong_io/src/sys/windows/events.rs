@@ -90,6 +90,11 @@ impl Events {
     pub fn is_empty(&self) -> bool {
         self.events.is_empty()
     }
+
+    /// Returns len of Events.
+    pub fn len(&self) -> usize {
+        self.events.len()
+    }
 }
 
 impl fmt::Debug for Events {

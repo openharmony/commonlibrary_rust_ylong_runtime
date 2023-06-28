@@ -86,7 +86,7 @@ pub struct Runtime {
 
 #[cfg(all(not(feature = "ffrt"), feature = "net"))]
 impl Runtime {
-    fn get_handle(&self) -> std::sync::Arc<Handle> {
+    pub(crate) fn get_handle(&self) -> std::sync::Arc<Handle> {
         match &self.async_spawner {
             #[cfg(feature = "current_thread_runtime")]
             AsyncHandle::CurrentThread(s) => s.handle.clone(),
@@ -305,3 +305,30 @@ impl Runtime {
         ret
     }
 }
+
+cfg_metrics!(
+    use crate::metrics::Metrics;
+    impl Runtime {
+        /// User can get some message from Runtime during running.
+        ///
+        /// # Example
+        /// ```
+        /// let runtime = ylong_runtime::builder::RuntimeBuilder::new_multi_thread().build().unwrap();
+        /// let _metrics = runtime.metrics();
+        /// ```
+        pub fn metrics(&self) -> Metrics {
+            Metrics::new(self)
+        }
+    }
+
+    /// Gets metrics of the global Runtime.
+    /// # Example
+    /// ```
+    /// use ylong_runtime::executor::get_global_runtime_metrics;
+    ///
+    /// let metrics = get_global_runtime_metrics();
+    /// ```
+    pub fn get_global_runtime_metrics() -> Metrics<'static> {
+        Metrics::new(global_default_async())
+    }
+);

@@ -13,6 +13,8 @@
 
 use std::io;
 use std::ops::Deref;
+#[cfg(feature = "metrics")]
+use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, Mutex};
 
 use ylong_io::{Interest, Source, Token};
@@ -58,6 +60,10 @@ pub(crate) struct Driver {
     /// Stores IO events that need to be handled
     #[cfg(not(feature = "ylong_ffrt"))]
     events: Option<Events>,
+
+    /// Save Handle used in metrics.
+    #[cfg(feature = "metrics")]
+    handle: Arc<Handle>,
 }
 
 pub(crate) struct Handle {
@@ -93,6 +99,22 @@ impl Handle {
     pub(crate) fn wake(&self) {
         self.waker.wake().expect("ylong_io wake failed");
     }
+
+    #[cfg(feature = "metrics")]
+    pub(crate) fn get_register_count(&self) -> usize {
+        self.inner
+            .metrics
+            .register_count
+            .load(std::sync::atomic::Ordering::Acquire)
+    }
+
+    #[cfg(feature = "metrics")]
+    pub(crate) fn get_ready_count(&self) -> usize {
+        self.inner
+            .metrics
+            .ready_count
+            .load(std::sync::atomic::Ordering::Acquire)
+    }
 }
 
 impl Deref for Handle {
@@ -120,6 +142,20 @@ pub(crate) struct Inner {
     /// Used to register fd
     #[cfg(not(feature = "ylong_ffrt"))]
     registry: Arc<Poll>,
+
+    /// Metrics
+    #[cfg(feature = "metrics")]
+    metrics: InnerMetrics,
+}
+
+/// Metrics of Inner
+#[cfg(feature = "metrics")]
+struct InnerMetrics {
+    /// Register count. This value will only increment, not decrease.
+    register_count: AtomicUsize,
+
+    /// Ready events count. This value will only increment, not decrease.
+    ready_count: AtomicUsize,
 }
 
 impl Driver {
@@ -165,19 +201,25 @@ impl Driver {
             resources: Mutex::new(None),
             allocator,
             registry: arc_poll.clone(),
+            #[cfg(feature = "metrics")]
+            metrics: InnerMetrics {
+                register_count: AtomicUsize::new(0),
+                ready_count: AtomicUsize::new(0),
+            },
         });
+        let arc_handle = Arc::new(Handle::new(inner, waker));
 
         let driver = Driver {
             resources: Some(slab),
             events: Some(events),
             tick: DRIVER_TICK_INIT,
             poll: arc_poll,
+            #[cfg(feature = "metrics")]
+            handle: arc_handle.clone(),
         };
+        let arc_driver = Arc::new(Mutex::new(driver));
 
-        (
-            Arc::new(Handle::new(inner, waker)),
-            Arc::new(Mutex::new(driver)),
-        )
+        (arc_handle, arc_driver)
     }
 
     /// Runs the driver. This method will blocking wait for fd events to come in
@@ -222,6 +264,11 @@ impl Driver {
             let ready = Ready::from_event(event);
             self.dispatch(token, ready);
         }
+        #[cfg(feature = "metrics")]
+        self.handle
+            .metrics
+            .ready_count
+            .fetch_add(events.len(), std::sync::atomic::Ordering::AcqRel);
 
         self.events = Some(events);
         Ok(has_events)
@@ -287,6 +334,10 @@ impl Inner {
 
         self.registry
             .register(io, Token::from_usize(token), interest)?;
+        #[cfg(feature = "metrics")]
+        self.metrics
+            .register_count
+            .fetch_add(1, std::sync::atomic::Ordering::AcqRel);
         Ok(schedule_io)
     }
 
