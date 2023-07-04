@@ -21,3 +21,25 @@ macro_rules! cfg_io {
 }
 
 pub(crate) use cfg_io;
+
+macro_rules! cfg_ffrt {
+    ($($item:item)*) => {
+        $(
+            #[cfg(feature = "ffrt")]
+            $item
+        )*
+    }
+}
+
+pub(crate) use cfg_ffrt;
+
+macro_rules! cfg_not_ffrt {
+    ($($item:item)*) => {
+        $(
+            #[cfg(not(feature = "ffrt"))]
+            $item
+        )*
+    }
+}
+
+pub(crate) use cfg_not_ffrt;

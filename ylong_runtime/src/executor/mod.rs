@@ -23,8 +23,9 @@ pub(crate) mod current_thread;
 pub(crate) mod netpoller;
 use crate::builder::{initialize_blocking_spawner, RuntimeBuilder};
 use crate::executor::blocking_pool::BlockPoolSpawner;
+use crate::macros::{cfg_ffrt, cfg_not_ffrt};
 use crate::task::TaskBuilder;
-use crate::{cfg_ffrt, cfg_not_ffrt, JoinHandle, Task};
+use crate::{JoinHandle, Task};
 use std::future::Future;
 
 use crate::builder::multi_thread_builder::GLOBAL_BUILDER;

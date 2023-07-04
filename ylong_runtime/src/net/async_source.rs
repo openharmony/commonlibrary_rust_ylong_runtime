@@ -49,9 +49,8 @@ impl<E: Source> AsyncSource<E> {
     /// # Error
     ///
     /// If no reactor is found or fd registration fails, an error will be returned.
-    ///
+    #[cfg(not(feature = "ffrt"))]
     pub fn new(mut io: E, interest: Option<Interest>) -> io::Result<AsyncSource<E>> {
-        #[cfg(not(feature = "ffrt"))]
         let inner = {
             let context = get_current_ctx()
                 .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "get_current_ctx() fail"))?;
@@ -60,9 +59,28 @@ impl<E: Source> AsyncSource<E> {
                 WorkerContext::Curr(ctx) => &ctx.handle,
             }
         };
-        #[cfg(feature = "ffrt")]
+
+        let interest = interest.unwrap_or_else(|| Interest::WRITABLE.add(Interest::READABLE));
+        let entry = inner.register_source(&mut io, interest)?;
+        Ok(AsyncSource {
+            io: Some(io),
+            entry,
+        })
+    }
+
+    /// Wraps a `Source` object into an `AsyncSource`. When the `AsyncSource` object is created,
+    /// it's fd will be registered into runtime's reactor.
+    ///
+    /// If `interest` passed in is None, the interested event for fd registration will be both
+    /// readable and writable.
+    ///
+    /// # Error
+    ///
+    /// If no reactor is found or fd registration fails, an error will be returned.
+    #[cfg(feature = "ffrt")]
+    pub fn new(mut io: E, interest: Option<Interest>) -> io::Result<AsyncSource<E>> {
         let inner = crate::net::Handle::get_ref();
-        // let inner = Driver::inner();
+
         let interest = interest.unwrap_or_else(|| Interest::WRITABLE.add(Interest::READABLE));
         let entry = inner.register_source(&mut io, interest)?;
         Ok(AsyncSource {
@@ -221,10 +239,10 @@ impl<E: Source> Deref for AsyncSource<E> {
 }
 
 // Deregisters fd when the `AsyncSource` object get dropped.
+#[cfg(not(feature = "ffrt"))]
 impl<E: Source> Drop for AsyncSource<E> {
     fn drop(&mut self) {
         if let Some(mut io) = self.io.take() {
-            #[cfg(not(feature = "ffrt"))]
             let inner = {
                 let context = get_current_ctx().expect("AsyncSource drop get_current_ctx() fail");
                 match context {
@@ -232,9 +250,19 @@ impl<E: Source> Drop for AsyncSource<E> {
                     WorkerContext::Curr(ctx) => &ctx.handle,
                 }
             };
-            #[cfg(feature = "ffrt")]
-            let inner = crate::net::Handle::get_ref();
             let _ = inner.deregister_source(&mut io);
+        }
+    }
+}
+
+// Deregisters fd when the `AsyncSource` object get dropped.
+#[cfg(feature = "ffrt")]
+impl<E: Source> Drop for AsyncSource<E> {
+    fn drop(&mut self) {
+        if let Some(io) = self.io.take() {
+            unsafe {
+                ylong_ffrt::ffrt_poller_deregister(io.as_raw_fd() as libc::c_int);
+            }
         }
     }
 }

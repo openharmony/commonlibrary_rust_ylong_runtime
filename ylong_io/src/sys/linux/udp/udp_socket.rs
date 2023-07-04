@@ -13,6 +13,7 @@
 
 use super::UdpSock;
 use crate::{Interest, Selector, Source, Token};
+use crate::source::Fd;
 use std::fmt::Formatter;
 use std::net::SocketAddr;
 use std::os::unix::io::AsRawFd;
@@ -398,48 +399,37 @@ impl fmt::Debug for ConnectedUdpSocket {
 }
 
 impl Source for UdpSocket {
-    fn register(
-        &mut self,
-        selector: &Selector,
-        token: Token,
-        interests: Interest,
-    ) -> io::Result<()> {
-        selector.register(self.inner.as_raw_fd(), token, interests)
+    fn register(&mut self, selector: &Selector, token: Token, interests: Interest) -> io::Result<()> {
+        selector.register(self.as_raw_fd(), token, interests)
     }
 
-    fn reregister(
-        &mut self,
-        selector: &Selector,
-        token: Token,
-        interests: Interest,
-    ) -> io::Result<()> {
-        selector.reregister(self.inner.as_raw_fd(), token, interests)
+    fn reregister(&mut self, selector: &Selector, token: Token, interests: Interest) -> io::Result<()> {
+        selector.reregister(self.as_raw_fd(), token, interests)
     }
 
     fn deregister(&mut self, selector: &Selector) -> io::Result<()> {
-        selector.deregister(self.inner.as_raw_fd())
+        selector.deregister(self.as_raw_fd())
+    }
+
+    fn as_raw_fd(&self) -> Fd {
+        self.inner.as_raw_fd()
     }
 }
+
 impl Source for ConnectedUdpSocket {
-    fn register(
-        &mut self,
-        selector: &Selector,
-        token: Token,
-        interests: Interest,
-    ) -> io::Result<()> {
-        selector.register(self.inner.as_raw_fd(), token, interests)
+    fn register(&mut self, selector: &Selector, token: Token, interests: Interest) -> io::Result<()> {
+        selector.register(self.as_raw_fd(), token, interests)
     }
 
-    fn reregister(
-        &mut self,
-        selector: &Selector,
-        token: Token,
-        interests: Interest,
-    ) -> io::Result<()> {
-        selector.reregister(self.inner.as_raw_fd(), token, interests)
+    fn reregister(&mut self, selector: &Selector, token: Token, interests: Interest) -> io::Result<()> {
+        selector.reregister(self.as_raw_fd(), token, interests)
     }
 
     fn deregister(&mut self, selector: &Selector) -> io::Result<()> {
-        selector.deregister(self.inner.as_raw_fd())
+        selector.deregister(self.as_raw_fd())
+    }
+
+    fn as_raw_fd(&self) -> Fd {
+        self.inner.as_raw_fd()
     }
 }

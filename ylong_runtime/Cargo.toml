@@ -28,6 +28,7 @@ ffrt_full = [
     "time",
     "fs",
     "ffrt",
+    "macros"
 ]
 
 # This feature controls the executor type runs below the runtime.

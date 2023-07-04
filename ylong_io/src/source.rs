@@ -14,6 +14,12 @@
 use crate::{Interest, Selector, Token};
 use std::io;
 
+#[cfg(target_os = "linux")]
+pub(crate) type Fd = i32;
+
+#[cfg(target_os = "windows")]
+pub(crate) type Fd = std::os::windows::io::RawSocket;
+
 /// Source Trait that every connection requires async polling in [`crate::Poll`] needs to implement.
 /// [`crate::Poll`] will asynchronously poll out connections, and handle it.
 pub trait Source {
@@ -35,4 +41,7 @@ pub trait Source {
 
     /// Deregisters the connection from [`crate::Poll`].
     fn deregister(&mut self, selector: &Selector) -> io::Result<()>;
+
+    /// Returns the raw fd of this IO.
+    fn as_raw_fd(&self) -> Fd;
 }

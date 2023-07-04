@@ -11,19 +11,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::cfg_ffrt;
+use crate::macros::{cfg_ffrt, cfg_not_ffrt};
 use crate::net::{Ready, ScheduleIO, Tick};
 use crate::util::bit::{Bit, Mask};
 use crate::util::slab::{Address, Ref, Slab};
 use std::io;
 use std::ops::Deref;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
-use ylong_io::{EventTrait, Events, Interest, Poll, Source, Token};
+use ylong_io::{Interest, Source, Token};
+
+cfg_ffrt! {
+    use libc::{c_void, c_int, c_uint};
+}
+
+cfg_not_ffrt! {
+    use ylong_io::{Events, Poll};
+    use std::time::Duration;
+
+    const EVENTS_MAX_CAPACITY: usize = 1024;
+    const WAKE_TOKEN: Token = Token(1 << 31);
+}
 
 const DRIVER_TICK_INIT: u8 = 0;
 
-const EVENTS_MAX_CAPACITY: usize = 1024;
 
 // Token structure
 // | reserved | generation | address |
@@ -33,21 +43,21 @@ const EVENTS_MAX_CAPACITY: usize = 1024;
 const GENERATION: Mask = Mask::new(7, 24);
 const ADDRESS: Mask = Mask::new(24, 0);
 
-const WAKE_TOKEN: Token = Token(1 << 31);
-
 /// IO reactor that listens to fd events and wakes corresponding tasks.
 pub(crate) struct Driver {
     /// Stores every IO source that is ready
     resources: Option<Slab<ScheduleIO>>,
 
-    /// Stores IO events that need to be handled
-    events: Option<Events>,
-
     /// Counter used for slab struct to compact
     tick: u8,
 
     /// Used for epoll
+    #[cfg(not(feature = "ylong_ffrt"))]
     poll: Arc<Poll>,
+
+    /// Stores IO events that need to be handled
+    #[cfg(not(feature = "ylong_ffrt"))]
+    events: Option<Events>,
 }
 
 pub(crate) struct Handle {
@@ -58,9 +68,8 @@ pub(crate) struct Handle {
 
 cfg_ffrt!(
     use std::mem::MaybeUninit;
-    static mut DRIVER: MaybeUninit<Mutex<Driver>> = MaybeUninit::uninit();
+    static mut DRIVER: MaybeUninit<Driver> = MaybeUninit::uninit();
     static mut HANDLE: MaybeUninit<Handle> = MaybeUninit::uninit();
-    use std::sync::MutexGuard;
 );
 
 #[cfg(feature = "ffrt")]
@@ -108,11 +117,40 @@ pub(crate) struct Inner {
     allocator: Slab<ScheduleIO>,
 
     /// Used to register fd
+    #[cfg(not(feature = "ylong_ffrt"))]
     registry: Arc<Poll>,
 }
 
 impl Driver {
-    #[cfg(not(feature = "ffrt"))]
+    /// IO dispatch function. Wakes the task through the token getting from the epoll events.
+    fn dispatch(&mut self, token: Token, ready: Ready) {
+        let addr_bit = Bit::from_usize(token.0);
+        let addr = addr_bit.get_by_mask(ADDRESS);
+
+        let io = match self
+            .resources
+            .as_mut()
+            .unwrap()
+            .get(Address::from_usize(addr))
+        {
+            Some(io) => io,
+            None => return,
+        };
+
+        if io
+            .set_readiness(Some(token.0), Tick::Set(self.tick), |curr| curr | ready)
+            .is_err()
+        {
+            return;
+        }
+
+        // Wake the io task
+        io.wake(ready)
+    }
+}
+
+#[cfg(not(feature = "ffrt"))]
+impl Driver {
     pub(crate) fn initialize() -> (Arc<Handle>, Arc<Mutex<Driver>>) {
         let poll = Poll::new().unwrap();
         let waker =
@@ -140,44 +178,13 @@ impl Driver {
         )
     }
 
-    #[cfg(feature = "ffrt")]
-    fn initialize() {
-        static ONCE: std::sync::Once = std::sync::Once::new();
-        ONCE.call_once(|| unsafe {
-            let poll = Poll::new().unwrap();
-            let arc_poll = Arc::new(poll);
-            let events = Events::with_capacity(EVENTS_MAX_CAPACITY);
-            let slab = Slab::new();
-            let allocator = slab.handle();
-            let inner = Arc::new(Inner {
-                resources: Mutex::new(None),
-                allocator,
-                registry: arc_poll.clone(),
-            });
-
-            let driver = Driver {
-                resources: Some(slab),
-                events: Some(events),
-                tick: DRIVER_TICK_INIT,
-                poll: arc_poll,
-            };
-            HANDLE = MaybeUninit::new(Handle::new(inner));
-            DRIVER = MaybeUninit::new(Mutex::new(driver));
-        });
-    }
-
-    /// Initializes the single instance IO driver.
-    #[cfg(feature = "ffrt")]
-    pub(crate) fn try_get_mut() -> Option<MutexGuard<'static, Driver>> {
-        Driver::initialize();
-        unsafe { &*DRIVER.as_ptr() }.try_lock().ok()
-    }
-
     /// Runs the driver. This method will blocking wait for fd events to come in and then
     /// wakes the corresponding tasks through the events.
     ///
     /// In linux environment, the driver uses epoll.
     pub(crate) fn drive(&mut self, time_out: Option<Duration>) -> io::Result<bool> {
+        use ylong_io::EventTrait;
+
         // For every 255 ticks, cleans the redundant entries inside the slab
         const COMPACT_INTERVAL: u8 = 255;
 
@@ -217,42 +224,72 @@ impl Driver {
         self.events = Some(events);
         Ok(has_events)
     }
+}
 
-    /// IO dispatch function. Wakes the task through the token getting from the epoll events.
-    fn dispatch(&mut self, token: Token, ready: Ready) {
-        let addr_bit = Bit::from_usize(token.0);
-        let addr = addr_bit.get_by_mask(ADDRESS);
+#[cfg(feature = "ffrt")]
+impl Driver {
+    fn initialize() {
+        static ONCE: std::sync::Once = std::sync::Once::new();
+        ONCE.call_once(|| unsafe {
+            let slab = Slab::new();
+            let allocator = slab.handle();
+            let inner = Arc::new(Inner {
+                resources: Mutex::new(None),
+                allocator,
+            });
 
-        let io = match self
-            .resources
-            .as_mut()
-            .unwrap()
-            .get(Address::from_usize(addr))
-        {
-            Some(io) => io,
-            None => return,
-        };
-
-        if io
-            .set_readiness(Some(token.0), Tick::Set(self.tick), |curr| curr | ready)
-            .is_err()
-        {
-            return;
-        }
-
-        // Wake the io task
-        io.wake(ready)
+            let driver = Driver {
+                resources: Some(slab),
+                tick: DRIVER_TICK_INIT,
+            };
+            HANDLE = MaybeUninit::new(Handle::new(inner));
+            DRIVER = MaybeUninit::new(driver);
+        });
     }
+
+    /// Initializes the single instance IO driver.
+    pub(crate) fn get_mut_ref() -> &'static mut Driver {
+        Driver::initialize();
+        unsafe {
+            &mut *DRIVER.as_mut_ptr()
+        }
+    }
+}
+
+#[cfg(feature = "ffrt")]
+extern "C" fn ffrt_dispatch_event(data: *const c_void, ready: c_uint) {
+    const COMPACT_INTERVAL: u8 = 255;
+
+    let driver = Driver::get_mut_ref();
+    driver.tick = driver.tick.wrapping_add(1);
+    if driver.tick == COMPACT_INTERVAL {
+        unsafe {
+            driver.resources.as_mut().unwrap().compact();
+        }
+    }
+
+    let token = Token::from_usize(data as usize);
+    let ready = crate::net::ready::from_event_inner(ready as i32);
+    driver.dispatch(token, ready);
 }
 
 impl Inner {
     /// Registers the fd of the `Source` object
+    #[cfg(not(feature = "ffrt"))]
     pub(crate) fn register_source(
         &self,
         io: &mut impl Source,
         interest: Interest,
     ) -> io::Result<Ref<ScheduleIO>> {
         // Allocates space for the slab. If reaches maximum capacity, error will be returned
+        let (schedule_io, token) = self.allocate_schedule_io_pair()?;
+
+        self.registry
+            .register(io, Token::from_usize(token), interest)?;
+        Ok(schedule_io)
+    }
+
+    fn allocate_schedule_io_pair(&self) -> io::Result<(Ref<ScheduleIO>, usize)> {
         let (addr, schedule_io) = unsafe {
             self.allocator.allocate().ok_or_else(|| {
                 io::Error::new(
@@ -261,19 +298,52 @@ impl Inner {
                 )
             })?
         };
-
-        // Initializes the token for finding the task in the slab.
         let mut base = Bit::from_usize(0);
         base.set_by_mask(GENERATION, schedule_io.generation());
         base.set_by_mask(ADDRESS, addr.as_usize());
-        let token = base.as_usize();
+        Ok((schedule_io, base.as_usize()))
+    }
 
-        self.registry
-            .register(io, Token::from_usize(token), interest)?;
+    /// Registers the fd of the `Source` object
+    #[cfg(feature = "ffrt")]
+    pub(crate) fn register_source(
+        &self,
+        io: &mut impl Source,
+        interest: Interest,
+    ) -> io::Result<Ref<ScheduleIO>> {
+        // Allocates space for the slab. If reaches maximum capacity, error will be returned
+        let (schedule_io, token) = self.allocate_schedule_io_pair()?;
+
+        fn interests_to_io_event(interests: Interest) -> c_uint {
+            let mut io_event = libc::EPOLLET as u32;
+
+            if interests.is_readable() {
+                io_event |= libc::EPOLLIN as u32;
+                io_event |= libc::EPOLLRDHUP as u32;
+            }
+
+            if interests.is_writable() {
+                io_event |= libc::EPOLLOUT as u32;
+            }
+
+            io_event as c_uint
+        }
+
+        let event = interests_to_io_event(interest);
+        unsafe {
+            ylong_ffrt::ffrt_poller_register(
+                io.as_raw_fd() as c_int,
+                event,
+                token as *const c_void,
+                ffrt_dispatch_event,
+            );
+        }
+
         Ok(schedule_io)
     }
 
     /// Deregisters the fd of the `Source` object.
+    #[cfg(not(feature = "ffrt"))]
     pub(crate) fn deregister_source(&self, io: &mut impl Source) -> io::Result<()> {
         self.registry.deregister(io)
     }

@@ -14,6 +14,7 @@
 use crate::sys::windows::udp::UdpSock;
 use crate::sys::NetState;
 use crate::{Interest, Selector, Source, Token};
+use crate::source::Fd;
 use std::fmt::Formatter;
 use std::net::SocketAddr;
 use std::os::windows::io::AsRawSocket;
@@ -291,6 +292,10 @@ impl Source for UdpSocket {
     fn deregister(&mut self, _selector: &Selector) -> io::Result<()> {
         self.state.deregister()
     }
+
+    fn as_raw_fd(&self) -> Fd {
+        self.inner.as_raw_socket()
+    }
 }
 
 impl Source for ConnectedUdpSocket {
@@ -315,5 +320,9 @@ impl Source for ConnectedUdpSocket {
 
     fn deregister(&mut self, _selector: &Selector) -> io::Result<()> {
         self.state.deregister()
+    }
+
+    fn as_raw_fd(&self) -> Fd {
+        self.inner.as_raw_socket()
     }
 }

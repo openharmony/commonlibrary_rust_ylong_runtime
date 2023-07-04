@@ -11,8 +11,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(all(feature = "net", feature = "ffrt"))]
-use crate::net::Driver as NetDriver;
 #[cfg(feature = "time")]
 use crate::time::Driver as TimerDriver;
 use std::cell::RefCell;
@@ -60,20 +58,10 @@ impl NetLooper {
 
     fn run(&self) {
         loop {
-            // run io driver
-            // For ffrt feature, only monitor thread would access the net-driver,
-            // therefore this unwrap is safe.
-            #[cfg(all(feature = "net", feature = "ffrt"))]
-            NetDriver::try_get_mut()
-                .expect("get io driver failed")
-                .drive(Some(NET_POLL_INTERVAL_TIME))
-                .expect("io driver running failed");
-
             // run time driver
             #[cfg(feature = "time")]
             TimerDriver::get_ref().run();
 
-            #[cfg(not(feature = "ffrt"))]
             thread::sleep(NET_POLL_INTERVAL_TIME);
         }
     }

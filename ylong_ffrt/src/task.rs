@@ -136,13 +136,13 @@ impl FfrtTaskAttr {
     }
 }
 
-impl Drop for FfrtTaskAttr {
-    fn drop(&mut self) {
-        unsafe {
-            ffrt_task_attr_destroy(self as _);
-        }
-    }
-}
+// impl Drop for FfrtTaskAttr {
+//     fn drop(&mut self) {
+//         unsafe {
+//             ffrt_task_attr_destroy(self as _);
+//         }
+//     }
+// }
 
 #[link(name = "ffrt")]
 // task.h

@@ -33,7 +33,6 @@ use std::io;
 use std::sync::Arc;
 
 pub(crate) use crate::builder::common_builder::CommonBuilder;
-use crate::cfg_not_ffrt;
 use crate::error::ScheduleError;
 use crate::executor::blocking_pool::BlockPoolSpawner;
 #[cfg(any(feature = "net", feature = "time"))]
@@ -43,7 +42,7 @@ pub use current_thread_builder::CurrentThreadBuilder;
 pub use multi_thread_builder::MultiThreadBuilder;
 #[cfg(any(feature = "net", feature = "time"))]
 use std::sync::Once;
-cfg_not_ffrt!(
+crate::macros::cfg_not_ffrt!(
     use crate::executor::async_pool::AsyncPoolSpawner;
 );
 
