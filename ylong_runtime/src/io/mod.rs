@@ -23,6 +23,10 @@ mod buffered;
 mod read_buf;
 mod read_task;
 mod seek_task;
+mod stderr;
+mod stdin;
+mod stdio;
+mod stdout;
 mod write_task;
 
 pub use async_buf_read::{AsyncBufRead, AsyncBufReadExt};
@@ -32,7 +36,10 @@ pub use async_write::{AsyncWrite, AsyncWriteExt};
 pub use buffered::{AsyncBufReader, AsyncBufWriter};
 pub use read_buf::ReadBuf;
 pub use read_task::ReadTask;
-pub use write_task::WriteTask;
+pub use stderr::{stderr, Stderr};
+pub use stdin::{stdin, Stdin};
+pub(crate) use stdio::State;
+pub use stdout::{stdout, Stdout};
 
 macro_rules! poll_ready {
     ($e:expr) => {
