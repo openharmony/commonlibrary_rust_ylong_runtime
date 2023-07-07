@@ -11,14 +11,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{fmt, io, net};
+use crate::sys::windows::tcp::TcpSocket;
+use crate::sys::NetState;
+use crate::{Interest, Selector, Source, Token};
 use std::fmt::Formatter;
 use std::io::{IoSlice, IoSliceMut, Read, Write};
 use std::net::{Shutdown, SocketAddr};
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
-use crate::{Interest, Selector, Source, Token};
-use crate::sys::{ NetState};
-use crate::sys::windows::tcp::TcpSocket;
+use std::{fmt, io, net};
 
 /// A non-blocking TCP Stream between a local socket and a remote socket.
 pub struct TcpStream {
@@ -41,7 +41,7 @@ impl TcpStream {
         let socket = TcpSocket::new_socket(addr)?;
         let stream = unsafe { TcpStream::from_raw_socket(socket.as_raw_socket() as _) };
 
-        socket.connect( addr)?;
+        socket.connect(addr)?;
         Ok(stream)
     }
 
@@ -276,11 +276,22 @@ impl FromRawSocket for TcpStream {
 }
 
 impl Source for TcpStream {
-    fn register(&mut self, selector: &Selector, token: Token, interests: Interest) -> io::Result<()> {
-        self.state.register(selector, token, interests, self.as_raw_socket())
+    fn register(
+        &mut self,
+        selector: &Selector,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
+        self.state
+            .register(selector, token, interests, self.as_raw_socket())
     }
 
-    fn reregister(&mut self, selector: &Selector, token: Token, interests: Interest) -> io::Result<()> {
+    fn reregister(
+        &mut self,
+        selector: &Selector,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
         self.state.reregister(selector, token, interests)
     }
 

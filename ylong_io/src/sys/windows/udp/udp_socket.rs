@@ -11,13 +11,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{fmt, io, net};
+use crate::sys::windows::udp::UdpSock;
+use crate::sys::NetState;
+use crate::{Interest, Selector, Source, Token};
 use std::fmt::Formatter;
 use std::net::SocketAddr;
 use std::os::windows::io::AsRawSocket;
-use crate::{Interest, Selector, Source, Token};
-use crate::sys::{NetState};
-use crate::sys::windows::udp::UdpSock;
+use std::{fmt, io, net};
 
 /// A UDP socket.
 pub struct UdpSocket {
@@ -100,7 +100,8 @@ impl UdpSocket {
     /// socket.send_to(&[0; 10], receiver_addr).expect("Send Socket Failed!");
     /// ```
     pub fn send_to(&self, buf: &[u8], target: SocketAddr) -> io::Result<usize> {
-        self.state.try_io(|inner|inner.send_to(buf, target), &self.inner)
+        self.state
+            .try_io(|inner| inner.send_to(buf, target), &self.inner)
     }
 
     /// Receives a single datagram message on the socket. On success, returns the number of bytes read and the origin.
@@ -119,7 +120,7 @@ impl UdpSocket {
     /// let filled_buf = &mut buf[..number_of_bytes];
     /// ```
     pub fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
-        self.state.try_io(|inner|inner.recv_from(buf), &self.inner)
+        self.state.try_io(|inner| inner.recv_from(buf), &self.inner)
     }
 
     /// Sets the value of the SO_BROADCAST option for this socket.
@@ -229,7 +230,7 @@ impl ConnectedUdpSocket {
     /// connected_sender.send(&[0, 1, 2]).expect("couldn't send message");
     /// ```
     pub fn send(&self, buf: &[u8]) -> io::Result<usize> {
-        self.state.try_io(|inner|inner.send(buf), &self.inner)
+        self.state.try_io(|inner| inner.send(buf), &self.inner)
     }
 
     /// Receives a single datagram message on the socket from the remote address to which it is connected. On success, returns the number of bytes read.
@@ -251,12 +252,14 @@ impl ConnectedUdpSocket {
     /// }
     /// ```
     pub fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
-        self.state.try_io(|inner|inner.recv(buf), &self.inner)
+        self.state.try_io(|inner| inner.recv(buf), &self.inner)
     }
 }
 
 impl fmt::Debug for UdpSocket {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result { self.inner.fmt(f) }
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        self.inner.fmt(f)
+    }
 }
 
 impl fmt::Debug for ConnectedUdpSocket {
@@ -266,11 +269,22 @@ impl fmt::Debug for ConnectedUdpSocket {
 }
 
 impl Source for UdpSocket {
-    fn register(&mut self, selector: &Selector, token: Token, interests: Interest) -> io::Result<()> {
-        self.state.register(selector, token, interests, self.inner.as_raw_socket())
+    fn register(
+        &mut self,
+        selector: &Selector,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
+        self.state
+            .register(selector, token, interests, self.inner.as_raw_socket())
     }
 
-    fn reregister(&mut self, selector: &Selector, token: Token, interests: Interest) -> io::Result<()> {
+    fn reregister(
+        &mut self,
+        selector: &Selector,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
         self.state.reregister(selector, token, interests)
     }
 
@@ -280,11 +294,22 @@ impl Source for UdpSocket {
 }
 
 impl Source for ConnectedUdpSocket {
-    fn register(&mut self, selector: &Selector, token: Token, interests: Interest) -> io::Result<()> {
-        self.state.register(selector, token, interests, self.inner.as_raw_socket())
+    fn register(
+        &mut self,
+        selector: &Selector,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
+        self.state
+            .register(selector, token, interests, self.inner.as_raw_socket())
     }
 
-    fn reregister(&mut self, selector: &Selector, token: Token, interests: Interest) -> io::Result<()> {
+    fn reregister(
+        &mut self,
+        selector: &Selector,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
         self.state.reregister(selector, token, interests)
     }
 

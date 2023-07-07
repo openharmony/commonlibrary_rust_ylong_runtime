@@ -15,4 +15,4 @@ mod socket;
 pub(crate) use socket::UdpSock;
 
 mod udp_socket;
-pub use udp_socket::{UdpSocket, ConnectedUdpSocket};
+pub use udp_socket::{ConnectedUdpSocket, UdpSocket};

@@ -13,13 +13,13 @@
 
 use crate::cfg_ffrt;
 use crate::net::{Ready, ScheduleIO, Tick};
+use crate::util::bit::{Bit, Mask};
+use crate::util::slab::{Address, Ref, Slab};
 use std::io;
 use std::ops::Deref;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use crate::util::bit::{Bit, Mask};
 use ylong_io::{EventTrait, Events, Interest, Poll, Source, Token};
-use crate::util::slab::{Address, Ref, Slab};
 
 const DRIVER_TICK_INIT: u8 = 0;
 
@@ -66,26 +66,19 @@ cfg_ffrt!(
 #[cfg(feature = "ffrt")]
 impl Handle {
     fn new(inner: Arc<Inner>) -> Self {
-        Handle {
-            inner,
-        }
+        Handle { inner }
     }
 
     pub(crate) fn get_ref() -> &'static Self {
         Driver::initialize();
-        unsafe {
-            &*HANDLE.as_ptr()
-        }
+        unsafe { &*HANDLE.as_ptr() }
     }
 }
 
 #[cfg(not(feature = "ffrt"))]
 impl Handle {
     fn new(inner: Arc<Inner>, waker: ylong_io::Waker) -> Self {
-        Handle {
-            inner,
-            waker,
-        }
+        Handle { inner, waker }
     }
 
     pub(crate) fn wake(&self) {
@@ -121,27 +114,30 @@ pub(crate) struct Inner {
 impl Driver {
     #[cfg(not(feature = "ffrt"))]
     pub(crate) fn initialize() -> (Arc<Handle>, Arc<Mutex<Driver>>) {
-            let poll = Poll::new().unwrap();
-            let waker = ylong_io::Waker::new(&poll, WAKE_TOKEN)
-                .expect("ylong_io waker construction failed");
-            let arc_poll = Arc::new(poll);
-            let events = Events::with_capacity(EVENTS_MAX_CAPACITY);
-            let slab = Slab::new();
-            let allocator = slab.handle();
-            let inner = Arc::new(Inner {
-                resources: Mutex::new(None),
-                allocator,
-                registry: arc_poll.clone(),
-            });
+        let poll = Poll::new().unwrap();
+        let waker =
+            ylong_io::Waker::new(&poll, WAKE_TOKEN).expect("ylong_io waker construction failed");
+        let arc_poll = Arc::new(poll);
+        let events = Events::with_capacity(EVENTS_MAX_CAPACITY);
+        let slab = Slab::new();
+        let allocator = slab.handle();
+        let inner = Arc::new(Inner {
+            resources: Mutex::new(None),
+            allocator,
+            registry: arc_poll.clone(),
+        });
 
-            let driver = Driver {
-                resources: Some(slab),
-                events: Some(events),
-                tick: DRIVER_TICK_INIT,
-                poll: arc_poll,
-            };
-            
-        (Arc::new(Handle::new(inner, waker)), Arc::new(Mutex::new(driver)))
+        let driver = Driver {
+            resources: Some(slab),
+            events: Some(events),
+            tick: DRIVER_TICK_INIT,
+            poll: arc_poll,
+        };
+
+        (
+            Arc::new(Handle::new(inner, waker)),
+            Arc::new(Mutex::new(driver)),
+        )
     }
 
     #[cfg(feature = "ffrt")]
@@ -172,11 +168,9 @@ impl Driver {
 
     /// Initializes the single instance IO driver.
     #[cfg(feature = "ffrt")]
-    pub(crate) fn try_get_mut() -> Option<MutexGuard<'static, Driver>>{
+    pub(crate) fn try_get_mut() -> Option<MutexGuard<'static, Driver>> {
         Driver::initialize();
-        unsafe {
-            & *DRIVER.as_ptr()
-        }.try_lock().ok()
+        unsafe { &*DRIVER.as_ptr() }.try_lock().ok()
     }
 
     /// Runs the driver. This method will blocking wait for fd events to come in and then
@@ -208,7 +202,6 @@ impl Driver {
             Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {}
             Err(err) => return Err(err),
         }
-
 
         let has_events = !events.is_empty();
 

@@ -11,15 +11,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{io, mem, net};
-use std::net::SocketAddr;
-use libc::{c_int, SOCK_DGRAM, AF_INET, AF_INET6, SOCK_CLOEXEC, SOCK_NONBLOCK};
-use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 use super::super::socket_addr::socket_addr_trans;
 use crate::UdpSocket;
+use libc::{c_int, AF_INET, AF_INET6, SOCK_CLOEXEC, SOCK_DGRAM, SOCK_NONBLOCK};
+use std::net::SocketAddr;
+use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
+use std::{io, mem, net};
 
 pub(crate) struct UdpSock {
-    socket: c_int
+    socket: c_int,
 }
 
 impl UdpSock {
@@ -37,18 +37,14 @@ impl UdpSock {
             Ok(socket) => Ok(UdpSock {
                 socket: socket as c_int,
             }),
-            Err(err) => {
-                Err(err)
-            }
+            Err(err) => Err(err),
         }
     }
 
     pub(crate) fn bind(self, addr: SocketAddr) -> io::Result<UdpSocket> {
         let (raw_addr, addr_length) = socket_addr_trans(&addr);
         match syscall!(bind(self.socket, raw_addr.as_ptr(), addr_length)) {
-            Err(err) if err.raw_os_error() != Some(libc::EINPROGRESS) => {
-                Err(err)
-            }
+            Err(err) if err.raw_os_error() != Some(libc::EINPROGRESS) => Err(err),
             _ => {
                 let udp_socket = Ok(UdpSocket {
                     inner: unsafe { net::UdpSocket::from_raw_fd(self.socket) },

@@ -11,14 +11,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::io::ReadBuf;
+use crate::net::AsyncSource;
 use std::fmt::{Debug, Formatter};
 use std::io;
+use std::mem::MaybeUninit;
 use std::net::SocketAddr;
 use std::task::{Context, Poll};
 use ylong_io::Interest;
-use crate::io::ReadBuf;
-use crate::net::AsyncSource;
-use std::mem::MaybeUninit;
 
 /// Asynchronous UdpSocket.
 ///
@@ -138,7 +138,7 @@ impl UdpSocket {
         let socket = ylong_io::UdpSocket::bind(local_addr)?;
         let connected_socket = match socket.connect(addr) {
             Ok(socket) => socket,
-            Err(e) => return Err(e)
+            Err(e) => return Err(e),
         };
         ConnectedUdpSocket::new(connected_socket)
     }
@@ -254,7 +254,8 @@ impl UdpSocket {
         buf: &[u8],
         target: SocketAddr,
     ) -> Poll<io::Result<usize>> {
-        self.source.poll_write_io(cx, || self.source.send_to(buf, target))
+        self.source
+            .poll_write_io(cx, || self.source.send_to(buf, target))
     }
 
     /// Receives a single datagram message on the socket. On success, returns the number of bytes
@@ -283,8 +284,8 @@ impl UdpSocket {
     /// }
     /// ```
     pub async fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
-        self.source.
-            async_process(Interest::READABLE, || self.source.recv_from(buf))
+        self.source
+            .async_process(Interest::READABLE, || self.source.recv_from(buf))
             .await
     }
 
@@ -586,7 +587,6 @@ impl ConnectedUdpSocket {
             .try_io(Interest::WRITABLE, || self.source.send(buf))
     }
 
-
     /// Attempts to send data on the socket to the remote address to which it was previously connected.
     /// The connect method will connect this socket to a remote address.
     /// This method will fail if the socket is not connected.
@@ -823,9 +823,9 @@ impl ConnectedUdpSocket {
 
 #[cfg(test)]
 mod tests {
+    use crate::futures::poll_fn;
     use crate::io::ReadBuf;
     use crate::net::UdpSocket;
-    use crate::futures::poll_fn;
     use crate::{block_on, spawn};
 
     /// UT test for `poll_send()` and `poll_recv()`.
@@ -960,7 +960,9 @@ mod tests {
                     panic!("Bind Socket Failed {}", e);
                 }
             };
-            broadcast_socket.set_broadcast(true).expect("set_broadcast failed");
+            broadcast_socket
+                .set_broadcast(true)
+                .expect("set_broadcast failed");
 
             assert!(broadcast_socket.broadcast().expect("get broadcast failed"));
         });
@@ -1026,7 +1028,10 @@ mod tests {
                     panic!("Connect Socket Failed {}", e);
                 }
             };
-            assert_eq!(connected_sock.peer_addr().expect("peer_addr failed"), peer_addr);
+            assert_eq!(
+                connected_sock.peer_addr().expect("peer_addr failed"),
+                peer_addr
+            );
         });
         block_on(handle).expect("block_on failed");
     }

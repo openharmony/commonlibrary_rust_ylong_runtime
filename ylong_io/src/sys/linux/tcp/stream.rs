@@ -12,9 +12,9 @@
 // limitations under the License.
 
 use super::TcpSocket;
-use crate::{Interest, Source, Selector, Token};
+use crate::{Interest, Selector, Source, Token};
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
-use std::net::{self, SocketAddr, Shutdown};
+use std::net::{self, Shutdown, SocketAddr};
 use std::os::unix::io::AsRawFd;
 
 /// A non-blocking TCP Stream between a local socket and a remote socket.

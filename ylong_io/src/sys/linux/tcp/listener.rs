@@ -12,7 +12,7 @@
 // limitations under the License.
 
 use super::{TcpSocket, TcpStream};
-use crate::{Interest, Source, Selector, Token};
+use crate::{Interest, Selector, Source, Token};
 use libc::{
     c_int, sockaddr_in, sockaddr_in6, sockaddr_storage, socklen_t, SOCK_CLOEXEC, SOCK_NONBLOCK,
 };

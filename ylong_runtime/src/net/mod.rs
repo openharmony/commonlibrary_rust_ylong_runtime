@@ -13,15 +13,15 @@
 
 //! Asynchronous TCP/UDP binding for `ylong_runtime`
 
-pub(crate) use driver::{Handle, Driver};
+pub(crate) use crate::schedule_io::{ScheduleIO, Tick};
+pub(crate) use driver::{Driver, Handle};
 pub(crate) use linked_list::{LinkedList, Node};
 pub(crate) use ready::{Ready, ReadyEvent};
 pub use sys::{Listener, Stream};
-pub(crate) use crate::schedule_io::{ScheduleIO, Tick};
 pub(crate) mod async_source;
 pub(crate) mod sys;
-pub(crate) use async_source::AsyncSource;
 use crate::macros::cfg_io;
+pub(crate) use async_source::AsyncSource;
 
 pub(crate) mod driver;
 mod linked_list;

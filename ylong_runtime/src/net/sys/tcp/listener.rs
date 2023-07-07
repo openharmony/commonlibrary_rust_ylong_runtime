@@ -11,10 +11,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use ylong_io::Interest;
+use crate::net::{AsyncSource, TcpStream};
 use std::io;
 use std::net::SocketAddr;
-use crate::net::{AsyncSource, TcpStream};
+use ylong_io::Interest;
 
 /// An asynchronous version of [`std::net::TcpListener`]. Provides async bind/accept methods.
 ///
@@ -78,10 +78,7 @@ impl TcpListener {
     pub async fn accept(&self) -> io::Result<(TcpStream, SocketAddr)> {
         let (stream, addr) = self
             .source
-            .async_process(
-                Interest::READABLE,
-                || self.source.accept()
-            )
+            .async_process(Interest::READABLE, || self.source.accept())
             .await?;
         let stream = TcpStream::new(stream)?;
         Ok((stream, addr))

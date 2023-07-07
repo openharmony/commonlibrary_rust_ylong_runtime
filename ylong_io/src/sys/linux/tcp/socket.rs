@@ -11,16 +11,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use super::super::socket_addr::socket_addr_trans;
 use super::{TcpListener, TcpStream};
 use libc::{
-    c_int, c_void, socklen_t, AF_INET, AF_INET6, SOCK_CLOEXEC, SOCK_NONBLOCK,
-    SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR,
+    c_int, c_void, socklen_t, AF_INET, AF_INET6, SOCK_CLOEXEC, SOCK_NONBLOCK, SOCK_STREAM,
+    SOL_SOCKET, SO_REUSEADDR,
 };
 use std::io;
 use std::mem::{self, size_of};
 use std::net::{self, SocketAddr};
 use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
-use super::super::socket_addr::socket_addr_trans;
 
 pub(crate) struct TcpSocket {
     socket: c_int,
@@ -41,9 +41,7 @@ impl TcpSocket {
             Ok(socket) => Ok(TcpSocket {
                 socket: socket as c_int,
             }),
-            Err(err) => {
-                Err(err)
-            }
+            Err(err) => Err(err),
         }
     }
 
@@ -57,9 +55,7 @@ impl TcpSocket {
             &set_value as *const c_int as *const c_void,
             size_of::<c_int>() as socklen_t
         )) {
-            Err(err) => {
-                Err(err)
-            }
+            Err(err) => Err(err),
             Ok(_) => Ok(()),
         }
     }
@@ -67,9 +63,7 @@ impl TcpSocket {
     pub(crate) fn bind(&self, addr: SocketAddr) -> io::Result<()> {
         let (raw_addr, addr_length) = socket_addr_trans(&addr);
         match syscall!(bind(self.socket, raw_addr.as_ptr(), addr_length)) {
-            Err(err) => {
-                Err(err)
-            }
+            Err(err) => Err(err),
             Ok(_) => Ok(()),
         }
     }
@@ -89,9 +83,7 @@ impl TcpSocket {
     pub(crate) fn connect(self, addr: SocketAddr) -> io::Result<TcpStream> {
         let (raw_addr, addr_length) = socket_addr_trans(&addr);
         match syscall!(connect(self.socket, raw_addr.as_ptr(), addr_length)) {
-            Err(err) if err.raw_os_error() != Some(libc::EINPROGRESS) => {
-                Err(err)
-            }
+            Err(err) if err.raw_os_error() != Some(libc::EINPROGRESS) => Err(err),
             _ => {
                 let tcp_stream = Ok(TcpStream {
                     inner: unsafe { net::TcpStream::from_raw_fd(self.socket) },

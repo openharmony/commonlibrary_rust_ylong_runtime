@@ -11,6 +11,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::futures::poll_fn;
+use crate::net::{LinkedList, Node, Ready, ReadyEvent};
+use crate::util::bit::{Bit, Mask};
+use crate::util::slab::Entry;
 use std::cell::UnsafeCell;
 use std::future::Future;
 use std::io;
@@ -21,11 +25,7 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Release, SeqCst};
 use std::sync::Mutex;
 use std::task::{Context, Poll, Waker};
-use crate::util::bit::{Bit, Mask};
 use ylong_io::Interest;
-use crate::util::slab::Entry;
-use crate::net::{LinkedList, Node, Ready, ReadyEvent};
-use crate::futures::poll_fn;
 
 const GENERATION: Mask = Mask::new(7, 24);
 pub(crate) const DRIVER_TICK: Mask = Mask::new(8, 16);
@@ -142,10 +142,7 @@ impl ScheduleIO {
         let mut fut = self.readiness_fut(interest);
         let mut fut = unsafe { Pin::new_unchecked(&mut fut) };
 
-        poll_fn(|cx| {
-            Pin::new(&mut fut).poll(cx)
-        })
-        .await
+        poll_fn(|cx| Pin::new(&mut fut).poll(cx)).await
     }
 
     async fn readiness_fut(&self, interest: Interest) -> io::Result<ReadyEvent> {
@@ -384,21 +381,21 @@ impl Drop for Readiness<'_> {
 
 #[cfg(test)]
 mod schedule_io_test {
-    use std::io;
-    use std::sync::atomic::Ordering::{Acquire, Release};
-    use crate::util::slab::Entry;
     use crate::net::{Ready, ReadyEvent};
     use crate::schedule_io::{ScheduleIO, Tick};
+    use crate::util::slab::Entry;
+    use std::io;
+    use std::sync::atomic::Ordering::{Acquire, Release};
 
     /*
-    * @title  schedule_io default function ut test
-    * @design Use path override
-    * @precon None
-    * @brief  1. Call default
-    *         2. Verify the returned results
-    * @expect 1. Get a ScheduleIO Instances
-    * @auto  Yes
-    */
+     * @title  schedule_io default function ut test
+     * @design Use path override
+     * @precon None
+     * @brief  1. Call default
+     *         2. Verify the returned results
+     * @expect 1. Get a ScheduleIO Instances
+     * @auto  Yes
+     */
     #[test]
     fn ut_schedule_io_default() {
         let mut schedule_io = ScheduleIO::default();
@@ -409,15 +406,15 @@ mod schedule_io_test {
     }
 
     /*
-    * @title  schedule_io reset function ut test
-    * @design Use path override
-    * @precon None
-    * @brief  1. Create a ScheduleIO
-    *         2. Call reset
-    *         3. Verify the returned results
-    * @expect 1. Generation part of the ScheduleIO status bits +1
-    * @auto  Yes
-    */
+     * @title  schedule_io reset function ut test
+     * @design Use path override
+     * @precon None
+     * @brief  1. Create a ScheduleIO
+     *         2. Call reset
+     *         3. Verify the returned results
+     * @expect 1. Generation part of the ScheduleIO status bits +1
+     * @auto  Yes
+     */
     #[test]
     fn ut_schedule_io_reset() {
         let schedule_io = ScheduleIO::default();
@@ -429,15 +426,15 @@ mod schedule_io_test {
     }
 
     /*
-    * @title  schedule_io generation function ut test
-    * @design Use path override
-    * @precon None
-    * @brief  1. Create a ScheduleIO
-    *         2. Call generation
-    *         3. Verify the returned results
-    * @expect 1. Get the generation of ScheduleIO
-    * @auto  Yes
-    */
+     * @title  schedule_io generation function ut test
+     * @design Use path override
+     * @precon None
+     * @brief  1. Create a ScheduleIO
+     *         2. Call generation
+     *         3. Verify the returned results
+     * @expect 1. Get the generation of ScheduleIO
+     * @auto  Yes
+     */
     #[test]
     fn ut_schedule_io_generation() {
         let schedule_io = ScheduleIO::default();
@@ -446,15 +443,15 @@ mod schedule_io_test {
     }
 
     /*
-    * @title  schedule_io shutdown function ut test
-    * @design Use path override
-    * @precon None
-    * @brief  1. Create a ScheduleIO
-    *         2. Call shutdown
-    *         3. Verify the returned results
-    * @expect 1. ScheduleIO shutdown. The is_shutdown part of the waiters is set to true
-    * @auto  Yes
-    */
+     * @title  schedule_io shutdown function ut test
+     * @design Use path override
+     * @precon None
+     * @brief  1. Create a ScheduleIO
+     *         2. Call shutdown
+     *         3. Verify the returned results
+     * @expect 1. ScheduleIO shutdown. The is_shutdown part of the waiters is set to true
+     * @auto  Yes
+     */
     #[test]
     fn ut_schedule_io_shutdown() {
         let mut schedule_io = ScheduleIO::default();
@@ -463,15 +460,15 @@ mod schedule_io_test {
     }
 
     /*
-    * @title  schedule_io clear_readiness function ut test
-    * @design Use path override
-    * @precon None
-    * @brief  1. Create a ScheduleIO
-    *         2. Call clear_readiness
-    *         3. Verify the returned results
-    * @expect 1. ScheduleIO readiness status clear
-    * @auto  Yes
-    */
+     * @title  schedule_io clear_readiness function ut test
+     * @design Use path override
+     * @precon None
+     * @brief  1. Create a ScheduleIO
+     *         2. Call clear_readiness
+     *         3. Verify the returned results
+     * @expect 1. ScheduleIO readiness status clear
+     * @auto  Yes
+     */
     #[test]
     fn ut_schedule_io_clear_readiness() {
         let schedule_io = ScheduleIO::default();
@@ -482,17 +479,17 @@ mod schedule_io_test {
     }
 
     /*
-    * @title  schedule_io set_readiness function ut test
-    * @design Use path override
-    * @precon None
-    * @brief  1. Create a ScheduleIO
-    *         2. Call set_readiness
-    *         3. Verify the returned results
-    * @expect 1. Constructed scenario, the generation part of the token is invalid, return failed
-    *         2. Construct scene, tick for Tick::Clear property, return failure
-    *         3. In a normal scenario, the ScheduleIO readiness section is modified successfully
-    * @auto  Yes
-    */
+     * @title  schedule_io set_readiness function ut test
+     * @design Use path override
+     * @precon None
+     * @brief  1. Create a ScheduleIO
+     *         2. Call set_readiness
+     *         3. Verify the returned results
+     * @expect 1. Constructed scenario, the generation part of the token is invalid, return failed
+     *         2. Construct scene, tick for Tick::Clear property, return failure
+     *         3. In a normal scenario, the ScheduleIO readiness section is modified successfully
+     * @auto  Yes
+     */
     #[test]
     fn ut_schedule_io_set_readiness() {
         ut_schedule_io_set_readiness_01();

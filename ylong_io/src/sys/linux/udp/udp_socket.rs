@@ -11,12 +11,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{fmt, io, net};
+use super::UdpSock;
+use crate::{Interest, Selector, Source, Token};
 use std::fmt::Formatter;
 use std::net::SocketAddr;
-use crate::{Interest, Selector, Source, Token};
 use std::os::unix::io::AsRawFd;
-use super::UdpSock;
+use std::{fmt, io, net};
 
 /// UdpSocket. The bottom layer uses std::net::UdpSocket。
 /// UdpSocket supports bind\connect\send\recv\send_to\recv_from\broadcast.
@@ -96,9 +96,7 @@ impl UdpSocket {
     /// about the underlying socket; it is left up to the user to set it in
     /// non-blocking mode.
     pub fn from_std(socket: net::UdpSocket) -> UdpSocket {
-        UdpSocket{
-            inner: socket
-        }
+        UdpSocket { inner: socket }
     }
 
     /// Returns the local address that this socket is bound to.
@@ -224,7 +222,7 @@ impl UdpSocket {
     ///     Ok(())
     /// }
     /// ```
-    pub fn set_broadcast(&self, on: bool) ->io::Result<()> {
+    pub fn set_broadcast(&self, on: bool) -> io::Result<()> {
         self.inner.set_broadcast(on)
     }
 
@@ -261,9 +259,7 @@ impl ConnectedUdpSocket {
     /// about the underlying socket; it is left up to the user to set it in
     /// non-blocking mode.
     pub fn from_std(socket: net::UdpSocket) -> ConnectedUdpSocket {
-        ConnectedUdpSocket{
-            inner: socket
-        }
+        ConnectedUdpSocket { inner: socket }
     }
 
     /// Returns the local address that this socket is bound to.
@@ -402,11 +398,21 @@ impl fmt::Debug for ConnectedUdpSocket {
 }
 
 impl Source for UdpSocket {
-    fn register(&mut self, selector: &Selector, token: Token, interests: Interest) -> io::Result<()> {
+    fn register(
+        &mut self,
+        selector: &Selector,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
         selector.register(self.inner.as_raw_fd(), token, interests)
     }
 
-    fn reregister(&mut self, selector: &Selector, token: Token, interests: Interest) -> io::Result<()> {
+    fn reregister(
+        &mut self,
+        selector: &Selector,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
         selector.reregister(self.inner.as_raw_fd(), token, interests)
     }
 
@@ -415,11 +421,21 @@ impl Source for UdpSocket {
     }
 }
 impl Source for ConnectedUdpSocket {
-    fn register(&mut self, selector: &Selector, token: Token, interests: Interest) -> io::Result<()> {
+    fn register(
+        &mut self,
+        selector: &Selector,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
         selector.register(self.inner.as_raw_fd(), token, interests)
     }
 
-    fn reregister(&mut self, selector: &Selector, token: Token, interests: Interest) -> io::Result<()> {
+    fn reregister(
+        &mut self,
+        selector: &Selector,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
         selector.reregister(self.inner.as_raw_fd(), token, interests)
     }
 
@@ -427,4 +443,3 @@ impl Source for ConnectedUdpSocket {
         selector.deregister(self.inner.as_raw_fd())
     }
 }
-

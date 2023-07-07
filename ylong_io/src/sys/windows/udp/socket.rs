@@ -11,13 +11,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{io, mem, net};
+use crate::sys::windows::net::init;
+use crate::sys::windows::socket_addr::socket_addr_trans;
 use std::net::SocketAddr;
 use std::os::windows::io::{FromRawSocket, RawSocket};
 use std::os::windows::raw;
-use windows_sys::Win32::Networking::WinSock::{bind as win_bind, ADDRESS_FAMILY, AF_INET, AF_INET6, closesocket, FIONBIO, INVALID_SOCKET, ioctlsocket, SOCK_DGRAM, socket, SOCKET, SOCKET_ERROR};
-use crate::sys::windows::net::init;
-use crate::sys::windows::socket_addr::socket_addr_trans;
+use std::{io, mem, net};
+use windows_sys::Win32::Networking::WinSock::{
+    bind as win_bind, closesocket, ioctlsocket, socket, ADDRESS_FAMILY, AF_INET, AF_INET6, FIONBIO,
+    INVALID_SOCKET, SOCKET, SOCKET_ERROR, SOCK_DGRAM,
+};
 
 #[derive(Debug)]
 pub(crate) struct UdpSock {
@@ -48,7 +51,7 @@ impl UdpSock {
                 let _ = unsafe { closesocket(socket) };
                 Err(err)
             }
-            Ok(_) => {Ok(UdpSock{socket})}
+            Ok(_) => Ok(UdpSock { socket }),
         }
     }
 

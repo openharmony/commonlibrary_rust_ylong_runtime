@@ -11,13 +11,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{fmt, io, net};
+use crate::sys::windows::tcp::TcpSocket;
+use crate::sys::NetState;
+use crate::{Interest, Selector, Source, TcpStream, Token};
 use std::fmt::Formatter;
 use std::net::SocketAddr;
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
-use crate::sys::windows::tcp::TcpSocket;
-use crate::{Interest, Selector, Source, TcpStream, Token};
-use crate::sys::NetState;
+use std::{fmt, io, net};
 
 /// A TCP socket server, listening for connections.
 pub struct TcpListener {
@@ -66,16 +66,29 @@ impl TcpListener {
     /// let ret = server.accept().unwrap();
     /// ```
     pub fn accept(&self) -> io::Result<(TcpStream, SocketAddr)> {
-        self.state.try_io(|inner|inner.accept(), &self.inner).map(|(stream, addr)| (TcpStream::from_std(stream), addr))
+        self.state
+            .try_io(|inner| inner.accept(), &self.inner)
+            .map(|(stream, addr)| (TcpStream::from_std(stream), addr))
     }
 }
 
 impl Source for TcpListener {
-    fn register(&mut self, selector: &Selector, token: Token, interests: Interest) -> io::Result<()> {
-        self.state.register(selector, token, interests, self.inner.as_raw_socket())
+    fn register(
+        &mut self,
+        selector: &Selector,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
+        self.state
+            .register(selector, token, interests, self.inner.as_raw_socket())
     }
 
-    fn reregister(&mut self, selector: &Selector, token: Token, interests: Interest) -> io::Result<()> {
+    fn reregister(
+        &mut self,
+        selector: &Selector,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
         self.state.reregister(selector, token, interests)
     }
 

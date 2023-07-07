@@ -11,13 +11,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(feature = "net")]
+use crate::net::{Driver, Handle};
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
 use std::sync::{Condvar, Mutex};
 use std::thread;
-#[cfg(feature = "net")]
-use crate::net::{Driver, Handle};
 
 #[derive(Clone)]
 pub(crate) struct Parker {
@@ -29,7 +29,7 @@ struct Inner {
     mutex: Mutex<bool>,
     condvar: Condvar,
     #[cfg(feature = "net")]
-    driver: Arc<Mutex<Driver>>
+    driver: Arc<Mutex<Driver>>,
 }
 
 const IDLE: usize = 0;
@@ -39,17 +39,14 @@ const PARKED_ON_DRIVER: usize = 2;
 const NOTIFIED: usize = 3;
 
 impl Parker {
-    pub(crate) fn new(
-        #[cfg(feature = "net")]
-        driver: Arc<Mutex<Driver>>
-    ) -> Parker {
+    pub(crate) fn new(#[cfg(feature = "net")] driver: Arc<Mutex<Driver>>) -> Parker {
         Parker {
             inner: Arc::new(Inner {
                 state: AtomicUsize::new(IDLE),
                 mutex: Mutex::new(false),
                 condvar: Condvar::new(),
                 #[cfg(feature = "net")]
-                driver
+                driver,
             }),
         }
     }
@@ -58,14 +55,10 @@ impl Parker {
         self.inner.park();
     }
 
-    pub(crate) fn unpark(
-        &self,
-        #[cfg(feature = "net")]
-        handle: Arc<Handle>,
-    ) {
+    pub(crate) fn unpark(&self, #[cfg(feature = "net")] handle: Arc<Handle>) {
         self.inner.unpark(
             #[cfg(feature = "net")]
-            handle
+            handle,
         );
     }
 
@@ -154,11 +147,7 @@ impl Inner {
         }
     }
 
-    fn unpark(
-        &self,
-        #[cfg(feature = "net")]
-        handle: Arc<Handle>
-    ) {
+    fn unpark(&self, #[cfg(feature = "net")] handle: Arc<Handle>) {
         match self.state.swap(NOTIFIED, SeqCst) {
             IDLE | NOTIFIED => {}
             PARKED_ON_CONDVAR => {
