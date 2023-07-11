@@ -11,7 +11,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 /// Schedule strategy implementation, includes FIFO LIFO priority and work-stealing
 /// work-stealing strategy include stealing half of every worker or the largest amount of worker
 use crate::task::Task;
@@ -427,9 +426,9 @@ impl GlobalQueue {
 mod test {
     use crate::executor::async_pool::MultiThreadScheduler;
     use crate::executor::queue::{unwrap, GlobalQueue, InnerBuffer, LocalQueue, LOCAL_QUEUE_CAP};
-    use crate::task::{Task, TaskBuilder, VirtualTableType};
     #[cfg(feature = "net")]
     use crate::net::Driver;
+    use crate::task::{Task, TaskBuilder, VirtualTableType};
     use std::future::Future;
     use std::pin::Pin;
     use std::sync::atomic::Ordering::Acquire;
@@ -530,16 +529,17 @@ mod test {
         #[cfg(feature = "net")]
         let (arc_handle, _) = Driver::initialize();
 
-        let exe_scheduler = Arc::downgrade(
-            &Arc::new(
-                MultiThreadScheduler::new(
-                    1,
-                    #[cfg(feature = "net")]
-                    arc_handle
-                )
-            )
+        let exe_scheduler = Arc::downgrade(&Arc::new(MultiThreadScheduler::new(
+            1,
+            #[cfg(feature = "net")]
+            arc_handle,
+        )));
+        let (task, _) = Task::create_task(
+            &builder,
+            exe_scheduler,
+            test_future(),
+            VirtualTableType::Ylong,
         );
-        let (task, _) = Task::create_task(&builder, exe_scheduler, test_future(), VirtualTableType::Ylong);
         let global_queue = GlobalQueue::new();
         let inner_buffer = InnerBuffer::new(LOCAL_QUEUE_CAP as u16);
         inner_buffer.push_back(task, &global_queue);
@@ -568,32 +568,34 @@ mod test {
         #[cfg(feature = "net")]
         let (arc_handle, _) = Driver::initialize();
 
-        let exe_scheduler = Arc::downgrade(
-            &Arc::new(
-                MultiThreadScheduler::new(
-                    1,
-                    #[cfg(feature = "net")]
-                    arc_handle.clone()
-                )
-            )
+        let exe_scheduler = Arc::downgrade(&Arc::new(MultiThreadScheduler::new(
+            1,
+            #[cfg(feature = "net")]
+            arc_handle.clone(),
+        )));
+        let (task, _) = Task::create_task(
+            &builder,
+            exe_scheduler,
+            test_future(),
+            VirtualTableType::Ylong,
         );
-        let (task, _) = Task::create_task(&builder, exe_scheduler, test_future(), VirtualTableType::Ylong);
         inner_buffer.push_back(task, &global_queue);
         assert_eq!(inner_buffer.len(), 1);
 
         let inner_buffer = InnerBuffer::new(LOCAL_QUEUE_CAP as u16);
         let global_queue = GlobalQueue::new();
         for _ in 0..LOCAL_QUEUE_CAP + 1 {
-            let exe_scheduler = Arc::downgrade(
-                &Arc::new(
-                    MultiThreadScheduler::new(
-                        1,
-                        #[cfg(feature = "net")]
-                        arc_handle.clone()
-                    )
-                )
+            let exe_scheduler = Arc::downgrade(&Arc::new(MultiThreadScheduler::new(
+                1,
+                #[cfg(feature = "net")]
+                arc_handle.clone(),
+            )));
+            let (task, _) = Task::create_task(
+                &builder,
+                exe_scheduler,
+                test_future(),
+                VirtualTableType::Ylong,
             );
-            let (task, _) = Task::create_task(&builder, exe_scheduler, test_future(), VirtualTableType::Ylong);
             inner_buffer.push_back(task, &global_queue);
         }
         assert_eq!(
@@ -619,34 +621,36 @@ mod test {
         let global_queue = GlobalQueue::new();
 
         #[cfg(feature = "net")]
-        let (arc_handle, _) = Driver::initialize(); 
+        let (arc_handle, _) = Driver::initialize();
 
         let builder = TaskBuilder::new();
         for _ in 0..LOCAL_QUEUE_CAP / 2 {
-            let exe_scheduler = Arc::downgrade(
-                &Arc::new(
-                    MultiThreadScheduler::new(
-                        2,
-                        #[cfg(feature = "net")]                
-                        arc_handle.clone()
-                    )
-                )
+            let exe_scheduler = Arc::downgrade(&Arc::new(MultiThreadScheduler::new(
+                2,
+                #[cfg(feature = "net")]
+                arc_handle.clone(),
+            )));
+            let (task, _) = Task::create_task(
+                &builder,
+                exe_scheduler,
+                test_future(),
+                VirtualTableType::Ylong,
             );
-            let (task, _) = Task::create_task(&builder, exe_scheduler, test_future(), VirtualTableType::Ylong);
             local_queue.push_back(task, &global_queue);
         }
 
         for _ in 0..LOCAL_QUEUE_CAP / 2 {
-            let exe_scheduler = Arc::downgrade(
-                &Arc::new(
-                    MultiThreadScheduler::new(
-                        2,
-                        #[cfg(feature = "net")]                
-                        arc_handle.clone()
-                    )
-                )
+            let exe_scheduler = Arc::downgrade(&Arc::new(MultiThreadScheduler::new(
+                2,
+                #[cfg(feature = "net")]
+                arc_handle.clone(),
+            )));
+            let (task, _) = Task::create_task(
+                &builder,
+                exe_scheduler,
+                test_future(),
+                VirtualTableType::Ylong,
             );
-            let (task, _) = Task::create_task(&builder, exe_scheduler, test_future(), VirtualTableType::Ylong);
             local_queue.push_back(task, &global_queue);
         }
 
@@ -657,33 +661,35 @@ mod test {
         let global_queue = GlobalQueue::new();
 
         #[cfg(feature = "net")]
-        let (arc_handle, _) = Driver::initialize(); 
+        let (arc_handle, _) = Driver::initialize();
 
         for _ in 0..LOCAL_QUEUE_CAP / 2 + 1 {
-            let exe_scheduler = Arc::downgrade(
-                &Arc::new(
-                    MultiThreadScheduler::new(
-                        2,
-                        #[cfg(feature = "net")]                
-                        arc_handle.clone()
-                    )
-                )
+            let exe_scheduler = Arc::downgrade(&Arc::new(MultiThreadScheduler::new(
+                2,
+                #[cfg(feature = "net")]
+                arc_handle.clone(),
+            )));
+            let (task, _) = Task::create_task(
+                &builder,
+                exe_scheduler,
+                test_future(),
+                VirtualTableType::Ylong,
             );
-            let (task, _) = Task::create_task(&builder, exe_scheduler, test_future(), VirtualTableType::Ylong);
             local_queue.push_back(task, &global_queue);
         }
 
         for _ in 0..LOCAL_QUEUE_CAP / 2 {
-            let exe_scheduler = Arc::downgrade(
-                &Arc::new(
-                    MultiThreadScheduler::new(
-                        2,
-                        #[cfg(feature = "net")]                
-                        arc_handle.clone()
-                    )
-                )
+            let exe_scheduler = Arc::downgrade(&Arc::new(MultiThreadScheduler::new(
+                2,
+                #[cfg(feature = "net")]
+                arc_handle.clone(),
+            )));
+            let (task, _) = Task::create_task(
+                &builder,
+                exe_scheduler,
+                test_future(),
+                VirtualTableType::Ylong,
             );
-            let (task, _) = Task::create_task(&builder, exe_scheduler, test_future(), VirtualTableType::Ylong);
             local_queue.push_back(task, &global_queue);
         }
 
@@ -716,19 +722,20 @@ mod test {
         let builder = TaskBuilder::new();
 
         #[cfg(feature = "net")]
-        let (arc_handle, _) = Driver::initialize(); 
+        let (arc_handle, _) = Driver::initialize();
 
         for _ in 0..LOCAL_QUEUE_CAP {
-            let exe_scheduler = Arc::downgrade(
-                &Arc::new(
-                    MultiThreadScheduler::new(
-                        2,
-                        #[cfg(feature = "net")]                
-                        arc_handle.clone()
-                    )
-                )
+            let exe_scheduler = Arc::downgrade(&Arc::new(MultiThreadScheduler::new(
+                2,
+                #[cfg(feature = "net")]
+                arc_handle.clone(),
+            )));
+            let (task, _) = Task::create_task(
+                &builder,
+                exe_scheduler,
+                test_future(),
+                VirtualTableType::Ylong,
             );
-            let (task, _) = Task::create_task(&builder, exe_scheduler, test_future(), VirtualTableType::Ylong);
             local_queue.push_back(task, &global_queue);
         }
         assert_eq!(local_queue.len(), LOCAL_QUEUE_CAP as u16);
@@ -756,19 +763,20 @@ mod test {
         let local_queue = Arc::new(LocalQueue::new());
 
         #[cfg(feature = "net")]
-        let (arc_handle, _) = Driver::initialize(); 
+        let (arc_handle, _) = Driver::initialize();
 
         for _ in 0..LOCAL_QUEUE_CAP {
-            let exe_scheduler = Arc::downgrade(
-                &Arc::new(
-                    MultiThreadScheduler::new(
-                        2,
-                        #[cfg(feature = "net")]                
-                        arc_handle.clone()
-                    )
-                )
+            let exe_scheduler = Arc::downgrade(&Arc::new(MultiThreadScheduler::new(
+                2,
+                #[cfg(feature = "net")]
+                arc_handle.clone(),
+            )));
+            let (task, _) = Task::create_task(
+                &builder,
+                exe_scheduler,
+                test_future(),
+                VirtualTableType::Ylong,
             );
-            let (task, _) = Task::create_task(&builder, exe_scheduler, test_future(), VirtualTableType::Ylong);
             local_queue.push_back(task, &global_queue);
         }
         assert_eq!(local_queue.len(), LOCAL_QUEUE_CAP as u16);
@@ -815,34 +823,36 @@ mod test {
         let builder = TaskBuilder::new();
 
         #[cfg(feature = "net")]
-        let (arc_handle, _) = Driver::initialize(); 
+        let (arc_handle, _) = Driver::initialize();
         for _ in 0..LOCAL_QUEUE_CAP {
-            let exe_scheduler = Arc::downgrade(
-                &Arc::new(
-                    MultiThreadScheduler::new(
-                        1,
-                        #[cfg(feature = "net")]
-                        arc_handle.clone(),
-                    )
-                )
+            let exe_scheduler = Arc::downgrade(&Arc::new(MultiThreadScheduler::new(
+                1,
+                #[cfg(feature = "net")]
+                arc_handle.clone(),
+            )));
+            let (task, _) = Task::create_task(
+                &builder,
+                exe_scheduler,
+                test_future(),
+                VirtualTableType::Ylong,
             );
-            let (task, _) = Task::create_task(&builder, exe_scheduler, test_future(), VirtualTableType::Ylong);
             local_queue.push_back(task, &global_queue);
         }
 
         #[cfg(feature = "net")]
-        let (arc_handle, _) = Driver::initialize(); 
+        let (arc_handle, _) = Driver::initialize();
         for _ in 0..LOCAL_QUEUE_CAP {
-            let exe_scheduler = Arc::downgrade(
-                &Arc::new(
-                    MultiThreadScheduler::new(
-                        1,
-                        #[cfg(feature = "net")]
-                        arc_handle.clone(),
-                    )
-                )
+            let exe_scheduler = Arc::downgrade(&Arc::new(MultiThreadScheduler::new(
+                1,
+                #[cfg(feature = "net")]
+                arc_handle.clone(),
+            )));
+            let (task, _) = Task::create_task(
+                &builder,
+                exe_scheduler,
+                test_future(),
+                VirtualTableType::Ylong,
             );
-            let (task, _) = Task::create_task(&builder, exe_scheduler, test_future(), VirtualTableType::Ylong);
             other_local_queue.push_back(task, &global_queue);
         }
 
@@ -860,18 +870,19 @@ mod test {
         let global_queue = GlobalQueue::new();
 
         #[cfg(feature = "net")]
-        let (arc_handle, _) = Driver::initialize(); 
+        let (arc_handle, _) = Driver::initialize();
         for _ in 0..LOCAL_QUEUE_CAP {
-            let exe_scheduler = Arc::downgrade(
-                &Arc::new(
-                    MultiThreadScheduler::new(
-                        1,
-                        #[cfg(feature = "net")]
-                        arc_handle.clone(),
-                    )
-                )
+            let exe_scheduler = Arc::downgrade(&Arc::new(MultiThreadScheduler::new(
+                1,
+                #[cfg(feature = "net")]
+                arc_handle.clone(),
+            )));
+            let (task, _) = Task::create_task(
+                &builder,
+                exe_scheduler,
+                test_future(),
+                VirtualTableType::Ylong,
             );
-            let (task, _) = Task::create_task(&builder, exe_scheduler, test_future(), VirtualTableType::Ylong);
             other_local_queue.push_back(task, &global_queue);
         }
 
@@ -890,18 +901,19 @@ mod test {
         let global_queue = GlobalQueue::new();
 
         #[cfg(feature = "net")]
-        let (arc_handle, _) = Driver::initialize(); 
+        let (arc_handle, _) = Driver::initialize();
         for _ in 0..LOCAL_QUEUE_CAP {
-            let exe_scheduler = Arc::downgrade(
-                &Arc::new(
-                    MultiThreadScheduler::new(
-                        1,
-                        #[cfg(feature = "net")]
-                        arc_handle.clone(),
-                    )
-                )
+            let exe_scheduler = Arc::downgrade(&Arc::new(MultiThreadScheduler::new(
+                1,
+                #[cfg(feature = "net")]
+                arc_handle.clone(),
+            )));
+            let (task, _) = Task::create_task(
+                &builder,
+                exe_scheduler,
+                test_future(),
+                VirtualTableType::Ylong,
             );
-            let (task, _) = Task::create_task(&builder, exe_scheduler, test_future(), VirtualTableType::Ylong);
             other_local_queue.push_back(task, &global_queue);
         }
 
@@ -935,18 +947,19 @@ mod test {
         let other_local_queue_clone_two = other_local_queue.clone();
 
         #[cfg(feature = "net")]
-        let (arc_handle, _) = Driver::initialize(); 
+        let (arc_handle, _) = Driver::initialize();
         for _ in 0..LOCAL_QUEUE_CAP {
-            let exe_scheduler = Arc::downgrade(
-                &Arc::new(
-                    MultiThreadScheduler::new(
-                        1,
-                        #[cfg(feature = "net")]
-                        arc_handle.clone(),
-                    )
-                )
+            let exe_scheduler = Arc::downgrade(&Arc::new(MultiThreadScheduler::new(
+                1,
+                #[cfg(feature = "net")]
+                arc_handle.clone(),
+            )));
+            let (task, _) = Task::create_task(
+                &builder,
+                exe_scheduler,
+                test_future(),
+                VirtualTableType::Ylong,
             );
-            let (task, _) = Task::create_task(&builder, exe_scheduler, test_future(), VirtualTableType::Ylong);
             other_local_queue.push_back(task, &global_queue);
         }
 

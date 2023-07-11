@@ -11,12 +11,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{io, mem, net};
-use std::net::{SocketAddr};
-use std::os::windows::io::{AsRawSocket, FromRawSocket, RawSocket};
-use windows_sys::Win32::Networking::WinSock::{self, closesocket, ioctlsocket, socket, SOCKET, SOCKET_ERROR, SOCK_STREAM, AF_INET, AF_INET6, ADDRESS_FAMILY, INVALID_SOCKET, FIONBIO};
 use crate::sys::windows::net::init;
 use crate::sys::windows::socket_addr::socket_addr_trans;
+use std::net::SocketAddr;
+use std::os::windows::io::{AsRawSocket, FromRawSocket, RawSocket};
+use std::{io, mem, net};
+use windows_sys::Win32::Networking::WinSock::{
+    self, closesocket, ioctlsocket, socket, ADDRESS_FAMILY, AF_INET, AF_INET6, FIONBIO,
+    INVALID_SOCKET, SOCKET, SOCKET_ERROR, SOCK_STREAM,
+};
 
 pub(crate) struct TcpSocket {
     socket: SOCKET,
@@ -46,7 +49,9 @@ impl TcpSocket {
                 let _ = unsafe { closesocket(socket) };
                 Err(err)
             }
-            Ok(_) => Ok(TcpSocket { socket: socket as SOCKET })
+            Ok(_) => Ok(TcpSocket {
+                socket: socket as SOCKET,
+            }),
         }
     }
 
@@ -56,11 +61,7 @@ impl TcpSocket {
 
         let (raw_addr, raw_addr_length) = socket_addr_trans(&addr);
         socket_syscall!(
-            bind(
-                self.socket as _,
-                raw_addr.as_ptr(),
-                raw_addr_length
-            ),
+            bind(self.socket as _, raw_addr.as_ptr(), raw_addr_length),
             PartialEq::eq,
             SOCKET_ERROR
         )?;
@@ -88,11 +89,7 @@ impl TcpSocket {
 
         let (socket_addr, socket_addr_length) = socket_addr_trans(&addr);
         let res = socket_syscall!(
-            connect(
-                self.socket as _,
-                socket_addr.as_ptr(),
-                socket_addr_length
-            ),
+            connect(self.socket as _, socket_addr.as_ptr(), socket_addr_length),
             PartialEq::eq,
             SOCKET_ERROR
         );
@@ -120,7 +117,9 @@ impl AsRawSocket for TcpSocket {
 
 impl FromRawSocket for TcpSocket {
     unsafe fn from_raw_socket(sock: RawSocket) -> Self {
-        TcpSocket { socket: sock as SOCKET }
+        TcpSocket {
+            socket: sock as SOCKET,
+        }
     }
 }
 

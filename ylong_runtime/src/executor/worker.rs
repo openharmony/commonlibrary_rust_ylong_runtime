@@ -15,10 +15,10 @@
 use crate::executor::async_pool::MultiThreadScheduler;
 use crate::executor::parker::Parker;
 use crate::executor::queue::LocalQueue;
-use crate::task::yield_now::wake_yielded_tasks;
-use crate::task::Task;
 #[cfg(feature = "net")]
 use crate::net::Handle;
+use crate::task::yield_now::wake_yielded_tasks;
+use crate::task::Task;
 use std::cell::{Cell, RefCell};
 use std::ptr;
 use std::sync::Arc;
@@ -31,7 +31,7 @@ thread_local! {
 pub(crate) enum WorkerContext {
     Multi(MultiWorkerContext),
     #[cfg(feature = "net")]
-    Curr(CurrentWorkerContext)
+    Curr(CurrentWorkerContext),
 }
 
 #[cfg(feature = "net")]
@@ -46,12 +46,10 @@ macro_rules! get_multi_worker_context {
 
 #[cfg(not(feature = "net"))]
 macro_rules! get_multi_worker_context {
-    ($e:expr) => {
-        {
-            let crate::executor::worker::WorkerContext::Multi(ctx) = $e;
-            ctx
-        }
-    };
+    ($e:expr) => {{
+        let crate::executor::worker::WorkerContext::Multi(ctx) = $e;
+        ctx
+    }};
 }
 
 pub(crate) use get_multi_worker_context;
@@ -59,12 +57,12 @@ pub(crate) use get_multi_worker_context;
 pub(crate) struct MultiWorkerContext {
     pub(crate) worker: Arc<Worker>,
     #[cfg(feature = "net")]
-    pub(crate) handle: Arc<Handle>
+    pub(crate) handle: Arc<Handle>,
 }
 
 #[cfg(feature = "net")]
 pub(crate) struct CurrentWorkerContext {
-    pub(crate) handle: Arc<Handle>
+    pub(crate) handle: Arc<Handle>,
 }
 
 /// Gets the worker context of the current thread
@@ -92,12 +90,8 @@ impl MultiWorkerContext {
 }
 
 /// Runs the worker thread
-pub(crate) fn run_worker(
-    worker: Arc<Worker>,
-    #[cfg(feature = "net")]
-    handle: Arc<Handle>,
-) {
-    let cur_context = WorkerContext::Multi( MultiWorkerContext {
+pub(crate) fn run_worker(worker: Arc<Worker>, #[cfg(feature = "net")] handle: Arc<Handle>) {
+    let cur_context = WorkerContext::Multi(MultiWorkerContext {
         worker,
         #[cfg(feature = "net")]
         handle,
@@ -184,7 +178,8 @@ impl Worker {
 
     fn get_task(&self, inner: &mut Inner) -> Option<Task> {
         // We're under worker environment, so it's safe to unwrap
-        let ctx = get_multi_worker_context!(get_current_ctx().expect("worker get_current_ctx() fail"));
+        let ctx =
+            get_multi_worker_context!(get_current_ctx().expect("worker get_current_ctx() fail"));
 
         // schedule lifo task first
         let mut lifo_slot = ctx.worker.lifo.borrow_mut();

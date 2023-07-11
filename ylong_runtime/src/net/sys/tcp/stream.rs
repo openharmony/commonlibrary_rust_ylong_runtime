@@ -11,15 +11,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::io::{AsyncRead, AsyncWrite, ReadBuf};
 use crate::net::AsyncSource;
-use ylong_io::Interest;
+use std::fmt::{Debug, Formatter};
 use std::io;
-use std::io::{IoSlice};
+use std::io::IoSlice;
 use std::net::{Shutdown, SocketAddr};
-use crate::io::{AsyncRead, ReadBuf, AsyncWrite};
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use std::fmt::{Debug, Formatter};
+use ylong_io::Interest;
 
 /// An asynchronous version of [`std::net::TcpStream`]
 ///
@@ -80,7 +80,7 @@ impl TcpStream {
             .async_process(
                 // Wait until the stream is writable
                 Interest::WRITABLE,
-                || Ok(())
+                || Ok(()),
             )
             .await?;
 
@@ -107,14 +107,18 @@ impl AsyncRead for TcpStream {
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
-        buf: &mut ReadBuf<'_>
+        buf: &mut ReadBuf<'_>,
     ) -> Poll<io::Result<()>> {
         self.source.poll_read(cx, buf)
     }
 }
 
 impl AsyncWrite for TcpStream {
-    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<io::Result<usize>> {
         self.source.poll_write(cx, buf)
     }
 

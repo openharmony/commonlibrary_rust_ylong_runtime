@@ -11,12 +11,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::macros::cfg_io;
 use crate::net::ScheduleIO;
+use crate::util::slab::Ref;
 use std::io;
 use std::ops::Deref;
 use ylong_io::{Interest, Source};
-use crate::macros::cfg_io;
-use crate::util::slab::Ref;
 
 cfg_io!(
     use std::task::{Context, Poll};
@@ -53,7 +53,8 @@ impl<E: Source> AsyncSource<E> {
     pub fn new(mut io: E, interest: Option<Interest>) -> io::Result<AsyncSource<E>> {
         #[cfg(not(feature = "ffrt"))]
         let inner = {
-            let context = get_current_ctx().ok_or_else(|| io::Error::new(io::ErrorKind::Other, "get_current_ctx() fail"))?;
+            let context = get_current_ctx()
+                .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "get_current_ctx() fail"))?;
             match context {
                 WorkerContext::Multi(ctx) => &ctx.handle,
                 WorkerContext::Curr(ctx) => &ctx.handle,
