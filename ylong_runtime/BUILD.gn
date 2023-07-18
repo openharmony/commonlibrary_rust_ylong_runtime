@@ -15,7 +15,7 @@ import("//build/ohos.gni")
 import("//build/test.gni")
 
 ohos_rust_shared_library("lib") {
-  crate_name = "ylong_runtime"
+  crate_name = "ylong_runtime_inner"
   crate_type = "dylib"
   crate_root = "src/lib.rs"
 
