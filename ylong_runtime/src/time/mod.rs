@@ -18,7 +18,6 @@ mod error;
 mod sleep;
 mod timeout;
 mod timer;
-mod timer_handle;
 mod wheel;
 
 pub(crate) use driver::Driver;
@@ -26,8 +25,8 @@ pub use sleep::{sleep, sleep_until};
 pub use timeout::timeout;
 pub use timer::{periodic_schedule, timer, timer_at, Timer};
 
-use crate::time::timer_handle::TimerHandle;
-use std::ptr::NonNull;
+use crate::util::link_list::{Link, Node};
+use std::ptr::{addr_of_mut, NonNull};
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::Relaxed;
 use std::task::Waker;
@@ -50,6 +49,9 @@ pub(crate) struct Clock {
     // Corresponding waker,
     // which is used to wake up sleep coroutine.
     waker: Option<Waker>,
+
+    // Linked_list node.
+    node: Node<Clock>,
 }
 
 impl Clock {
@@ -61,6 +63,7 @@ impl Clock {
             duration: 0,
             result: AtomicBool::new(false),
             waker: None,
+            node: Node::new(),
         }
     }
 
@@ -111,11 +114,20 @@ impl Clock {
     pub(crate) fn set_result(&mut self, result: bool) {
         self.result.store(result, Relaxed);
     }
+}
 
-    // Creates a TimerHandle to point to the current structure.
-    pub(crate) fn handle(&self) -> TimerHandle {
-        TimerHandle {
-            inner: NonNull::from(self),
-        }
+impl Default for Clock {
+    fn default() -> Self {
+        Clock::new()
+    }
+}
+
+unsafe impl Link for Clock {
+    unsafe fn node(mut ptr: NonNull<Self>) -> NonNull<Node<Self>>
+    where
+        Self: Sized,
+    {
+        let node_ptr = addr_of_mut!(ptr.as_mut().node);
+        NonNull::new_unchecked(node_ptr)
     }
 }
