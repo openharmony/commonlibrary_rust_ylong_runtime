@@ -45,11 +45,7 @@ fn main() -> io::Result<()> {
                 println!("Accept connection addr: {stream:?} {addr:?}");
                 let token = Token(unique_token.0 + 1);
                 unique_token = Token(unique_token.0 + 1);
-                poll.register(
-                    &mut stream,
-                    token,
-                    Interest::READABLE.add(Interest::WRITABLE),
-                )?;
+                poll.register(&mut stream, token, Interest::READABLE | Interest::WRITABLE)?;
                 connections.insert(token, stream);
             } else {
                 match connections.get_mut(&event.token()) {

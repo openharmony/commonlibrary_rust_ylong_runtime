@@ -47,10 +47,10 @@ mod events;
 pub use events::EventTrait;
 
 #[cfg(unix)]
-mod linux;
+mod unix;
 
 #[cfg(unix)]
-pub use self::linux::*;
+pub use self::unix::*;
 
 #[cfg(windows)]
 mod windows;

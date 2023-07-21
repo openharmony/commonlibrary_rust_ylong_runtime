@@ -64,7 +64,7 @@ impl<E: Source> AsyncSource<E> {
     pub fn new(mut io: E, interest: Option<Interest>) -> io::Result<AsyncSource<E>> {
         let inner = Handle::get_handle()?;
 
-        let interest = interest.unwrap_or_else(|| Interest::WRITABLE.add(Interest::READABLE));
+        let interest = interest.unwrap_or_else(|| Interest::READABLE | Interest::WRITABLE);
         let entry = inner.io_register(&mut io, interest)?;
         Ok(AsyncSource {
             io: Some(io),
@@ -88,7 +88,7 @@ impl<E: Source> AsyncSource<E> {
     pub fn new(mut io: E, interest: Option<Interest>) -> io::Result<AsyncSource<E>> {
         let inner = crate::net::IoHandle::get_ref();
 
-        let interest = interest.unwrap_or_else(|| Interest::WRITABLE.add(Interest::READABLE));
+        let interest = interest.unwrap_or_else(|| Interest::READABLE | Interest::WRITABLE);
         let entry = inner.register_source(&mut io, interest)?;
         Ok(AsyncSource {
             io: Some(io),
