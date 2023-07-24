@@ -14,6 +14,7 @@
 use crate::sys::windows::tcp::TcpSocket;
 use crate::sys::NetState;
 use crate::{Interest, Selector, Source, TcpStream, Token};
+use crate::source::Fd;
 use std::fmt::Formatter;
 use std::net::SocketAddr;
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
@@ -73,14 +74,8 @@ impl TcpListener {
 }
 
 impl Source for TcpListener {
-    fn register(
-        &mut self,
-        selector: &Selector,
-        token: Token,
-        interests: Interest,
-    ) -> io::Result<()> {
-        self.state
-            .register(selector, token, interests, self.inner.as_raw_socket())
+    fn register(&mut self, selector: &Selector, token: Token, interests: Interest) -> io::Result<()> {
+        self.state.register(selector, token, interests, self.as_raw_socket())
     }
 
     fn reregister(
@@ -94,6 +89,10 @@ impl Source for TcpListener {
 
     fn deregister(&mut self, _selector: &Selector) -> io::Result<()> {
         self.state.deregister()
+    }
+
+    fn as_raw_fd(&self) -> Fd {
+        self.inner.as_raw_socket()
     }
 }
 

@@ -14,6 +14,7 @@
 use crate::sys::windows::tcp::TcpSocket;
 use crate::sys::NetState;
 use crate::{Interest, Selector, Source, Token};
+use crate::source::Fd;
 use std::fmt::Formatter;
 use std::io::{IoSlice, IoSliceMut, Read, Write};
 use std::net::{Shutdown, SocketAddr};
@@ -297,5 +298,9 @@ impl Source for TcpStream {
 
     fn deregister(&mut self, _selector: &Selector) -> io::Result<()> {
         self.state.deregister()
+    }
+
+    fn as_raw_fd(&self) -> Fd {
+        self.inner.as_raw_socket()
     }
 }

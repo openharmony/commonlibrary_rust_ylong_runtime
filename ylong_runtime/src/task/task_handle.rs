@@ -13,11 +13,11 @@
 
 use crate::error::{ErrorKind, ScheduleError};
 use crate::executor::Schedule;
+use crate::macros::{cfg_ffrt, cfg_not_ffrt};
 use crate::task::raw::{Header, Inner, TaskMngInfo};
 use crate::task::state::StateAction;
 use crate::task::waker::WakerRefHeader;
 use crate::task::{state, Task};
-use crate::{cfg_ffrt, cfg_not_ffrt};
 use std::future::Future;
 use std::panic;
 use std::ptr::NonNull;
@@ -392,9 +392,11 @@ where
     }
 
     pub(crate) fn ffrt_wake_by_ref(&self) {
-        self.header().state.turn_to_scheduling();
-        let ffrt_task = unsafe { (*self.inner().task.get()).as_ref().unwrap() };
-        ffrt_task.wake_task();
+        let prev = self.header().state.turn_to_scheduling();
+        if !state::is_scheduling(prev) {
+            let ffrt_task = unsafe { (*self.inner().task.get()).as_ref().unwrap() };
+            ffrt_task.wake_task();
+        }
     }
 
     // Actually cancels the task during running

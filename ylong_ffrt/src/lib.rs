@@ -41,8 +41,6 @@ use libc::{c_int, c_void};
 pub enum Qos {
     /// Inherits parent's qos level
     Inherent = -1,
-    /// Unspecific qos
-    Unspecific,
     /// Lowest qos
     Background,
     /// Utility qos
@@ -51,6 +49,8 @@ pub enum Qos {
     Default,
     /// User initialiated qos
     UserInitiated,
+    /// Deadline qos
+    DeadlineRequest,
     /// Highest qos
     UserInteractive,
 }

@@ -16,6 +16,7 @@ use crate::{Interest, Selector, Source, Token};
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::{self, Shutdown, SocketAddr};
 use std::os::unix::io::AsRawFd;
+use crate::source::Fd;
 
 /// A non-blocking TCP Stream between a local socket and a remote socket.
 pub struct TcpStream {
@@ -120,7 +121,7 @@ impl Source for TcpStream {
         token: Token,
         interests: Interest,
     ) -> io::Result<()> {
-        selector.register(self.inner.as_raw_fd(), token, interests)
+        selector.register(self.as_raw_fd(), token, interests)
     }
 
     fn reregister(
@@ -129,10 +130,14 @@ impl Source for TcpStream {
         token: Token,
         interests: Interest,
     ) -> io::Result<()> {
-        selector.reregister(self.inner.as_raw_fd(), token, interests)
+        selector.reregister(self.as_raw_fd(), token, interests)
     }
 
     fn deregister(&mut self, selector: &Selector) -> io::Result<()> {
-        selector.deregister(self.inner.as_raw_fd())
+        selector.deregister(self.as_raw_fd())
+    }
+
+    fn as_raw_fd(&self) -> Fd {
+        self.inner.as_raw_fd()
     }
 }

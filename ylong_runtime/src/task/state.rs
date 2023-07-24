@@ -11,8 +11,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::cfg_not_ffrt;
 use crate::error::ErrorKind;
+use crate::macros::cfg_not_ffrt;
 /// Task state, include SCHEDULED  RUNNING  COMPLETED CLOSED and so on and transform method
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed};

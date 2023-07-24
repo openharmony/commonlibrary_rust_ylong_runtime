@@ -20,6 +20,7 @@ use std::io;
 use std::mem::{size_of, MaybeUninit};
 use std::net::{self, SocketAddr};
 use std::os::unix::io::{AsRawFd, FromRawFd};
+use crate::source::Fd;
 
 /// A socket server.
 pub struct TcpListener {
@@ -90,7 +91,7 @@ impl Source for TcpListener {
         token: Token,
         interests: Interest,
     ) -> io::Result<()> {
-        selector.register(self.inner.as_raw_fd(), token, interests)
+        selector.register(self.as_raw_fd(), token, interests)
     }
 
     fn reregister(
@@ -99,11 +100,15 @@ impl Source for TcpListener {
         token: Token,
         interests: Interest,
     ) -> io::Result<()> {
-        selector.reregister(self.inner.as_raw_fd(), token, interests)
+        selector.reregister(self.as_raw_fd(), token, interests)
     }
 
     fn deregister(&mut self, selector: &Selector) -> io::Result<()> {
-        selector.deregister(self.inner.as_raw_fd())
+        selector.deregister(self.as_raw_fd())
+    }
+
+    fn as_raw_fd(&self) -> Fd {
+        self.inner.as_raw_fd()
     }
 }
 

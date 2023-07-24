@@ -12,10 +12,11 @@
 // limitations under the License.
 
 use crate::executor::Schedule;
+use crate::macros::cfg_ffrt;
 use crate::task::state::TaskState;
 use crate::task::task_handle::TaskHandle;
 use crate::task::{TaskBuilder, VirtualTableType};
-use crate::{cfg_ffrt, ScheduleError};
+use crate::ScheduleError;
 use std::cell::UnsafeCell;
 use std::future::Future;
 use std::mem;

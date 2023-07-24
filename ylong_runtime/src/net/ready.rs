@@ -12,12 +12,16 @@
 // limitations under the License.
 
 use core::ops;
-use ylong_io::{Event, EventTrait, Interest};
+use ylong_io::Interest;
 
 const READABLE: usize = 0b0_01;
 const WRITABLE: usize = 0b0_10;
 const READ_CLOSED: usize = 0b0_0100;
 const WRITE_CLOSED: usize = 0b0_1000;
+
+crate::macros::cfg_not_ffrt! {
+    use ylong_io::{Event, EventTrait};
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd)]
 pub(crate) struct Ready(usize);
@@ -41,6 +45,7 @@ impl Ready {
 
     pub const ALL: Ready = Ready(READABLE | WRITABLE | READ_CLOSED | WRITE_CLOSED);
 
+    #[cfg(not(feature = "ffrt"))]
     pub(crate) fn from_event(event: &Event) -> Ready {
         let mut ready = Ready::EMPTY;
 
@@ -160,6 +165,50 @@ impl ReadyEvent {
 
     pub fn get_ready(&self) -> Ready {
         self.ready
+    }
+}
+
+crate::macros::cfg_ffrt! {
+    fn is_readable(event: i32) -> bool {
+        (event as libc::c_int & libc::EPOLLIN) != 0
+            || (event as libc::c_int & libc::EPOLLPRI) != 0
+    }
+
+    fn is_writable(event: i32) -> bool {
+        (event as libc::c_int & libc::EPOLLOUT) != 0
+    }
+
+    fn is_read_closed(event: i32) -> bool {
+        event as libc::c_int & libc::EPOLLHUP != 0
+            || (event as libc::c_int & libc::EPOLLIN != 0
+                && event as libc::c_int & libc::EPOLLRDHUP != 0)
+    }
+
+    fn is_write_closed(event: i32) -> bool {
+        event as libc::c_int & libc::EPOLLHUP != 0
+            || (event as libc::c_int & libc::EPOLLOUT != 0
+                && event as libc::c_int & libc::EPOLLERR != 0)
+            || event as libc::c_int == libc::EPOLLERR
+    }
+
+    pub(crate) fn from_event_inner(event: i32) -> Ready {
+        let mut ready = Ready::EMPTY;
+        if is_readable(event) {
+            ready |= Ready::READABLE;
+        }
+
+        if is_writable(event) {
+            ready |= Ready::WRITABLE;
+        }
+
+        if is_read_closed(event) {
+            ready |= Ready::READ_CLOSED;
+        }
+
+        if is_write_closed(event) {
+            ready |= Ready::WRITE_CLOSED;
+        }
+        ready
     }
 }
 

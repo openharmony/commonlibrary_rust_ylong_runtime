@@ -89,25 +89,3 @@ where
     let rt = executor::global_default_async();
     rt.block_on(task)
 }
-
-macro_rules! cfg_ffrt {
-    ($($item:item)*) => {
-        $(
-            #[cfg(feature = "ffrt")]
-            $item
-        )*
-    }
-}
-
-pub(crate) use cfg_ffrt;
-
-macro_rules! cfg_not_ffrt {
-    ($($item:item)*) => {
-        $(
-            #[cfg(not(feature = "ffrt"))]
-            $item
-        )*
-    }
-}
-
-pub(crate) use cfg_not_ffrt;
