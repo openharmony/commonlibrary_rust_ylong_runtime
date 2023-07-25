@@ -24,10 +24,16 @@
       "third_party": []
     },
     "build": {
-      "sub_component": [
-        "//commonlibrary/rust/ylong_runtime/ylong_runtime:lib"
+      "sub_component": [],
+      "inner_kits": [
+        {
+          "header": {
+            "header_base": [],
+            "header_files": []
+          },
+          "name": "//commonlibrary/rust/ylong_runtime/ylong_runtime:lib"
+        }
       ],
-      "inner_kits": [],
       "test": []
     }
   }
