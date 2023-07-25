@@ -11,15 +11,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::sys::windows::net::init;
-use crate::sys::windows::socket_addr::socket_addr_trans;
 use std::net::SocketAddr;
 use std::os::windows::io::{AsRawSocket, FromRawSocket, RawSocket};
 use std::{io, mem, net};
+
 use windows_sys::Win32::Networking::WinSock::{
     self, closesocket, ioctlsocket, socket, ADDRESS_FAMILY, AF_INET, AF_INET6, FIONBIO,
     INVALID_SOCKET, SOCKET, SOCKET_ERROR, SOCK_STREAM,
 };
+
+use crate::sys::windows::net::init;
+use crate::sys::windows::socket_addr::socket_addr_trans;
 
 pub(crate) struct TcpSocket {
     socket: SOCKET,
@@ -71,6 +73,7 @@ impl TcpSocket {
     /// System call to listen.
     pub(crate) fn listen(self, backlog: u32) -> io::Result<()> {
         use std::convert::TryInto;
+
         use WinSock::listen;
 
         let backlog = backlog.try_into().unwrap_or(i32::MAX);

@@ -11,12 +11,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::TcpSocket;
-use crate::{Interest, Selector, Source, Token};
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::{self, Shutdown, SocketAddr};
 use std::os::unix::io::AsRawFd;
+
+use super::TcpSocket;
 use crate::source::Fd;
+use crate::{Interest, Selector, Source, Token};
 
 /// A non-blocking TCP Stream between a local socket and a remote socket.
 pub struct TcpStream {

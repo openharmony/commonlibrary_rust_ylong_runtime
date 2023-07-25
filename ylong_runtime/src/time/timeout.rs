@@ -11,13 +11,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::time::error::TimerError;
-use crate::time::sleep;
-use crate::time::sleep::Sleep;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
+
+use crate::time::error::TimerError;
+use crate::time::sleep;
+use crate::time::sleep::Sleep;
 
 /// Requires a future to be completed by a set deadline.
 ///
@@ -25,9 +26,10 @@ use std::time::Duration;
 ///
 /// ```
 /// use std::time::Duration;
+///
 /// use ylong_runtime::time::timeout;
 ///
-/// let handle = ylong_runtime::spawn(timeout(Duration::from_secs(1), async {1}));
+/// let handle = ylong_runtime::spawn(timeout(Duration::from_secs(1), async { 1 }));
 /// let result = ylong_runtime::block_on(handle).unwrap().unwrap();
 /// assert_eq!(result, 1);
 /// ```
@@ -77,14 +79,12 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::time::timeout;
-    use crate::{block_on, spawn};
     use std::time::Duration;
 
-    /// timeout ut test case.
-    ///
-    /// # Title
-    /// ut_timeout_test
+    use crate::time::timeout;
+    use crate::{block_on, spawn};
+
+    /// UT test cases for timeout
     ///
     /// # Brief
     /// 1. Use timeout to create a Timeout Struct.
@@ -118,10 +118,7 @@ mod test {
         assert!(!result);
     }
 
-    /// timeout ut test case.
-    ///
-    /// # Title
-    /// ut_timeout_test_002
+    /// UT test cases for timeout
     ///
     /// # Brief
     /// 1. Use timeout to create a Timeout Struct.

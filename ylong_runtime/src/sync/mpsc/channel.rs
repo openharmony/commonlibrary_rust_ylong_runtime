@@ -11,11 +11,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::sync::mpsc::Container;
 use std::ops::Deref;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{AcqRel, Relaxed};
 use std::sync::Arc;
+
+use crate::sync::mpsc::Container;
 
 pub(crate) struct Channel<C: Container> {
     chan: C,

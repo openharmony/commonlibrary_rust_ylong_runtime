@@ -12,20 +12,17 @@
 // limitations under the License.
 
 use std::time::Duration;
-use ylong_runtime::sync::mpsc::bounded_channel;
-use ylong_runtime::sync::mpsc::unbounded_channel;
+
+use ylong_runtime::sync::mpsc::{bounded_channel, unbounded_channel};
 use ylong_runtime::sync::{RecvError, SendError};
 use ylong_runtime::task::JoinHandle;
 
-/// SDV test for `UnboundedSender`.
-///
-/// # Title
-/// sdv_unbounded_send_recv_test
+/// SDV test cases for `UnboundedSender`.
 ///
 /// # Brief
-/// 1.Create a unbounded mpsc channel.
-/// 2.Send two values to the receiver then drop.
-/// 3.Receive two values successfully and then receive error.
+/// 1. Create a unbounded mpsc channel.
+/// 2. Send two values to the receiver then drop.
+/// 3. Receive two values successfully and then receive error.
 #[test]
 fn sdv_unbounded_send_recv_test() {
     let (tx, mut rx) = unbounded_channel();
@@ -40,15 +37,12 @@ fn sdv_unbounded_send_recv_test() {
     let _ = ylong_runtime::block_on(handle);
 }
 
-/// SDV test for `UnboundedSender`.
-///
-/// # Title
-/// sdv_unbounded_send_try_recv_test
+/// SDV test cases for `UnboundedSender`.
 ///
 /// # Brief
-/// 1.Create a unbounded mpsc channel.
-/// 2.Try receiving before and after sender sends a value.
-/// 3.Try receiving after sender has been dropped.
+/// 1. Create a unbounded mpsc channel.
+/// 2. Try receiving before and after sender sends a value.
+/// 3. Try receiving after sender has been dropped.
 #[test]
 fn sdv_unbounded_send_try_recv_test() {
     let (tx, mut rx) = unbounded_channel();
@@ -59,15 +53,12 @@ fn sdv_unbounded_send_try_recv_test() {
     assert_eq!(rx.try_recv(), Err(RecvError::Closed));
 }
 
-/// SDV test for `UnboundedSender`.
-///
-/// # Title
-/// sdv_unbounded_send_recv_timeout_test
+/// SDV test cases for `UnboundedSender`.
 ///
 /// # Brief
-/// 1.Create a unbounded mpsc channel.
-/// 2.Send a value to the receiver.
-/// 3.Receive the value in the limited time twice.
+/// 1. Create a unbounded mpsc channel.
+/// 2. Send a value to the receiver.
+/// 3. Receive the value in the limited time twice.
 #[test]
 fn sdv_unbounded_send_recv_timeout_test() {
     let (tx, mut rx) = unbounded_channel();
@@ -82,15 +73,12 @@ fn sdv_unbounded_send_recv_timeout_test() {
     let _ = ylong_runtime::block_on(handle);
 }
 
-/// SDV test for `BoundedSender`.
-///
-/// # Title
-/// sdv_bounded_send_recv_test
+/// SDV test cases for `BoundedSender`.
 ///
 /// # Brief
-/// 1.Create a bounded mpsc channel with capacity.
-/// 2.Send two value to the receiver.
-/// 3.Receive two values successfully and then receive error.
+/// 1. Create a bounded mpsc channel with capacity.
+/// 2. Send two value to the receiver.
+/// 3. Receive two values successfully and then receive error.
 #[test]
 fn sdv_bounded_send_recv_test() {
     let (tx, mut rx) = bounded_channel::<i32>(1);
@@ -107,17 +95,14 @@ fn sdv_bounded_send_recv_test() {
     let _ = ylong_runtime::block_on(handle);
 }
 
-/// SDV test for `BoundedSender`.
-///
-/// # Title
-/// sdv_bounded_try_send_try_recv_test
+/// SDV test cases for `BoundedSender`.
 ///
 /// # Brief
-/// 1.Create a bounded mpsc channel with capacity.
-/// 2.Try receiving and fails.
-/// 3.Try sending two values and one succeeds and one fails.
-/// 4.Try receiving and succeeds.
-/// 5.Drop the sender and then receiver fails to receive.
+/// 1. Create a bounded mpsc channel with capacity.
+/// 2. Try receiving and fails.
+/// 3. Try sending two values and one succeeds and one fails.
+/// 4. Try receiving and succeeds.
+/// 5. Drop the sender and then receiver fails to receive.
 #[test]
 fn sdv_bounded_try_send_try_recv_test() {
     let (tx, mut rx) = bounded_channel::<i32>(1);
@@ -129,15 +114,14 @@ fn sdv_bounded_try_send_try_recv_test() {
     assert_eq!(rx.try_recv(), Err(RecvError::Closed));
 }
 
-/// SDV test for `BoundedSender`.
-///
-/// # Title
-/// sdv_bounded_send_timeout_recv_timeout_test
+/// SDV test cases for `BoundedSender`.
 ///
 /// # Brief
-/// 1.Create a bounded mpsc channel with capacity.
-/// 2.Send two values to the receiver in the limited time and one succeeds and one fails.
-/// 3.Receive two values from the sender in the limited time and one succeeds and one fails.
+/// 1. Create a bounded mpsc channel with capacity.
+/// 2. Send two values to the receiver in the limited time and one succeeds and
+///    one fails.
+/// 3. Receive two values from the sender in the limited time and one succeeds
+///    and one fails.
 #[test]
 fn sdv_bounded_send_timeout_recv_timeout_test() {
     let (tx, mut rx) = bounded_channel(1);
@@ -153,16 +137,15 @@ fn sdv_bounded_send_timeout_recv_timeout_test() {
     let _ = ylong_runtime::block_on(handle);
 }
 
-/// SDV test for `BoundedSender` and `UnboundedSender`.
-///
-/// # Title
-/// sdv_is_closed
+/// SDV test cases for `BoundedSender` and `UnboundedSender`.
 ///
 /// # Brief
-/// 1.Create a unbounded mpsc channel.
-/// 2.Check the close state of unbounded channel before and after the receiver is dropped.
-/// 3.Create a bounded mpsc channel with capacity.
-/// 3.Check the close state of bounded channel before and after the receiver is dropped.
+/// 1. Create a unbounded mpsc channel.
+/// 2. Check the close state of unbounded channel before and after the receiver
+///    is dropped.
+/// 3. Create a bounded mpsc channel with capacity.
+/// 4. Check the close state of bounded channel before and after the receiver is
+///    dropped.
 #[test]
 fn sdv_mpsc_is_closed() {
     let (tx, rx) = unbounded_channel::<i32>();
@@ -178,16 +161,13 @@ fn sdv_mpsc_is_closed() {
     assert!(tx.try_send(1).is_err());
 }
 
-/// SDV test for `BoundedSender` and `UnboundedSender`.
-///
-/// # Title
-/// sdv_is_same
+/// SDV test cases for `BoundedSender` and `UnboundedSender`.
 ///
 /// # Brief
-/// 1.Create two unbounded mpsc channels.
-/// 2.Check whether senders have the same source.
-/// 3.Create two bounded mpsc channels with capacity.
-/// 2.Check whether senders have the same source.
+/// 1. Create two unbounded mpsc channels.
+/// 2. Check whether senders have the same source.
+/// 3. Create two bounded mpsc channels with capacity.
+/// 4. Check whether senders have the same source.
 #[test]
 fn sdv_mpsc_is_same() {
     let (tx, _) = unbounded_channel::<i32>();
@@ -203,16 +183,13 @@ fn sdv_mpsc_is_same() {
     assert!(tx.is_same(&tx));
 }
 
-/// SDV test for `BoundedSender` and `UnboundedSender`.
-///
-/// # Title
-/// sdv_len
+/// SDV test cases for `BoundedSender` and `UnboundedSender`.
 ///
 /// # Brief
-/// 1.Create two unbounded mpsc channels.
-/// 2.Check the correctness of length of channel.
-/// 3.Create two bounded mpsc channels with capacity.
-/// 2.Check the correctness of length of channel.
+/// 1. Create two unbounded mpsc channels.
+/// 2. Check the correctness of length of channel.
+/// 3. Create two bounded mpsc channels with capacity.
+/// 4. Check the correctness of length of channel.
 #[test]
 fn sdv_mpsc_len() {
     let (tx, mut rx) = unbounded_channel();
@@ -244,16 +221,13 @@ fn sdv_mpsc_len() {
     assert_eq!(rx.len(), 0);
 }
 
-/// SDV test for `BoundedSender` and `UnboundedSender`.
-///
-/// # Title
-/// sdv_multi_send_recv_test
+/// SDV test cases for `BoundedSender` and `UnboundedSender`.
 ///
 /// # Brief
-/// 1.Create a unbounded mpsc channel.
-/// 2.Send and receive for many times.
-/// 3.Create a bounded mpsc channel with capacity.
-/// 2.Send and receive for many times.
+/// 1. Create a unbounded mpsc channel.
+/// 2. Send and receive for many times.
+/// 3. Create a bounded mpsc channel with capacity.
+/// 4. Send and receive for many times.
 #[test]
 fn sdv_multi_send_recv_test() {
     let (tx, mut rx) = unbounded_channel();

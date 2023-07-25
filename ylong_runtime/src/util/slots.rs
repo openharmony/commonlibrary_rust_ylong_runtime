@@ -14,12 +14,12 @@
 //! Slots container, similar to [`std::collections::LinkedList`]
 
 use std::error::Error;
-use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
-use std::ops;
 use std::option::Option::Some;
+use std::{fmt, ops};
 
-//Index tag of empty slot, vector will panic if the new capacity exceeds isize::MAX bytes.
+// Index tag of empty slot, vector will panic if the new capacity exceeds
+// isize::MAX bytes.
 const NULL: usize = usize::MAX;
 
 #[derive(Debug, Eq, PartialEq)]
@@ -103,7 +103,6 @@ impl<T> Slots<T> {
     ///
     /// # Examples
     /// ```
-    ///
     /// use ylong_runtime::util::slots::Slots;
     ///
     /// let mut slots = Slots::new();
@@ -125,10 +124,11 @@ impl<T> Slots<T> {
     ///
     /// Two situations:
     ///
-    /// 1.The next slot is exactly the next position of the array. Insert the data into the vector,
-    ///   increase the length, and calculate the next insertion position.
-    ///
-    /// 2.The next slot is the recycled slot. Update the index of `next` and then insert the data.
+    /// 1. The next slot is exactly the next position of the array. Insert the
+    ///    data into the vector, increase the length, and calculate the next
+    ///    insertion position.
+    /// 2. The next slot is the recycled slot. Update the index of `next` and
+    ///    then insert the data.
     ///
     /// # Examples
     ///
@@ -208,7 +208,7 @@ impl<T> Slots<T> {
                     head.prev = NULL;
                 }
             }
-            //Update linked-list information.
+            // Update linked-list information.
             self.len -= 1;
             self.next = curr;
             return val;
@@ -237,7 +237,8 @@ impl<T> Slots<T> {
                 // At the next insertion, update the next insertion position
                 entry.prev = NULL;
                 entry.next = self.next;
-                //If this node is the header node, update the header node; otherwise, update the `next` of the previous node.
+                // If this node is the header node, update the header node; otherwise, update
+                // the `next` of the previous node.
                 match self.entries.get_mut(prev) {
                     None => {
                         self.head = next;
@@ -246,7 +247,8 @@ impl<T> Slots<T> {
                         slot.next = next;
                     }
                 }
-                //If this node is the tail node, update the tail node; otherwise, update the `prev` of the next node.
+                // If this node is the tail node, update the tail node; otherwise, update the
+                // `prev` of the next node.
                 match self.entries.get_mut(next) {
                     None => {
                         self.tail = prev;
@@ -255,7 +257,7 @@ impl<T> Slots<T> {
                         slot.prev = prev;
                     }
                 }
-                //Update linked-list information.
+                // Update linked-list information.
                 self.len -= 1;
                 self.next = key;
                 return Ok(val);
@@ -264,7 +266,8 @@ impl<T> Slots<T> {
         Err(SlotsError)
     }
 
-    /// Get the reference of the element in the container according to the index.
+    /// Get the reference of the element in the container according to the
+    /// index.
     ///
     /// # Examples
     ///
@@ -287,7 +290,8 @@ impl<T> Slots<T> {
         }
     }
 
-    /// Get the mutable reference of the element in the container according to the index.
+    /// Get the mutable reference of the element in the container according to
+    /// the index.
     ///
     /// # Examples
     ///
@@ -311,7 +315,8 @@ impl<T> Slots<T> {
         }
     }
 
-    /// Check whether the index is valid and whether there is an element at the index in the container.
+    /// Check whether the index is valid and whether there is an element at the
+    /// index in the container.
     ///
     /// # Examples
     ///
@@ -331,7 +336,8 @@ impl<T> Slots<T> {
         }
     }
 
-    /// Create an immutable iterator for the container to poll all elements int the order of insertion.
+    /// Create an immutable iterator for the container to poll all elements int
+    /// the order of insertion.
     ///
     /// # Examples
     ///
@@ -346,7 +352,6 @@ impl<T> Slots<T> {
     /// for (key, element) in slots.iter() {
     ///     assert_eq!(slots.get(key).unwrap(), element);
     /// }
-    ///
     /// ```
     pub fn iter(&self) -> SlotsIter<T> {
         SlotsIter {
@@ -475,7 +480,7 @@ impl<'a, T> Iterator for SlotsIter<'a, T> {
     }
 }
 
-#[cfg(all(test))]
+#[cfg(test)]
 mod test {
     use crate::util::slots::Slots;
 
@@ -490,11 +495,11 @@ mod test {
         }
     }
 
-    /// UT test for Slots::new().
-    /// # Title
-    /// ut_slots_new
+    /// UT test cases for Slots::new().
+    ///
     /// # Brief
-    /// 1.Verify the parameters after initialization, which should be consistent with the initial value.
+    /// 1. Verify the parameters after initialization, which should be
+    ///    consistent with the initial value.
     #[test]
     fn ut_slots_new() {
         let slots: Slots<i32> = Slots::new();
@@ -503,11 +508,11 @@ mod test {
         assert_eq!(slots.entries, Vec::with_capacity(0));
     }
 
-    /// UT test for Slots::with_capacity().
-    /// # Title
-    /// ut_slots_with_capacity
+    /// UT test cases for Slots::with_capacity().
+    ///
     /// # Brief
-    /// 1.Verify the parameters after initialization, which should be consistent with the initial value.
+    /// 1. Verify the parameters after initialization, which should be
+    ///    consistent with the initial value.
     #[test]
     fn ut_slots_with_capacity() {
         let slots_new: Slots<i32> = Slots::new();
@@ -515,11 +520,10 @@ mod test {
         assert_eq!(slots_new, slots_with_capacity);
     }
 
-    /// UT test for Slots::len().
-    /// # Title
-    /// ut_slots_len
+    /// UT test cases for Slots::len().
+    ///
     /// # Brief
-    /// 1.Inserting a certain number of data into the container.
+    /// 1. Inserting a certain number of data into the container.
     #[test]
     fn ut_slots_len() {
         let mut slots = Slots::new();
@@ -531,11 +535,11 @@ mod test {
         assert_eq!(slots.len(), 1000);
     }
 
-    /// UT test for Slots::clear().
-    /// # Title
-    /// ut_slots_clear
+    /// UT test cases for Slots::clear().
+    ///
     /// # Brief
-    /// 1.Empty the container to make it exactly the same as the initialized container.
+    /// 1. Empty the container to make it exactly the same as the initialized
+    ///    container.
     #[test]
     fn ut_slots_clear() {
         let mut slots = Slots::new();
@@ -548,13 +552,14 @@ mod test {
         assert_eq!(slots, Slots::new());
     }
 
-    /// UT test for Slots::insert().
-    /// # Title
-    /// ut_slots_push_back
+    /// UT test cases for Slots::insert().
+    ///
     /// # Brief
-    /// 1.The next slot is exactly the next position of the array. Insert the data into the vector,
-    /// increase the length, and calculate the next insertion position.
-    /// 2.The next slot is the recycled slot. Update the index of `next` and then insert the data.
+    /// 1. The next slot is exactly the next position of the array. Insert the
+    ///    data into the vector, increase the length, and calculate the next
+    ///    insertion position.
+    /// 2. The next slot is the recycled slot. Update the index of `next` and
+    ///    then insert the data.
     #[test]
     fn ut_slots_push_back() {
         let mut slots = Slots::new();
@@ -609,11 +614,10 @@ mod test {
         }
     }
 
-    /// UT test for Slots::pop_front()
-    /// # Title
-    /// ut_slots_pop_front
+    /// UT test cases for Slots::pop_front()
+    ///
     /// # Brief
-    /// 1.Pop the slot from the head of container.
+    /// 1. Pop the slot from the head of container.
     #[test]
     fn ut_slots_pop_front() {
         let mut slots = Slots::new();
@@ -636,13 +640,12 @@ mod test {
         assert_eq!(slots.len(), 0);
     }
 
-    /// UT test for Slots::remove().
-    /// # Title
-    /// ut_slots_remove
+    /// UT test cases for Slots::remove().
+    ///
     /// # Brief
-    /// 1.Get the invalid data location.
-    /// 2.Get the valid data location, and it stores data.
-    /// 3.Get the valid data location, and it doesn't store data.
+    /// 1. Get the invalid data location.
+    /// 2. Get the valid data location, and it stores data.
+    /// 3. Get the valid data location, and it doesn't store data.
     #[test]
     fn ut_slots_remove() {
         let mut slots = Slots::new();
@@ -655,12 +658,11 @@ mod test {
         assert_eq!(slots.remove(0), Ok(0));
     }
 
-    /// UT test for Slots::get().
-    /// # Title
-    /// ut_slots_get
+    /// UT test cases for Slots::get().
+    ///
     /// # Brief
-    /// 1.Enter the location that stores data.
-    /// 2.Enter the location that doesn't store data.
+    /// 1. Enter the location that stores data.
+    /// 2. Enter the location that doesn't store data.
     #[test]
     fn ut_slots_get() {
         let mut slots = Slots::new();
@@ -670,12 +672,11 @@ mod test {
         assert_eq!(slots.get(123), None);
     }
 
-    /// UT test for Slots::get_mut().
-    /// # Title
-    /// ut_slots_get_mut
+    /// UT test cases for Slots::get_mut().
+    ///
     /// # Brief
-    /// 1.Enter the location that stores data.
-    /// 2.Enter the location that doesn't store data.
+    /// 1. Enter the location that stores data.
+    /// 2. Enter the location that doesn't store data.
     #[test]
     fn ut_slots_get_mut() {
         let mut slots = Slots::new();
@@ -686,13 +687,14 @@ mod test {
         assert_eq!(slots.get(123), None);
     }
 
-    /// UT test for Slots::contains().
-    /// # Title
-    /// ut_slots_contains
+    /// UT test cases for Slots::contains().
+    ///
     /// # Brief
-    /// 1.The container exists the location and there are data at that location.
-    /// 2.The container exists the location and there are no data at that location.
-    /// 3.The container doesn't exist the location.
+    /// 1. The container exists the location and there are data at that
+    ///    location.
+    /// 2. The container exists the location and there are no data at that
+    ///    location.
+    /// 3. The container doesn't exist the location.
     #[test]
     fn ut_slots_contains() {
         let mut slots = Slots::new();
@@ -706,11 +708,10 @@ mod test {
         assert!(!slots.contains(key));
     }
 
-    /// UT test for Slots::iter().
-    /// # Title
-    /// ut_slots_iter
+    /// UT test cases for Slots::iter().
+    ///
     /// # Brief
-    /// 1.Validate elements through iterators.
+    /// 1. Validate elements through iterators.
     #[test]
     fn ut_slots_iter() {
         let mut slots = Slots::new();
@@ -724,12 +725,11 @@ mod test {
         }
     }
 
-    /// UT test for Slots::is_empty().
-    /// # Title
-    /// ut_slots_is_empty
+    /// UT test cases for Slots::is_empty().
+    ///
     /// # Brief
-    /// 1.Verify empty container, the result is true.
-    /// 2.Verify non-empty container, the result is false.
+    /// 1. Verify empty container, the result is true.
+    /// 2. Verify non-empty container, the result is false.
     #[test]
     fn ut_slots_is_empty() {
         let mut slots = Slots::new();
@@ -739,12 +739,11 @@ mod test {
         assert!(!slots.is_empty());
     }
 
-    /// UT test for Slots::capacity().
-    /// # Title
-    /// ut_slots_capacity
+    /// UT test cases for Slots::capacity().
+    ///
     /// # Brief
-    /// 1.Verify the container that is initialized.
-    /// 2.Verify the container that is initialized with specific capacity.
+    /// 1. Verify the container that is initialized.
+    /// 2. Verify the container that is initialized with specific capacity.
     #[test]
     fn ut_slots_capacity() {
         let slots: Slots<i32> = Slots::new();

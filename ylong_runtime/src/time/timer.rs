@@ -11,29 +11,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::futures::poll_fn;
-use crate::time::sleep::{sleep_until, Sleep};
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
 
+use crate::futures::poll_fn;
+use crate::time::sleep::{sleep_until, Sleep};
+
 const TEN_YEARS: Duration = Duration::from_secs(86400 * 365 * 10);
 
-/// Creates new [`Timer`] that yields with interval of `period`. The first task starts immediately.
+/// Creates new [`Timer`] that yields with interval of `period`. The first task
+/// starts immediately.
 ///
 /// # Examples
 ///
 /// ```
 /// use std::time::Duration;
+///
 /// use ylong_runtime::time;
 ///
 /// async fn timer_test() {
 ///     let mut timer = time::timer(Duration::from_millis(10));
-///
-///     timer.next_period().await; // ticks immediately
-///     timer.next_period().await; // ticks after 10 ms
-///     timer.next_period().await; // ticks after 10 ms
+///     // ticks immediately
+///     timer.next_period().await;
+///     // ticks after 10 ms
+///     timer.next_period().await;
+///     // ticks after 10 ms
+///     timer.next_period().await;
 /// }
 ///
 /// let handle = ylong_runtime::spawn(timer_test());
@@ -50,17 +55,20 @@ pub fn timer(period: Duration) -> Timer {
 ///
 /// ```
 /// use std::time::{Duration, Instant};
+///
 /// use ylong_runtime::time;
 ///
 /// async fn timer_at_test() {
 ///     let mut timer = time::timer_at(
 ///         Instant::now() + Duration::from_millis(10),
-///         Duration::from_millis(30)
+///         Duration::from_millis(30),
 ///     );
-///
-///     timer.next_period().await; // ticks after 10 ms
-///     timer.next_period().await; // ticks after 30 ms
-///     timer.next_period().await; // ticks after 30 ms
+///     // ticks after 10 ms
+///     timer.next_period().await;
+///     // ticks after 30 ms
+///     timer.next_period().await;
+///     // ticks after 30 ms
+///     timer.next_period().await;
 /// }
 ///
 /// let handle = ylong_runtime::spawn(timer_at_test());
@@ -77,15 +85,16 @@ pub fn timer_at(start: Instant, period: Duration) -> Timer {
 /// # Examples
 ///
 /// ```
-/// use std::time::{Duration, Instant};
-/// use ylong_runtime::{spawn, block_on, time};
 /// use std::sync::{Arc, Mutex};
+/// use std::time::{Duration, Instant};
+///
+/// use ylong_runtime::{block_on, spawn, time};
 ///
 /// let x = Arc::new(Mutex::new(0));
 /// let xc = x.clone();
 ///
 /// let closure = move || {
-/// let mut a = xc.lock().unwrap();
+///     let mut a = xc.lock().unwrap();
 ///     *a = *a + 1;
 /// };
 ///
@@ -159,15 +168,13 @@ impl Timer {
 
 #[cfg(test)]
 mod test {
-    use crate::time::sleep;
-    use crate::{block_on, spawn, time};
     use std::sync::{Arc, Mutex};
     use std::time::{Duration, Instant};
 
-    /// time ut test case.
-    ///
-    /// # Title
-    /// new_timer
+    use crate::time::sleep;
+    use crate::{block_on, spawn, time};
+
+    /// UT test cases for new_timer
     ///
     /// # Brief
     /// 1. Uses time to create a Timer Struct.
@@ -183,10 +190,7 @@ mod test {
         });
     }
 
-    /// time ut test case.
-    ///
-    /// # Title
-    /// new_timer_base
+    /// UT test cases for new_timer_base
     ///
     /// # Brief
     /// 1. Uses timer_at to create a Timer Struct.
@@ -210,10 +214,7 @@ mod test {
         block_on(handle).unwrap();
     }
 
-    /// time ut test case.
-    ///
-    /// # Title
-    /// new_timer_timeout
+    /// UT test cases for new_timer_timeout
     ///
     /// # Brief
     /// 1. Uses time to create a Timer Struct.
@@ -239,10 +240,7 @@ mod test {
         block_on(handle).unwrap();
     }
 
-    /// time ut test case.
-    ///
-    /// # Title
-    /// new_timer_schedule
+    /// UT test cases for new_timer_schedule
     ///
     /// # Brief
     /// 1. Creates a closure.

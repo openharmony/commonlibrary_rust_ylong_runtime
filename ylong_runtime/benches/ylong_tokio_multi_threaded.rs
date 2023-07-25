@@ -75,14 +75,14 @@ macro_rules! spawn_yield_many {
 #[cfg(test)]
 mod ylong_multi_threaded {
     extern crate test;
-    use crate::task_helpers::*;
-    use test::Bencher;
-
     use std::hint::black_box;
     use std::sync::{mpsc, Arc};
 
+    use test::Bencher;
     use ylong_runtime::executor::Runtime;
     use ylong_runtime::task::yield_now;
+
+    use crate::task_helpers::*;
 
     runtime_spawn_function!();
 
@@ -119,15 +119,14 @@ mod ylong_multi_threaded {
 #[cfg(test)]
 mod tokio_multi_threaded {
     extern crate test;
-    use test::Bencher;
-
-    use crate::task_helpers::*;
-
     use std::hint::black_box;
     use std::sync::mpsc;
 
+    use test::Bencher;
     use tokio::runtime::Runtime;
     use tokio::task::yield_now;
+
+    use crate::task_helpers::*;
 
     runtime_spawn_function!();
 

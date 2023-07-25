@@ -11,12 +11,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::futures::poll_fn;
-use crate::sync::atomic_waker::AtomicWaker;
-use crate::sync::error::SendError::{Closed, Full};
-use crate::sync::error::{RecvError, SendError};
-use crate::sync::mpsc::Container;
-use crate::sync::wake_list::WakerList;
 use std::cell::RefCell;
 use std::future::Future;
 use std::mem::MaybeUninit;
@@ -25,6 +19,13 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
 use std::task::Poll::{Pending, Ready};
 use std::task::{Context, Poll};
+
+use crate::futures::poll_fn;
+use crate::sync::atomic_waker::AtomicWaker;
+use crate::sync::error::SendError::{Closed, Full};
+use crate::sync::error::{RecvError, SendError};
+use crate::sync::mpsc::Container;
+use crate::sync::wake_list::WakerList;
 
 /// The offset of the index.
 const INDEX_SHIFT: usize = 1;
@@ -84,8 +85,8 @@ impl<T> Array<T> {
             let node = self.data.get(index).unwrap();
             let node_index = node.index.load(Acquire);
 
-            // Compare the index of the node with the tail to avoid senders in different cycles
-            // writing data to the same point at the same time.
+            // Compare the index of the node with the tail to avoid senders in different
+            // cycles writing data to the same point at the same time.
             if (tail >> INDEX_SHIFT) == node_index {
                 match self.tail.compare_exchange_weak(
                     tail,

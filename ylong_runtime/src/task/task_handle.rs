@@ -11,6 +11,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::future::Future;
+use std::panic;
+use std::ptr::NonNull;
+use std::task::{Context, Poll, Waker};
+
 use crate::error::{ErrorKind, ScheduleError};
 use crate::executor::Schedule;
 use crate::macros::{cfg_ffrt, cfg_not_ffrt};
@@ -18,10 +23,6 @@ use crate::task::raw::{Header, Inner, TaskMngInfo};
 use crate::task::state::StateAction;
 use crate::task::waker::WakerRefHeader;
 use crate::task::{state, Task};
-use std::future::Future;
-use std::panic;
-use std::ptr::NonNull;
-use std::task::{Context, Poll, Waker};
 cfg_ffrt! {
     use std::ffi::c_void;
     use std::ptr::null_mut;
@@ -250,8 +251,8 @@ where
 {
     pub(crate) unsafe fn shutdown(self) {
         self.header().state.set_cancel();
-        // Check if the JoinHandle gets dropped already. If JoinHandle is still there, wakes
-        // the JoinHandle.
+        // Check if the JoinHandle gets dropped already. If JoinHandle is still there,
+        // wakes the JoinHandle.
         let cur = self.header().state.get_current_state();
         if state::is_care_join_handle(cur) {
             let stage = self.inner().stage.get();

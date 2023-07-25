@@ -12,18 +12,16 @@
 // limitations under the License.
 
 use std::{io, thread};
+
 use ylong_runtime::net::UdpSocket;
 
-/// SDV test for `send()` and `recv()`.
-///
-/// # Title
-/// test_send_recv
+/// SDV test cases for `send()` and `recv()`.
 ///
 /// # Brief
-/// 1.Create UdpSocket and connect to the remote address.
-/// 2.Sender sends message first.
-/// 3.Receiver receives message.
-/// 4.Check if the test results are correct.
+/// 1. Create UdpSocket and connect to the remote address.
+/// 2. Sender sends message first.
+/// 3. Receiver receives message.
+/// 4. Check if the test results are correct.
 #[test]
 fn sdv_udp_send_recv() {
     let sender_addr = "127.0.0.1:8081".parse().unwrap();
@@ -73,16 +71,13 @@ fn sdv_udp_send_recv() {
     ylong_runtime::block_on(handle).expect("block_on failed");
 }
 
-/// SDV test for `send_to()` and `recv_from()`.
-///
-/// # Title
-/// test_send_to_recv_from
+/// SDV test cases for `send_to()` and `recv_from()`.
 ///
 /// # Brief
-/// 1.Create UdpSocket.
-/// 2.Sender sends message to the specified address.
-/// 3.Receiver receives message and return the address the message from.
-/// 4.Check if the test results are correct.
+/// 1. Create UdpSocket.
+/// 2. Sender sends message to the specified address.
+/// 3. Receiver receives message and return the address the message from.
+/// 4. Check if the test results are correct.
 #[test]
 fn sdv_udp_send_to_recv_from() {
     let sender_addr = "127.0.0.1:8085".parse().unwrap();
@@ -149,16 +144,14 @@ fn sdv_udp_send() {
     ylong_runtime::block_on(handle).expect("block_on failed");
 }
 
-/// SDV test for functions in a multithreaded environment.
-///
-/// # Title
-/// test_thread_func
+/// SDV test cases for functions in a multithreaded environment.
 ///
 /// # Brief
-/// 1.Create sender and receiver threads, bind their new UdpSockets and connect to each other.
-/// 2.Sender send message in sender thread.
-/// 3.Receiver receives message in receiver thread.
-/// 4.Check if the test results are correct.
+/// 1. Create sender and receiver threads, bind their new UdpSockets and connect
+///    to each other.
+/// 2. Sender send message in sender thread.
+/// 3. Receiver receives message in receiver thread.
+/// 4. Check if the test results are correct.
 #[test]
 fn sdv_udp_recv() {
     let sender_addr = "127.0.0.1:8089".parse().unwrap();
@@ -186,13 +179,14 @@ fn sdv_udp_recv() {
     ylong_runtime::block_on(handle).expect("block_on failed");
 }
 
-/// SDV test for `try_send_to()` and `try_recv_from()`.
+/// SDV test cases for `try_send_to()` and `try_recv_from()`.
 ///
 /// # Brief
-/// 1.Create UdpSocket.
-/// 2.Sender tries to send message to the specified address.
-/// 3.Receiver tries to receive message and return the address the message from.
-/// 4.Check if the test results are correct.
+/// 1. Create UdpSocket.
+/// 2. Sender tries to send message to the specified address.
+/// 3. Receiver tries to receive message and return the address the message
+///    from.
+/// 4. Check if the test results are correct.
 #[test]
 fn sdv_udp_try_recv_from() {
     let sender_addr = "127.0.0.1:8091".parse().unwrap();
@@ -272,13 +266,16 @@ fn sdv_udp_try_send() {
     ylong_runtime::block_on(handle).expect("block_on failed");
 }
 
-/// SDV test for try_send and try_recv
+/// SDV test cases for try_send and try_recv
 ///
 /// # Brief
-/// 1.Create sender and receiver threads, bind their new UdpSockets and connect to each other.
-/// 2.Sender waits for writable events and attempts to send message in sender thread.
-/// 3.Receiver waits for readable events and attempts to receive message in receiver thread.
-/// 4.Check if the test results are correct.
+/// 1. Create sender and receiver threads, bind their new UdpSockets and connect
+///    to each other.
+/// 2. Sender waits for writable events and attempts to send message in sender
+///    thread.
+/// 3. Receiver waits for readable events and attempts to receive message in
+///    receiver thread.
+/// 4. Check if the test results are correct.
 #[test]
 fn sdv_udp_try_recv() {
     let sender_addr = "127.0.0.1:8093".parse().unwrap();

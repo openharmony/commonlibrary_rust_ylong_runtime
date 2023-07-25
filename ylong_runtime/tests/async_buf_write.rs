@@ -13,17 +13,19 @@
 
 use std::fs;
 use std::io::{IoSlice, SeekFrom};
+
 use ylong_runtime::fs::File;
 use ylong_runtime::io::{AsyncBufWriter, AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 use ylong_runtime::net::{TcpListener, TcpStream};
 
-/// SDV test for AsyncBufWriter `write`
+/// SDV test cases for AsyncBufWriter `write`
 ///
 /// # Brief
 /// 1. Establish an asynchronous tcp connection.
-/// 2. The client wraps the TcpStream inside a AsyncBufWriter and calls `write` to send some data.
-/// 4. The server receives data.
-/// 5. Check the read buf.
+/// 2. The client wraps the TcpStream inside a AsyncBufWriter and calls `write`
+///    to send some data.
+/// 3. The server receives data.
+/// 4. Check the read buf.
 #[test]
 fn sdv_buf_writer_write() {
     let server = ylong_runtime::spawn(async move {
@@ -55,14 +57,14 @@ fn sdv_buf_writer_write() {
     ylong_runtime::block_on(client).unwrap();
 }
 
-/// SDV test for AsyncBufWriter `write_vectored`
+/// SDV test cases for AsyncBufWriter `write_vectored`
 ///
 /// # Brief
 /// 1. Establish an asynchronous tcp connection.
-/// 2. The client wraps the TcpStream inside a AsyncBufWriter and calls `write_vectored`
-///    to send segmented data.
-/// 4. The server receives data.
-/// 5. Check the read buf.
+/// 2. The client wraps the TcpStream inside a AsyncBufWriter and calls
+///    `write_vectored` to send segmented data.
+/// 3. The server receives data.
+/// 4. Check the read buf.
 #[test]
 fn sdv_buf_writer_write_vectored() {
     let server = ylong_runtime::spawn(async move {
@@ -97,12 +99,13 @@ fn sdv_buf_writer_write_vectored() {
     ylong_runtime::block_on(client).unwrap();
 }
 
-/// SDV test for AsyncBufWriter `seek`
+/// SDV test cases for AsyncBufWriter `seek`
 ///
 /// # Brief
 /// 1. Create a file and write data.
-/// 2. Open the file, seek to three different positions in the file and read data.
-/// 5. Check the read buf.
+/// 2. Open the file, seek to three different positions in the file and read
+///    data.
+/// 3. Check the read buf.
 #[test]
 fn sdv_buf_writer_seek() {
     let handle = ylong_runtime::spawn(async move {

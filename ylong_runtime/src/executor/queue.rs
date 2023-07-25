@@ -11,18 +11,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/// Schedule strategy implementation, includes FIFO LIFO priority and work-stealing
-/// work-stealing strategy include stealing half of every worker or the largest amount of worker
-use crate::task::Task;
-
 use std::cell::UnsafeCell;
 use std::collections::linked_list::LinkedList;
 use std::mem::MaybeUninit;
-use std::sync::atomic::AtomicU32;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
-use std::sync::atomic::{AtomicU16, AtomicUsize};
+use std::sync::atomic::{AtomicU16, AtomicU32, AtomicUsize};
 use std::sync::{Arc, Mutex};
 use std::{cmp, ptr};
+
+/// Schedule strategy implementation, includes FIFO LIFO priority and
+/// work-stealing work-stealing strategy include stealing half of every worker
+/// or the largest amount of worker
+use crate::task::Task;
 
 unsafe fn non_atomic_load(data: &AtomicU16) -> u16 {
     ptr::read(data as *const AtomicU16 as *const u16)
@@ -247,8 +247,8 @@ impl InnerBuffer {
         let mut count = loop {
             let (src_front_steal, src_front_real) = unwrap(src_prev_front);
 
-            // if these two values are not equal, it means another worker has stolen from this
-            // queue, therefore abort this steal.
+            // if these two values are not equal, it means another worker has stolen from
+            // this queue, therefore abort this steal.
             if src_front_steal != src_front_real {
                 return None;
             };
@@ -422,19 +422,20 @@ impl GlobalQueue {
 }
 
 #[cfg(feature = "multi_instance_runtime")]
-#[cfg(all(test))]
+#[cfg(test)]
 mod test {
-    use crate::executor::async_pool::MultiThreadScheduler;
-    use crate::executor::queue::{unwrap, GlobalQueue, InnerBuffer, LocalQueue, LOCAL_QUEUE_CAP};
-    #[cfg(feature = "net")]
-    use crate::net::Driver;
-    use crate::task::{Task, TaskBuilder, VirtualTableType};
     use std::future::Future;
     use std::pin::Pin;
     use std::sync::atomic::Ordering::Acquire;
     use std::sync::Arc;
     use std::task::{Context, Poll};
     use std::thread::park;
+
+    use crate::executor::async_pool::MultiThreadScheduler;
+    use crate::executor::queue::{unwrap, GlobalQueue, InnerBuffer, LocalQueue, LOCAL_QUEUE_CAP};
+    #[cfg(feature = "net")]
+    use crate::net::Driver;
+    use crate::task::{Task, TaskBuilder, VirtualTableType};
 
     impl InnerBuffer {
         fn len(&self) -> u16 {
@@ -468,8 +469,8 @@ mod test {
         type Output = usize;
         fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
             if self.total > self.value {
-                //unsafe {
-                //Pin::get_unchecked_mut(self).value += 1;
+                // unsafe {
+                // Pin::get_unchecked_mut(self).value += 1;
 
                 //}
                 self.get_mut().value += 1;
@@ -495,31 +496,26 @@ mod test {
         ut_inner_buffer_steal_into();
     }
 
-    /*
-     * @title  InnerBuffer::new() UT test
-     * @design The function has no invalid values in the input, no exception branch, direct check function, return value
-     * @precon After calling InnerBuffer::new() function, get its created object
-     * @brief  Describe test case execution
-     *         1、Checking the parameters after initialization is completed
-     * @expect The function entry has no invalid value, no exception branch, and the property value should be related to the entry after the initialization is completed
-     * @auto   true
-     */
+    /// UT test cases for InnerBuffer::new()
+    ///
+    /// # Brief
+    /// 1. Checking the parameters after initialization is completed
     fn ut_inner_buffer_new() {
         let inner_buffer = InnerBuffer::new(LOCAL_QUEUE_CAP as u16);
         assert_eq!(inner_buffer.cap, LOCAL_QUEUE_CAP as u16);
         assert_eq!(inner_buffer.buffer.len(), LOCAL_QUEUE_CAP);
     }
 
-    /*
-     * @title  InnerBuffer::is_empty() UT test
-     * @design The function has no invalid values in the input, no exception branch, direct check function, return value
-     * @precon After calling InnerBuffer::new() function, get its created object
-     * @brief  Describe test case execution
-     *         1、Checking the parameters after initialization is completed
-     *         2、After entering a task into the queue space, determine again whether it is empty or not, and it should be non-empty
-     * @expect The function entry has no invalid value, no exception branch, and the property value should be related to the entry after the initialization is completed
-     * @auto   true
-     */
+    // InnerBuffer::is_empty() UT test cases
+    //
+
+    /// # Brief
+    // case execution         1. Checking the parameters after initialization is
+    // completed         2. After entering a task into the queue space,
+    // determine again whether it is empty or not, and it should be non-empty
+    //
+    // property value should be related to the entry after the initialization is
+    // completed
     fn ut_inner_buffer_is_empty() {
         let inner_buffer = InnerBuffer::new(LOCAL_QUEUE_CAP as u16);
         assert!(inner_buffer.is_empty());
@@ -546,17 +542,17 @@ mod test {
         assert!(!inner_buffer.is_empty());
     }
 
-    /*
-     * @title  InnerBuffer::len() UT test
-     * @design The function entry has no invalid value, there is an exception branch, direct check function, return value
-     * @precon After calling InnerBuffer::new() function, get its created object
-     * @brief  Describe test case execution
-     *         1、Checking the parameters after initialization is completed
-     *         2、Insert tasks up to their capacity into the local queue, checking the local queue length
-     *         3、Insert tasks into the local queue that exceed its capacity, checking the local queue length as well as the global queue length
-     * @expect The function entry has no invalid value, no exception branch, and the property value should be related to the entry after the initialization is completed
-     * @auto   true
-     */
+    // InnerBuffer::len() UT test cases
+    //
+
+    /// # Brief
+    // case execution         1. Checking the parameters after initialization is
+    // completed         2. Insert tasks up to their capacity into the local
+    // queue, checking the local queue length         3. Insert tasks into the
+    // local queue that exceed its capacity, checking the local queue length as well
+    // as the global queue length
+    // value, no exception branch, and the property value should be related to the
+    // entry after the initialization is completed
     fn ut_inner_buffer_len() {
         let inner_buffer = InnerBuffer::new(LOCAL_QUEUE_CAP as u16);
         assert_eq!(inner_buffer.len(), 0);
@@ -605,18 +601,19 @@ mod test {
         assert_eq!(global_queue.len.load(Acquire), 1 + LOCAL_QUEUE_CAP / 2);
     }
 
-    /*
-     * @title  InnerBuffer::push_back() UT test
-     * @design The function entry has no invalid value, there is an exception branch, direct check function, return value
-     * @precon After calling InnerBuffer::new() function, get its created object
-     * @brief  Describe test case execution
-     *         1、Insert tasks up to capacity into the local queue, verifying that they are functionally correct
-     *         2、Insert tasks that exceed the capacity into the local queue and verify that they are functionally correct
-     * @expect The function entry has no invalid value, there is an exception branch, after the initialization is completed the property value should be related to the entry
-     * @auto   true
-     */
+    // InnerBuffer::push_back() UT test cases
+    //
+
+    /// # Brief
+    // case execution         1. Insert tasks up to capacity into the local
+    // queue, verifying that they are functionally correct         2. Insert
+    // tasks that exceed the capacity into the local queue and verify that they are
+    // functionally correct
+    // there is an exception branch, after the initialization is completed the
+    // property value should be related to the entry
     fn ut_inner_buffer_push_back() {
-        // 1、Insert tasks up to capacity into the local queue, verifying that they are functionally correct
+        // 1. Insert tasks up to capacity into the local queue, verifying that they are
+        // functionally correct
         let local_queue = LocalQueue::new();
         let global_queue = GlobalQueue::new();
 
@@ -656,7 +653,8 @@ mod test {
 
         assert_eq!(local_queue.len(), 256);
 
-        // 2、Insert tasks that exceed the capacity into the local queue and verify that they are functionally correct
+        // 2. Insert tasks that exceed the capacity into the local queue and verify that
+        // they are functionally correct
         let local_queue = LocalQueue::new();
         let global_queue = GlobalQueue::new();
 
@@ -700,24 +698,28 @@ mod test {
         assert_eq!(global_queue.len.load(Acquire), 1 + LOCAL_QUEUE_CAP / 2);
     }
 
-    /*
-     * @title  InnerBuffer::pop_front() UT test
-     * @design The function entry has no invalid value, there is an exception branch, direct check function, return value
-     * @precon After calling InnerBuffer::new() function, get its created object
-     * @brief  Describe test case execution
-     *         1、Multi-threaded take out task operation with empty local queue, check if the function is correct
-     *         2、If the local queue is not empty, multi-threaded take out operations up to the number of existing tasks and check if the function is correct
-     *         3、If the local queue is not empty, the multi-threaded operation to take out more than the number of existing tasks, check whether the function is correct
-     * @expect The function entry has no invalid value, and the property value should be related to the entry after the initialization is completed
-     * @auto   true
-     */
+    // InnerBuffer::pop_front() UT test cases
+    //
+
+    /// # Brief
+    // case execution         1. Multi-threaded take out task operation with
+    // empty local queue, check if the function is correct         2. If the
+    // local queue is not empty, multi-threaded take out operations up to the number
+    // of existing tasks and check if the function is correct         3. If the
+    // local queue is not empty, the multi-threaded operation to take out more than
+    // the number of existing tasks, check whether the function is correct
+    //
+    // should be related to the entry after the initialization is completed
+    //
     fn ut_inner_buffer_pop_front() {
-        // 1、Multi-threaded take out task operation with empty local queue, check if the function is correct
+        // 1. Multi-threaded take out task operation with empty local queue, check if
+        // the function is correct
         let local_queue = LocalQueue::new();
         let global_queue = GlobalQueue::new();
         assert!(local_queue.pop_front().is_none());
 
-        // 2、If the local queue is not empty, multi-threaded take out operations up to the number of existing tasks and check if the function is correct
+        // 2. If the local queue is not empty, multi-threaded take out operations up to
+        // the number of existing tasks and check if the function is correct
         let local_queue = Arc::new(LocalQueue::new());
         let builder = TaskBuilder::new();
 
@@ -759,7 +761,8 @@ mod test {
         thread_two.join().expect("failed");
         assert!(local_queue.is_empty());
 
-        // 3、If the local queue is not empty, the multi-threaded operation to take out more than the number of existing tasks, check whether the function is correct
+        // 3. If the local queue is not empty, the multi-threaded operation to take out
+        // more than the number of existing tasks, check whether the function is correct
         let local_queue = Arc::new(LocalQueue::new());
 
         #[cfg(feature = "net")]
@@ -801,21 +804,29 @@ mod test {
         assert!(local_queue.is_empty());
     }
 
-    /*
-     * @title  InnerBuffer::steal_into() UT test
-     * @design The function entry has no invalid value, there is an exception branch, direct check function, return value
-     * @precon After calling InnerBuffer::new() function, get its created object
-     * @brief  Describe test case execution
-     *         1、In the single-threaded case, the local queue has more than half the number of tasks, steal from other local queues, the number of steals is 0, check whether the function is completed
-     *         2、In the single-threaded case, the number of tasks already in the local queue is not more than half, steal from other local queues, the number of steals is 0, check whether the function is completed
-     *         3、In the single-threaded case, the number of tasks already in the local queue is not more than half, steal from other local queues, the number of steals is not 0, check whether the function is completed
-     *         4、Multi-threaded case, other queues are doing take out operations, but steal from this queue to see if the function is completed
-     *         5、In the multi-threaded case, other queues are being stolen by non-local queues, steal from that stolen queue and see if the function is completed
-     * @expect The function entry has no invalid value, and the property value should be related to the entry after the initialization is completed
-     * @auto   true
-     */
+    // InnerBuffer::steal_into() UT test cases
+    //
+
+    /// # Brief
+    // case execution         1. In the single-threaded case, the local queue
+    // has more than half the number of tasks, steal from other local queues, the
+    // number of steals is 0, check whether the function is completed
+    //         2. In the single-threaded case, the number of tasks already in the
+    // local queue is not more than half, steal from other local queues, the number
+    // of steals is 0, check whether the function is completed         3. In the
+    // single-threaded case, the number of tasks already in the local queue is not
+    // more than half, steal from other local queues, the number of steals is not 0,
+    // check whether the function is completed         4. Multi-threaded case,
+    // other queues are doing take out operations, but steal from this queue to see
+    // if the function is completed         5. In the multi-threaded case, other
+    // queues are being stolen by non-local queues, steal from that stolen queue and
+    // see if the function is completed
+    // invalid value, and the property value should be related to the entry after
+    // the initialization is completed
     fn ut_inner_buffer_steal_into() {
-        // 1、In the single-threaded case, the local queue has more than half the number of tasks, steal from other local queues, the number of steals is 0, check whether the function is completed
+        // 1. In the single-threaded case, the local queue has more than half the number
+        // of tasks, steal from other local queues, the number of steals is 0, check
+        // whether the function is completed
         let local_queue = LocalQueue::new();
         let other_local_queue = LocalQueue::new();
         let global_queue = GlobalQueue::new();
@@ -858,13 +869,17 @@ mod test {
 
         assert!(other_local_queue.steal_into(&local_queue).is_none());
 
-        // 2、In the single-threaded case, the number of tasks already in the local queue is not more than half, steal from other local queues, the number of steals is 0, check whether the function is completed
+        // 2. In the single-threaded case, the number of tasks already in the local
+        // queue is not more than half, steal from other local queues, the number of
+        // steals is 0, check whether the function is completed
         let local_queue = LocalQueue::new();
         let other_local_queue = LocalQueue::new();
 
         assert!(other_local_queue.steal_into(&local_queue).is_none());
 
-        // 3、In the single-threaded case, the number of tasks already in the local queue is not more than half, steal from other local queues, the number of steals is not 0, check whether the function is completed
+        // 3. In the single-threaded case, the number of tasks already in the local
+        // queue is not more than half, steal from other local queues, the number of
+        // steals is not 0, check whether the function is completed
         let local_queue = LocalQueue::new();
         let other_local_queue = LocalQueue::new();
         let global_queue = GlobalQueue::new();
@@ -890,7 +905,8 @@ mod test {
         assert_eq!(other_local_queue.len(), (LOCAL_QUEUE_CAP / 2) as u16);
         assert_eq!(local_queue.len(), (LOCAL_QUEUE_CAP / 2 - 1) as u16);
 
-        // 4、Multi-threaded case, other queues are doing take out operations, but steal from this queue to see if the function is completed
+        // 4. Multi-threaded case, other queues are doing take out operations, but steal
+        // from this queue to see if the function is completed
         let local_queue = Arc::new(LocalQueue::new());
         let local_queue_clone = local_queue.clone();
 
@@ -935,7 +951,8 @@ mod test {
             (LOCAL_QUEUE_CAP / 2) as u16
         );
 
-        // 5、In the multi-threaded case, other queues are being stolen by non-local queues, steal from that stolen queue and see if the function is completed
+        // 5. In the multi-threaded case, other queues are being stolen by non-local
+        // queues, steal from that stolen queue and see if the function is completed
         let local_queue_one = Arc::new(LocalQueue::new());
         let local_queue_one_clone = local_queue_one.clone();
 

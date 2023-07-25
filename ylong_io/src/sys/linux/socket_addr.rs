@@ -11,9 +11,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use libc::{sockaddr, socklen_t};
 use std::mem::size_of;
 use std::net::SocketAddr;
+
+use libc::{sockaddr, socklen_t};
 
 #[repr(C)]
 pub(crate) union SocketAddrLibC {

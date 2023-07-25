@@ -20,10 +20,9 @@ mod token;
 pub use token::Token;
 
 pub mod sys;
-pub use sys::Selector;
 #[cfg(feature = "udp")]
 pub use sys::{ConnectedUdpSocket, UdpSocket};
-pub use sys::{Event, EventTrait, Events};
+pub use sys::{Event, EventTrait, Events, Selector};
 #[cfg(feature = "tcp")]
 pub use sys::{TcpListener, TcpStream};
 

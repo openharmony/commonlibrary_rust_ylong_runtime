@@ -37,7 +37,8 @@ fn main() {
     let core_pool_size = 4;
     // Sets whether the asynchronous thread pool is tied for core processing
     let is_affinity = true;
-    // Creates runtime environment second time (only asynchronous thread pools are supported)
+    // Creates runtime environment second time (only asynchronous thread pools are
+    // supported)
     let runtime_two = RuntimeBuilder::new_multi_thread()
         .is_affinity(is_affinity)
         .worker_num(core_pool_size)

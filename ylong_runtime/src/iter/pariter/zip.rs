@@ -11,8 +11,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::ParallelIterator;
 use std::iter;
+
+use super::ParallelIterator;
 
 pub fn zip<A, B>(mut a: A, mut b: B) -> Zip<A, B>
 where

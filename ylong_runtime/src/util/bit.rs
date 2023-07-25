@@ -15,7 +15,8 @@
 
 /// Mask, representing a segment of consecutive binary bits, e.g.
 ///
-/// When using the mask with a binary number for **and** operations, the value at the mask position of the binary number can be obtained.
+/// When using the mask with a binary number for **and** operations, the value
+/// at the mask position of the binary number can be obtained.
 ///
 /// For example: 0000_1111(mask) & 1010_1010(target number) = 0000_1010
 ///
@@ -25,7 +26,6 @@
 ///
 /// // On a 64-bit machine, you can get the mask 0xf
 /// let mask = Mask::new(4, 0);
-///
 /// ```
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Mask {
@@ -34,7 +34,8 @@ pub struct Mask {
 }
 
 impl Mask {
-    /// Creates a mask. Generates a mask based on the length of consecutive binary bits + an offset.
+    /// Creates a mask. Generates a mask based on the length of consecutive
+    /// binary bits + an offset.
     ///
     /// # Parameter
     /// width: Length of consecutive binary bits
@@ -56,7 +57,8 @@ impl Mask {
     /// let mask = Mask::new(width, shift);
     /// // Get mask as 0xf0
     /// ```
-    /// When width >= machine word length, a mask of all 1's is returned regardless of the shift.
+    /// When width >= machine word length, a mask of all 1's is returned
+    /// regardless of the shift.
     /// ```rust
     /// use ylong_runtime::util::bit::Mask;
     ///
@@ -74,15 +76,16 @@ impl Mask {
     /// let mask = Mask::new(width, shift);
     /// // On a 64-bit machine, the mask is 0x0
     /// ```
-    /// When width < machine word length and width + shift > machine word length, it will ensure that width remains unchanged and shift becomes machine word length - width.
-    /// ```rust
+    /// When width < machine word length and width + shift > machine word
+    /// length, it will ensure that width remains unchanged and shift becomes
+    /// machine word length - width. ```rust
     /// use ylong_runtime::util::bit::Mask;
     ///
     /// let width = 32;
     /// let shift = 64;
     /// let mask = Mask::new(width, shift);
-    /// // On a 64-bit machine, the mask is 0xffff_ffff_0000_0000, the offset becomes 32.
-    /// ```
+    /// // On a 64-bit machine, the mask is 0xffff_ffff_0000_0000, the offset
+    /// becomes 32. ```
     pub const fn new(width: u32, shift: u32) -> Self {
         const USIZE_LEN: u32 = 0usize.wrapping_sub(1).count_ones();
         if width >= USIZE_LEN {
@@ -104,12 +107,15 @@ impl Mask {
     }
 }
 
-/// Bit is used for some binary processing. A usize type can be converted to a Bit type to get a part of it by concatenating it with a Mask type.
+/// Bit is used for some binary processing. A usize type can be converted to a
+/// Bit type to get a part of it by concatenating it with a Mask type.
 ///
-/// Uses the get_by_mask method to get the value of the specified bit from the Bit. Uses set_by_mask to add the value of the specified bit to the bit.
+/// Uses the get_by_mask method to get the value of the specified bit from the
+/// Bit. Uses set_by_mask to add the value of the specified bit to the bit.
 ///
-/// For example, divides a usize type into different meanings according to each bit, uses Mask to get the mask in the corresponding position,
-/// and then uses Bit set_by_mask\get_by_mask to modify the specified bit.
+/// For example, divides a usize type into different meanings according to each
+/// bit, uses Mask to get the mask in the corresponding position, and then uses
+/// Bit set_by_mask\get_by_mask to modify the specified bit.
 ///
 /// # Example
 /// ```not run
@@ -171,12 +177,13 @@ impl Bit {
 
     /// Overwrites a usize data to the specified mask position of the bit.
     ///
-    /// If the binary length of the given usize data is greater than the binary bit length of the mask, it will be truncated.
+    /// If the binary length of the given usize data is greater than the binary
+    /// bit length of the mask, it will be truncated.
     ///
     /// # Example
     /// When Mask binary length >= val binary length (excluding leading zeros)
     /// ```rust
-    /// use ylong_runtime::util::bit::{Mask, Bit};
+    /// use ylong_runtime::util::bit::{Bit, Mask};
     ///
     /// // mask's length 16
     /// const MASK: Mask = Mask::new(16, 0);
@@ -186,11 +193,11 @@ impl Bit {
     /// let val = 0x1234usize;
     /// bits.set_by_mask(MASK, val);
     /// assert_eq!(bits, Bit::from_usize(0x1234));
-    ///
     /// ```
-    /// When Mask binary length < val binary length (excluding leading zeros), val is truncated and only the low bit is retained.
+    /// When Mask binary length < val binary length (excluding leading zeros),
+    /// val is truncated and only the low bit is retained.
     /// ```rust
-    /// use ylong_runtime::util::bit::{Mask, Bit};
+    /// use ylong_runtime::util::bit::{Bit, Mask};
     ///
     /// // mask's length 16
     /// const MASK: Mask = Mask::new(16, 0);
@@ -243,7 +250,7 @@ impl Bit {
     ///
     /// # Example
     /// ```rust
-    /// use ylong_runtime::util::bit::{Mask, Bit};
+    /// use ylong_runtime::util::bit::{Bit, Mask};
     ///
     /// let base = 0xffffusize;
     /// let mut bits = Bit::from_usize(base);
@@ -255,23 +262,13 @@ impl Bit {
     }
 }
 
-/*
-* @title  mask new function ut test
-* @design Conditions of use override
-* @precon None
-* @brief  1. Get the current machine word length
-*         2. Call the new function according to the machine word length, pass in the parameters, and create the Mask
-*         3. Check return value
-* @expect 1. On a 64-bit machine, width >= 64, get width = 64, shift = 0
-*         2. On a 64-bit machine, width == 0, get width = 0, shift = 0
-*         3. On a 64-bit machine, 0 < width < 64, width + shift >= 64, get width = input width,  shift = 64 - input width
-*         4. On a 64-bit machine, 0 < width < 64, width + shift < 64, call width = input width,  shift = input shift
-*         5. On a 32-bit machine, width >= 32, call new, get width = 32, shift = 0
-*         6. On a 32-bit machine, width == 0, call new, get width = 0, shift = 0
-*         7. On a 32-bit machine, 0 < width < 32, width + shift >= 32, get width = input width, shift = 32 - input width
-*         8. On a 32-bit machine, 0 < width < 32, width + shift < 32, get width = input width, shift = input width
-* @auto   Yes
-*/
+/// UT test cases for mask new function
+///
+/// # Brief  
+/// 1. Get the current machine word length.
+/// 2. Call the new function according to the machine word length, pass in the
+///    parameters, and create the Mask.
+/// 3. Check return value.
 #[test]
 fn ut_mask_new() {
     const USIZE_LEN: u32 = 0usize.wrapping_sub(1).count_ones();
@@ -658,14 +655,10 @@ fn ut_mask_new() {
     }
 }
 
-/*
-* @title  bit from_usize function ut test
-* @design Conditions of use override
-* @precon None
-* @brief  None
-* @expect 1. Pass in any usize, call from_usize, and check the return value
-* @auto   Yes
-*/
+/// UT test cases for bit from_usize function
+///
+/// # Brief
+/// 1. Pass in any usize, call from_usize, and check the return value.
 #[test]
 fn ut_bit_from_usize() {
     const USIZE_MAX: usize = 0usize.wrapping_sub(1);
@@ -676,16 +669,12 @@ fn ut_bit_from_usize() {
     assert_eq!(Bit::from_usize(USIZE_MAX), Bit(USIZE_MAX));
 }
 
-/*
-* @title  bit as_usize function ut test
-* @design Conditions of use override
-* @precon None
-* @brief  1. Creating a Bit Instance
-*         2. Call as_usize
-*         3. Check return value
-* @expect 1. Get the bit internal usize
-* @auto   Yes
-*/
+/// UT test cases for bit as_usize function
+///
+/// # Brief  
+/// 1. Creating a Bit Instance.
+/// 2. Call as_usize.
+/// 3. Check return value.
 #[test]
 fn ut_bit_as_usize() {
     const USIZE_MAX: usize = 0usize.wrapping_sub(1);
@@ -696,16 +685,12 @@ fn ut_bit_as_usize() {
     assert_eq!(Bit::from_usize(USIZE_MAX).as_usize(), USIZE_MAX);
 }
 
-/*
-* @title  bit set function ut test
-* @design Conditions of use override
-* @precon None
-* @brief  1. Creating a Bit Instance
-*         2. Call the set function and pass in a new usize
-*         3. Check return value
-* @expect 1. Bit Internal value becomes the new usize passed in
-* @auto   Yes
-*/
+/// UT test cases for bit set function
+///
+/// # Brief  
+/// 1. Creating a Bit Instance.
+/// 2. Call the set function and pass in a new usize.
+/// 3. Check return value.
 #[test]
 fn ut_bit_set() {
     const USIZE_MAX: usize = 0usize.wrapping_sub(1);
@@ -724,16 +709,12 @@ fn ut_bit_set() {
     assert_eq!(b.as_usize(), 0xf0f0);
 }
 
-/*
-* @title  bit clear function ut test
-* @design Conditions of use override
-* @precon None
-* @brief  1. Creating a Bit Instance
-*         2. Call clear()
-*         3. Calibrate the instance
-* @expect 1. The internal value of this Bit instance is cleared to zero
-* @auto   Yes
-*/
+/// UT test cases for bit clear function
+///
+/// # Brief  
+/// 1. Creating a Bit Instance.
+/// 2. Call clear().
+/// 3. Calibrate the instance.
 #[test]
 fn ut_bit_clear() {
     const USIZE_MAX: usize = 0usize.wrapping_sub(1);
@@ -752,17 +733,12 @@ fn ut_bit_clear() {
     assert_eq!(b.as_usize(), 0);
 }
 
-/*
-* @title  bit set_by_mask function ut test
-* @design Conditions of use override
-* @precon None
-* @brief  1. Create a Bit instance, create a Mask instance
-*         2. Call set_by_mask()
-*         3. Verify the Bit instance
-* @expect 1. Mask length < val valid value length, the truncated part of the valid value is overwritten into the Bit instance
-*         2. Mask length >= val valid value length, the complete part of the valid value is overwritten into the Bit instance
-* @auto   Yes
-*/
+/// UT test cases for bit set_by_mask function
+///
+/// # Brief  
+/// 1. Create a Bit instance, create a Mask instance.
+/// 2. Call set_by_mask().
+/// 3. Verify the Bit instance.
 #[test]
 fn ut_bit_set_by_mask() {
     const USIZE_LEN: u32 = 0usize.wrapping_sub(1).count_ones();
@@ -918,16 +894,12 @@ fn ut_bit_set_by_mask() {
     }
 }
 
-/*
-* @title  bit get_by_mask function ut test
-* @design Conditions of use override
-* @precon None
-* @brief  1. Create a Bit instance, create a Mask instance
-*         2. Call get_by_mask()
-*         3. Check return value
-* @expect 1. Gets the value of the Bit instance on the corresponding Mask bit
-* @auto   Yes
-*/
+/// UT test cases for bit get_by_mask function
+///
+/// # Brief  
+/// 1. Create a Bit instance, create a Mask instance.
+/// 2. Call get_by_mask().
+/// 3. Check return value.
 #[test]
 fn ut_bit_get_by_mask() {
     const USIZE_LEN: u32 = 0usize.wrapping_sub(1).count_ones();

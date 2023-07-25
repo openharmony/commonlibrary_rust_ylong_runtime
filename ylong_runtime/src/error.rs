@@ -114,7 +114,7 @@ impl ScheduleError {
     /// # Examples
     ///
     /// ```
-    /// use ylong_runtime::error::{ScheduleError, ErrorKind};
+    /// use ylong_runtime::error::{ErrorKind, ScheduleError};
     ///
     /// // Able to create new error types directly from strings
     /// let custom_error = ScheduleError::new(ErrorKind::TaskShutdown, "task shutdown");
@@ -140,8 +140,7 @@ impl ScheduleError {
     /// # Examples
     ///
     /// ```
-    /// use ylong_runtime::error::ScheduleError;
-    /// use ylong_runtime::error::ErrorKind;
+    /// use ylong_runtime::error::{ErrorKind, ScheduleError};
     ///
     /// fn print_error(err: ScheduleError) {
     ///     if let Some(inner_err) = err.into_inner() {
@@ -167,8 +166,7 @@ impl ScheduleError {
     /// # Examples
     ///
     /// ```
-    /// use ylong_runtime::error::ScheduleError;
-    /// use ylong_runtime::error::ErrorKind;
+    /// use ylong_runtime::error::{ErrorKind, ScheduleError};
     ///
     /// fn print_error(err: ScheduleError) {
     ///     println!("{:?}", err.kind());
@@ -195,20 +193,15 @@ impl From<ScheduleError> for io::Error {
 
 impl std::error::Error for ScheduleError {}
 
-#[cfg(all(test))]
+#[cfg(test)]
 mod test {
     use crate::error::{ErrorKind, ScheduleError};
 
-    /*
-     * @title  ScheduleError `Debug` UT test
-     * @design The function has no input parameters, there is an exception branch, direct check function, return value
-     * @precon None
-     * @brief  Describe test case execution
-     *         1、Creating simple errors
-     *         2、Creating complex errors
-     * @expect Verify that `Debug` prints for different error cases, and that they correspond to each other
-     * @auto   true
-     */
+    /// UT test cases for ScheduleError `Debug`
+    ///
+    /// # Brief
+    /// 1. Creating simple errors
+    /// 2. Creating complex errors
     #[test]
     fn ut_schedule_error_debug() {
         let simple_error: ScheduleError = ErrorKind::TaskShutdown.into();
@@ -221,16 +214,11 @@ mod test {
         );
     }
 
-    /*
-     * @title  ScheduleError `Display` UT test
-     * @design The function has no input parameters, there is an exception branch, direct check function, return value
-     * @precon None
-     * @brief  Describe test case execution
-     *         1、Creating simple errors
-     *         2、Creating complex errors
-     * @expect Verify that `Display` prints for different error cases, and that they correspond to each other
-     * @auto   true
-     */
+    /// UT test cases for ScheduleError `Display`
+    ///
+    /// # Brief
+    /// 1. Creating simple errors
+    /// 2. Creating complex errors
     #[test]
     fn ut_schedule_error_display() {
         let simple_error: ScheduleError = ErrorKind::TaskShutdown.into();
@@ -243,16 +231,11 @@ mod test {
         );
     }
 
-    /*
-     * @title  ScheduleError::new() UT test
-     * @design The function has no invalid input, there is an exception branch, direct check function, return value
-     * @precon None
-     * @brief  Describe test case execution
-     *         1、Creating simple errors
-     *         2、Creating complex errors
-     * @expect Verify the error structure created
-     * @auto   true
-     */
+    /// UT test cases for ScheduleError::new()
+    ///
+    /// # Brief
+    /// 1. Creating simple errors
+    /// 2. Creating complex errors
     #[test]
     fn ut_schedule_error_new() {
         let custom_error_one =
@@ -274,16 +257,11 @@ mod test {
         assert_eq!(format!("{custom_error_two}"), "TaskShutdown: task shutdown");
     }
 
-    /*
-     * @title  ScheduleError::kind() UT test
-     * @design The function has no input parameters, there is an exception branch, direct check function, return value
-     * @precon None
-     * @brief  Describe test case execution
-     *         1、Creating simple errors
-     *         2、Creating complex errors
-     * @expect Verify the `ErrorKind` condition in the created error structure
-     * @auto   true
-     */
+    /// UT test cases for ScheduleError::kind()
+    ///
+    /// # Brief
+    /// 1. Creating simple errors
+    /// 2. Creating complex errors
     #[test]
     fn ut_schedule_error_kind() {
         let simple_error: ScheduleError = ErrorKind::Other.into();
@@ -293,16 +271,11 @@ mod test {
         assert_eq!(format!("{:?}", custom_error.kind()), "TaskShutdown");
     }
 
-    /*
-     * @title  ScheduleError::into_inner() UT test
-     * @design The function has no input parameters, there is an exception branch, direct check function, return value
-     * @precon None
-     * @brief  Describe test case execution
-     *         1、Creating simple errors
-     *         2、Creating complex errors
-     * @expect Checking the results according to the different cases of creation errors
-     * @auto   true
-     */
+    /// UT test cases for ScheduleError::into_inner()
+    ///
+    /// # Brief
+    /// 1. Creating simple errors
+    /// 2. Creating complex errors
     #[test]
     fn ut_schedule_error_into_inner() {
         let simple_error: ScheduleError = ErrorKind::Other.into();

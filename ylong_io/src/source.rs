@@ -11,8 +11,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{Interest, Selector, Token};
 use std::io;
+
+use crate::{Interest, Selector, Token};
 
 #[cfg(target_os = "linux")]
 pub(crate) type Fd = i32;
@@ -20,8 +21,9 @@ pub(crate) type Fd = i32;
 #[cfg(target_os = "windows")]
 pub(crate) type Fd = std::os::windows::io::RawSocket;
 
-/// Source Trait that every connection requires async polling in [`crate::Poll`] needs to implement.
-/// [`crate::Poll`] will asynchronously poll out connections, and handle it.
+/// Source Trait that every connection requires async polling in [`crate::Poll`]
+/// needs to implement. [`crate::Poll`] will asynchronously poll out
+/// connections, and handle it.
 pub trait Source {
     /// Registers the connection into [`crate::Poll`]
     fn register(
@@ -31,7 +33,8 @@ pub trait Source {
         interests: Interest,
     ) -> io::Result<()>;
 
-    /// Reregisters the connection into [`crate::Poll`], this can change [`Interest`].
+    /// Reregisters the connection into [`crate::Poll`], this can change
+    /// [`Interest`].
     fn reregister(
         &mut self,
         selector: &Selector,

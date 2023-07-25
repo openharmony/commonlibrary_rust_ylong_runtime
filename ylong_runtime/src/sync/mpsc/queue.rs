@@ -11,10 +11,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::futures::poll_fn;
-use crate::sync::atomic_waker::AtomicWaker;
-use crate::sync::error::{RecvError, SendError};
-use crate::sync::mpsc::Container;
 use std::cell::RefCell;
 use std::mem::MaybeUninit;
 use std::ptr;
@@ -23,6 +19,11 @@ use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
 use std::sync::atomic::{AtomicBool, AtomicPtr, AtomicUsize};
 use std::task::Poll::{Pending, Ready};
 use std::task::{Context, Poll};
+
+use crate::futures::poll_fn;
+use crate::sync::atomic_waker::AtomicWaker;
+use crate::sync::error::{RecvError, SendError};
+use crate::sync::mpsc::Container;
 
 /// The capacity of a block.
 const CAPACITY: usize = 32;
@@ -65,9 +66,10 @@ impl<T> Block<T> {
 
     fn insert(&self, ptr: *mut Block<T>) {
         let mut curr = self;
-        // The number of cycles is limited. Recycling blocks is to avoid frequent creation and
-        // destruction, but trying too many times may consume more resources. Every block should
-        // stop trying after failing to insert for a certain times.
+        // The number of cycles is limited. Recycling blocks is to avoid frequent
+        // creation and destruction, but trying too many times may consume more
+        // resources. Every block should stop trying after failing to insert for
+        // a certain times.
         for _ in 0..5 {
             match curr.try_insert(ptr) {
                 Ok(_) => return,

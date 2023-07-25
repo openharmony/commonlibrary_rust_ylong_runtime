@@ -13,18 +13,20 @@
 
 //! Joinhandle for asynchronous tasks.
 //!
-//! [`JoinHandle`] is similar to a JoinHandle for a thread. It could be used to await an
-//! asynchronous task to finish to get its result.
+//! [`JoinHandle`] is similar to a JoinHandle for a thread. It could be used to
+//! await an asynchronous task to finish to get its result.
 
-use crate::error::ScheduleError;
-use crate::task::raw::RawTask;
-use crate::task::state;
 use std::future::Future;
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task::{Context, Poll, Waker};
+
 #[cfg(feature = "ffrt")]
 use ylong_ffrt::FfrtTaskHandle;
+
+use crate::error::ScheduleError;
+use crate::task::raw::RawTask;
+use crate::task::state;
 
 /// A handle to the actual spawned task.
 ///
@@ -32,15 +34,15 @@ use ylong_ffrt::FfrtTaskHandle;
 /// for a ylong task rather than a thread.
 ///
 /// It could be used to join the corresponding task or cancel it.
-/// If a `JoinHandle` is dropped, then the task continues executing in the background
-/// and its return value is lost. There is no way to join the task after its JoinHandle is
-/// dropped.
+/// If a `JoinHandle` is dropped, then the task continues executing in the
+/// background and its return value is lost. There is no way to join the task
+/// after its JoinHandle is dropped.
 ///
 /// # Examples
 ///
 /// ```
 /// let handle = ylong_runtime::spawn(async {
-///     let handle2 = ylong_runtime::spawn(async {1});
+///     let handle2 = ylong_runtime::spawn(async { 1 });
 ///     assert_eq!(handle2.await.unwrap(), 1);
 /// });
 /// ylong_runtime::block_on(handle).unwrap();
@@ -61,10 +63,11 @@ impl<R> JoinHandle<R> {
         }
     }
 
-    /// Cancels the task associating with this JoinHandle. If the task has already finished,
-    /// this method does nothing.
+    /// Cancels the task associating with this JoinHandle. If the task has
+    /// already finished, this method does nothing.
     ///
-    /// When successfully canceled, `.await` on this JoinHandle will return a `TaskCanceled` error.
+    /// When successfully canceled, `.await` on this JoinHandle will return a
+    /// `TaskCanceled` error.
     pub fn cancel(&self) {
         unsafe {
             self.raw.cancel();
@@ -143,13 +146,14 @@ impl CancelHandle {
 
     /// Cancels the task associated with this handle.
     ///
-    /// If the task has been already finished or it is currently running and about to finish,
-    /// then this method will do nothing.
+    /// If the task has been already finished or it is currently running and
+    /// about to finish, then this method will do nothing.
     pub fn cancel(&self) {
         unsafe { self.raw.cancel() }
     }
 
-    /// Checks whether the task associated with this handle has finished executing.
+    /// Checks whether the task associated with this handle has finished
+    /// executing.
     pub fn is_finished(&self) -> bool {
         let state = self.raw.header().state.get_current_state();
         state::is_finished(state)

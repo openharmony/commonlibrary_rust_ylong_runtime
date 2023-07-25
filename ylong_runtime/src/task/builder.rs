@@ -11,18 +11,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Builder to configure the task. Tasks that get spawned through [`TaskBuilder`] inherit all
-//! attributes of this builder.
+//! Builder to configure the task. Tasks that get spawned through
+//! [`TaskBuilder`] inherit all attributes of this builder.
 //!
 //! A task has following attributes:
 //! - priority
 //! - task name
 
-use crate::spawn::spawn_async;
-use crate::spawn::spawn_blocking;
+use std::future::Future;
+
+use crate::spawn::{spawn_async, spawn_blocking};
 use crate::task::PriorityLevel;
 use crate::JoinHandle;
-use std::future::Future;
 
 /// Tasks attribute
 #[derive(Clone)]
@@ -99,7 +99,7 @@ impl TaskBuilder {
     }
 }
 
-#[cfg(all(test))]
+#[cfg(test)]
 mod test {
     use crate::task::{PriorityLevel, TaskBuilder};
 
@@ -111,19 +111,15 @@ mod test {
         ut_builder_insert_front();
         ut_builder_stat();
     }
-    /*
-     * @title  Builder::new ut test
-     * @design No entry, no exception branch
-     * @precon After calling the Builder::new function, get its object
-     * @brief  Describe test case execution
-     *         1、Checks if the object name property is None
-     *         2、Checks if the object pri property is None
-     *         3、Checks if the object worker_id property is None
-     *         4、Checks if the object is_stat property is false
-     *         5、Checks if the object is_insert_front property is false
-     * @expect The initialized parameters should correspond to the set ones
-     * @auto   true
-     */
+
+    /// UT test cases for Builder::new
+    ///
+    /// # Brief
+    /// 1. Checks if the object name property is None
+    /// 2. Checks if the object pri property is None
+    /// 3. Checks if the object worker_id property is None
+    /// 4. Checks if the object is_stat property is false
+    /// 5. Checks if the object is_insert_front property is false
     fn ut_builder_new() {
         let builder = TaskBuilder::new();
         assert_eq!(builder.name, None);
@@ -132,15 +128,10 @@ mod test {
         assert!(!builder.is_insert_front);
     }
 
-    /*
-     * @title  Builder::name ut test
-     * @design No invalid values, no abnormal branches
-     * @precon After calling the Builder::new function, get its object
-     * @brief  Describe test case execution
-     *         1、Checks if the object name property is a modified value
-     * @expect Parameters and modified values should correspond to each other
-     * @auto   true
-     */
+    /// UT test cases for Builder::name
+    ///
+    /// # Brief
+    /// 1. Checks if the object name property is a modified value
     fn ut_builder_name() {
         let builder = TaskBuilder::new();
 
@@ -148,19 +139,14 @@ mod test {
         assert_eq!(builder.name(name.clone()).name.unwrap(), name);
     }
 
-    /*
-     * @title  Builder::name ut test
-     * @design No invalid values, no abnormal branches
-     * @precon After calling the Builder::new function, get its object
-     * @brief  Describe test case execution
-     *         1、pri set to AbsHigh, check return value
-     *         2、pri set to High, check return value
-     *         3、pri set to Low, check return value
-     *         4、pri set to AbsLow, check return value
-     *         5、pri set to Butt, check return value
-     * @expect Parameters and modified values should correspond to each other
-     * @auto   true
-     */
+    /// UT test cases for Builder::name
+    ///
+    /// # Brief
+    /// 1. pri set to AbsHigh, check return value
+    /// 2. pri set to High, check return value
+    /// 3. pri set to Low, check return value
+    /// 4. pri set to AbsLow, check return value
+    /// 5. pri set to Butt, check return value
     fn ut_builder_pri() {
         let builder = TaskBuilder::new();
         let pri = PriorityLevel::AbsHigh;
@@ -179,16 +165,11 @@ mod test {
         assert_eq!(builder.priority(pri).pri.unwrap(), pri);
     }
 
-    /*
-     * @title  Builder::stat ut test
-     * @design No invalid values, no abnormal branches
-     * @precon After calling the Builder::new function, get its object
-     * @brief  Describe test case execution
-     *         1、is_stat set to true, check return value
-     *         2、is_stat set to false, check return value
-     * @expect Parameters and modified values should correspond to each other
-     * @auto   true
-     */
+    /// UT test cases for Builder::stat
+    ///
+    /// # Brief
+    /// 1. is_stat set to true, check return value
+    /// 2. is_stat set to false, check return value
     fn ut_builder_stat() {
         let builder = TaskBuilder::new();
         let is_stat = true;
@@ -199,16 +180,11 @@ mod test {
         assert_eq!(builder.stat(is_stat).is_stat, is_stat);
     }
 
-    /*
-     * @title  Builder::insert_front ut test
-     * @design No invalid values, no abnormal branches
-     * @precon After calling the Builder::new function, get its object
-     * @brief  Describe test case execution
-     *         1、is_insert_front set to true, check return value
-     *         2、is_insert_front set to false, check return value
-     * @expect Parameters and modified values should correspond to each other
-     * @auto   true
-     */
+    /// UT test cases for Builder::insert_front
+    ///
+    /// # Brief
+    /// 1. is_insert_front set to true, check return value
+    /// 2. is_insert_front set to false, check return value
     fn ut_builder_insert_front() {
         let builder = TaskBuilder::new();
         let is_insert_front = true;

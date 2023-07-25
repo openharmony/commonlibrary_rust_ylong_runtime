@@ -11,37 +11,41 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::io::{AsyncRead, AsyncWrite, ReadBuf};
-use crate::net::AsyncSource;
 use std::fmt::{Debug, Formatter};
 use std::io;
 use std::io::IoSlice;
 use std::net::{Shutdown, SocketAddr};
 use std::pin::Pin;
 use std::task::{Context, Poll};
+
 use ylong_io::Interest;
+
+use crate::io::{AsyncRead, AsyncWrite, ReadBuf};
+use crate::net::AsyncSource;
 
 /// An asynchronous version of [`std::net::TcpStream`]
 ///
-/// After creating a `TcpStream` by either connecting to a remote host or accepting a
-/// connection on a `TcpListener`, data can be transmitted asynchronously
-/// by reading and writing to it.
+/// After creating a `TcpStream` by either connecting to a remote host or
+/// accepting a connection on a `TcpListener`, data can be transmitted
+/// asynchronously by reading and writing to it.
 ///
 ///
 /// # Example
 /// ```rust
-/// use ylong_runtime::net::TcpStream;
-/// use std::io::IoSlice;
-/// use std::io::IoSliceMut;
 /// use std::io;
+/// use std::io::{IoSlice, IoSliceMut};
+///
 /// use ylong_runtime::io::{AsyncReadExt, AsyncWriteExt};
+/// use ylong_runtime::net::TcpStream;
 ///
 /// async fn io_func() -> io::Result<()> {
 ///     let addr = "127.0.0.1:8080".parse().unwrap();
 ///     let mut stream = TcpStream::connect(addr).await?;
 ///
 ///     let _ = stream.write(b"hello client").await?;
-///     let _ = stream.write_vectored(&[IoSlice::new(b"hello client")]).await?;
+///     let _ = stream
+///         .write_vectored(&[IoSlice::new(b"hello client")])
+///         .await?;
 ///
 ///     let mut read_buf = [0 as u8; 1024];
 ///     let _ = stream.read(&mut read_buf).await?;
@@ -64,8 +68,9 @@ impl TcpStream {
     ///
     /// # Example
     /// ```rust
-    /// use ylong_runtime::net::TcpStream;
     /// use std::io;
+    ///
+    /// use ylong_runtime::net::TcpStream;
     ///
     /// async fn io_func() -> io::Result<()> {
     ///     let addr = "127.0.0.1:8080".parse().unwrap();
@@ -90,7 +95,8 @@ impl TcpStream {
         Ok(stream)
     }
 
-    // Registers the ylong_io::TcpStream's fd to the reactor, and returns async TcpStream.
+    // Registers the ylong_io::TcpStream's fd to the reactor, and returns async
+    // TcpStream.
     pub(crate) fn new(stream: ylong_io::TcpStream) -> io::Result<Self> {
         let source = AsyncSource::new(stream, None)?;
         Ok(TcpStream { source })

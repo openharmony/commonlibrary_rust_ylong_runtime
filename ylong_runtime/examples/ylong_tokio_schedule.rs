@@ -13,6 +13,7 @@
 
 //! Examples for task scheduling
 use std::hint::black_box;
+
 use ylong_runtime::task::yield_now;
 
 fn recur_fibbo(a: u64) -> u64 {

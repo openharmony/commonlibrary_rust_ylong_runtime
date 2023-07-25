@@ -11,16 +11,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::super::socket_addr::socket_addr_trans;
-use super::{TcpListener, TcpStream};
-use libc::{
-    c_int, c_void, socklen_t, AF_INET, AF_INET6, SOCK_CLOEXEC, SOCK_NONBLOCK, SOCK_STREAM,
-    SOL_SOCKET, SO_REUSEADDR,
-};
 use std::io;
 use std::mem::{self, size_of};
 use std::net::{self, SocketAddr};
 use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
+
+use libc::{
+    c_int, c_void, socklen_t, AF_INET, AF_INET6, SOCK_CLOEXEC, SOCK_NONBLOCK, SOCK_STREAM,
+    SOL_SOCKET, SO_REUSEADDR,
+};
+
+use super::super::socket_addr::socket_addr_trans;
+use super::{TcpListener, TcpStream};
 
 pub(crate) struct TcpSocket {
     socket: c_int,

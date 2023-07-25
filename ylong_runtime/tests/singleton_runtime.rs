@@ -15,16 +15,13 @@ mod helpers;
 use helpers::*;
 use ylong_runtime::builder::RuntimeBuilder;
 use ylong_runtime::task::TaskBuilder;
-
 #[cfg(feature = "time")]
 use ylong_runtime::time;
 const SPAWN_NUM: usize = 100;
 const THREAD_NUM: usize = 10;
 
-/// SDV test for concurrently spawning tasks on the singleton runtime, through runtime instance.
-///
-/// # Title
-/// sdv_concurrently_runtime_spawn_async_in_async_task
+/// SDV test cases for concurrently spawning tasks on the singleton runtime,
+/// through runtime instance.
 ///
 /// # Brief
 /// 1. Spawn multiple threads and build runtime together.
@@ -51,10 +48,8 @@ fn sdv_concurrently_runtime_spawn_async_in_async_task() {
     }
 }
 
-/// SDV test for concurrently spawning tasks on the singleton runtime, through ylong_runtime::spawn.
-///
-/// # Title
-/// sdv_concurrently_spawn_async_in_async_task
+/// SDV test cases for concurrently spawning tasks on the singleton runtime,
+/// through ylong_runtime::spawn.
 ///
 /// # Brief
 /// 1. Spawn multiple threads and build runtime together.
@@ -81,10 +76,8 @@ fn sdv_concurrently_spawn_async_in_async_task() {
     }
 }
 
-/// SDV test for concurrently spawning tasks on the singleton runtime, through task builder instance.
-///
-/// # Title
-/// sdv_concurrently_task_builder_spawn_async_in_async_task
+/// SDV test cases for concurrently spawning tasks on the singleton runtime,
+/// through task builder instance.
 ///
 /// # Brief
 /// 1. Spawn multiple threads and build runtime together.
@@ -112,12 +105,13 @@ fn sdv_concurrently_task_builder_spawn_async_in_async_task() {
     }
 }
 
-/// SDV test for blocking on a time sleep without initializing the runtime.
+/// SDV test cases for blocking on a time sleep without initializing the
+/// runtime.
 ///
 /// # Brief
-/// 1. Construct a future that calls time::sleep
-/// 2. Use ylong_runtime::block_on to await this future to completion
-/// 3. Check future's return value
+/// 1. Construct a future that calls time::sleep.
+/// 2. Use ylong_runtime::block_on to await this future to completion.
+/// 3. Check future's return value.
 #[cfg(feature = "time")]
 #[test]
 fn sdv_global_block_on() {
@@ -131,9 +125,9 @@ fn sdv_global_block_on() {
 /// SDV for setting the global runtime after starting the runtime
 ///
 /// # Brief
-/// 1. Use global runtime to spawn a task
-/// 2. Configures the global runtime
-/// 3. Check the error
+/// 1. Use global runtime to spawn a task.
+/// 2. Configures the global runtime.
+/// 3. Check the error.
 #[test]
 fn sdv_build_global_failed() {
     let _ = ylong_runtime::block_on(ylong_runtime::spawn(async move { 1 }));

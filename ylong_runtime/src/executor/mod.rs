@@ -21,18 +21,18 @@ pub(crate) mod current_thread;
 
 #[cfg(any(feature = "time", feature = "net"))]
 pub(crate) mod netpoller;
+use std::future::Future;
+use std::mem::MaybeUninit;
+use std::sync::Once;
+
+use crate::builder::multi_thread_builder::GLOBAL_BUILDER;
 use crate::builder::{initialize_blocking_spawner, RuntimeBuilder};
 use crate::executor::blocking_pool::BlockPoolSpawner;
+#[cfg(feature = "current_thread_runtime")]
+use crate::executor::current_thread::CurrentThreadSpawner;
 use crate::macros::{cfg_ffrt, cfg_not_ffrt};
 use crate::task::TaskBuilder;
 use crate::{JoinHandle, Task};
-use std::future::Future;
-
-use crate::builder::multi_thread_builder::GLOBAL_BUILDER;
-#[cfg(feature = "current_thread_runtime")]
-use crate::executor::current_thread::CurrentThreadSpawner;
-use std::mem::MaybeUninit;
-use std::sync::Once;
 cfg_ffrt! {
     use crate::builder::initialize_ffrt_spawner;
     use crate::ffrt::spawner::spawn;
@@ -73,13 +73,14 @@ pub(crate) enum AsyncHandle {
 /// Runtime struct.
 ///
 /// # If `multi_instance_runtime` feature is turned on
-/// There will be multiple runtime executors, initializing from user settings in `RuntimeBuilder`.
+/// There will be multiple runtime executors, initializing from user settings in
+/// `RuntimeBuilder`.
 ///
 /// # If `multi_instance_runtime` feature is turned off
 /// There will be only *ONE* runtime executor singleton inside one process.
-/// The async and blocking pools working when calling methods of this struct are stored in the
-/// global static executor instance. Here, keep the empty struct for compatibility
-/// and possibility for function extension in the future.
+/// The async and blocking pools working when calling methods of this struct are
+/// stored in the global static executor instance. Here, keep the empty struct
+/// for compatibility and possibility for function extension in the future.
 pub struct Runtime {
     pub(crate) async_spawner: AsyncHandle,
 }
@@ -158,13 +159,14 @@ impl Runtime {
 impl Runtime {
     /// Spawns a future onto the runtime, returning a [`JoinHandle`] for it.
     ///
-    /// The future will be later polled by the executor, which is usually implemented as a thread
-    /// pool. The executor will run the future util finished.
+    /// The future will be later polled by the executor, which is usually
+    /// implemented as a thread pool. The executor will run the future util
+    /// finished.
     ///
-    /// Awaits on the JoinHandle will return the result of the future, but users don't have to
-    /// `.await` the `JoinHandle` in order to run the future, since the future will be executed
-    /// in the background once it's spawned. Dropping the JoinHandle will throw away the returned
-    /// value.
+    /// Awaits on the JoinHandle will return the result of the future, but users
+    /// don't have to `.await` the `JoinHandle` in order to run the future,
+    /// since the future will be executed in the background once it's
+    /// spawned. Dropping the JoinHandle will throw away the returned value.
     ///
     /// # Examples
     ///
@@ -212,8 +214,8 @@ impl Runtime {
 
     /// Spawns the provided function or closure onto the runtime.
     ///
-    /// It's usually used for cpu-bounded computation that does not return pending and takes a
-    /// relatively long time.
+    /// It's usually used for cpu-bounded computation that does not return
+    /// pending and takes a relatively long time.
     ///
     /// # Examples
     ///
@@ -240,13 +242,13 @@ impl Runtime {
         crate::spawn::spawn_blocking(&TaskBuilder::new(), task)
     }
 
-    /// Blocks the current thread and runs the given future (usually a JoinHandle) to completion,
-    /// and gets its return value.
+    /// Blocks the current thread and runs the given future (usually a
+    /// JoinHandle) to completion, and gets its return value.
     ///
     /// Any code after the `block_on` will be executed once the future is done.
     ///
-    /// Don't use this method on an asynchronous environment, since it will block the worker
-    /// thread and may cause deadlock.
+    /// Don't use this method on an asynchronous environment, since it will
+    /// block the worker thread and may cause deadlock.
     ///
     /// # Examples
     ///

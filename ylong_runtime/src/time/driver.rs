@@ -11,8 +11,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::time::wheel::Wheel;
-use crate::time::Clock;
 use std::convert::TryInto;
 use std::fmt::Error;
 use std::mem::MaybeUninit;
@@ -20,6 +18,9 @@ use std::ptr::NonNull;
 use std::sync::{Mutex, Once};
 use std::task::Waker;
 use std::time::Instant;
+
+use crate::time::wheel::Wheel;
+use crate::time::Clock;
 
 // Timer Driver
 pub(crate) struct Driver {
@@ -72,7 +73,8 @@ impl Driver {
             lock.set_last_elapsed(elapsed);
 
             // Unsafe access to clock_entry is only unsafe when Sleep Drop,
-            // but does not let `Sleep` go to `Ready` before access to clock_entry fetched by poll.
+            // but does not let `Sleep` go to `Ready` before access to clock_entry fetched
+            // by poll.
             let clock_handle = unsafe { clock_entry.as_mut() };
             waker_list[waker_idx] = clock_handle.take_waker();
             waker_idx += 1;

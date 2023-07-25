@@ -13,17 +13,19 @@
 
 use std::fs;
 use std::io::SeekFrom;
+
 use ylong_runtime::fs::File;
 use ylong_runtime::io::{
     AsyncBufReadExt, AsyncBufReader, AsyncReadExt, AsyncSeekExt, AsyncWriteExt,
 };
 use ylong_runtime::net::{TcpListener, TcpStream};
 
-/// SDV test for AsyncBufReader `read_util`
+/// SDV test cases for AsyncBufReader `read_util`
 ///
 /// # Brief
 /// 1. Establish an asynchronous tcp connection.
-/// 2. The client sends some data to the server. The message contains a `:` character.
+/// 2. The client sends some data to the server. The message contains a `:`
+///    character.
 /// 3. The server wraps the TcpStream inside a AsyncBufReader
 /// 4. The server calls `read_until` with a delimiter ':'.
 /// 5. Check the read buf.
@@ -62,11 +64,12 @@ fn sdv_buf_reader_read_until() {
     ylong_runtime::block_on(client).unwrap();
 }
 
-/// SDV test for AsyncBufReader `read_line`
+/// SDV test cases for AsyncBufReader `read_line`
 ///
 /// # Brief
 /// 1. Establish an asynchronous tcp connection.
-/// 2. The client sends some data to the server. The message contains the `\n` byte.
+/// 2. The client sends some data to the server. The message contains the `\n`
+///    byte.
 /// 3. The server wraps the TcpStream inside a AsyncBufReader
 /// 4. The server calls `read_line` with a delimiter '\n'.
 /// 5. Check the read buf.
@@ -103,14 +106,15 @@ fn sdv_buf_reader_read_line() {
     ylong_runtime::block_on(client).unwrap();
 }
 
-/// SDV test for AsyncBufReader `split`
+/// SDV test cases for AsyncBufReader `split`
 ///
 /// # Brief
 /// 1. Establish an asynchronous tcp connection.
-/// 2. The client sends some data to the server. The message contains a `-` character.
+/// 2. The client sends some data to the server. The message contains a `-`
+///    character.
 /// 3. The server wraps the TcpStream inside a AsyncBufReader
-/// 4. The server calls `split` to get segments and calls `next` with a delimiter
-///    '-' for several times.
+/// 4. The server calls `split` to get segments and calls `next` with a
+///    delimiter '-' for several times.
 /// 5. Check the read buf.
 #[test]
 fn sdv_buf_reader_split() {
@@ -141,14 +145,15 @@ fn sdv_buf_reader_split() {
     ylong_runtime::block_on(client).unwrap();
 }
 
-/// SDV test for AsyncBufReader `lines`
+/// SDV test cases for AsyncBufReader `lines`
 ///
 /// # Brief
 /// 1. Establish an asynchronous tcp connection.
-/// 2. The client sends some data to the server. The message contains the `\n` byte.
+/// 2. The client sends some data to the server. The message contains the `\n`
+///    byte.
 /// 3. The server wraps the TcpStream inside a AsyncBufReader
-/// 4. The server calls `lines` to get segments and calls `next_line` with a delimiter
-///    '\n' for several times.
+/// 4. The server calls `lines` to get segments and calls `next_line` with a
+///    delimiter '\n' for several times.
 /// 5. Check the read buf.
 #[test]
 fn sdv_buf_reader_lines() {
@@ -188,13 +193,13 @@ fn sdv_buf_reader_lines() {
     ylong_runtime::block_on(client).unwrap();
 }
 
-/// SDV test for AsyncBufReader `seek`
+/// SDV test cases for AsyncBufReader `seek`
 ///
 /// # Brief
 /// 1. Create a file and write data.
 /// 2. Open the file and call `read_until` with a delimiter '-'.
 /// 3. Seek to three different positions in the file and read data.
-/// 5. Check the read buf.
+/// 4. Check the read buf.
 #[test]
 fn sdv_buf_reader_seek() {
     let handle = ylong_runtime::spawn(async move {

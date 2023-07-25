@@ -26,9 +26,10 @@
 /// ```
 ///
 /// The `<async expression>` for all branches will run concurrently. Once the
-/// first expression is completed, the corresponding `<handler>` will be executed.
-/// Each branch is optional `if <precondition>`. if the `<precondition>` returns
-/// false, the corresponding `<handler>` will not be executed.
+/// first expression is completed, the corresponding `<handler>` will be
+/// executed. Each branch is optional `if <precondition>`. if the
+/// `<precondition>` returns false, the corresponding `<handler>` will not be
+/// executed.
 ///
 /// When none of the branches can match, Executes the else expression.
 ///
@@ -58,7 +59,7 @@
 /// }
 /// ```
 ///
-///  # Examples
+/// # Examples
 ///
 /// Uses if to filter asynchronous tasks
 /// ```
@@ -69,7 +70,7 @@
 ///     2
 /// }
 /// async fn do_async3() -> bool {
-///    false
+///     false
 /// }
 /// async fn select_test() {
 ///     let mut count = 0;
@@ -94,7 +95,7 @@
 ///     assert_eq!(count, 2);
 /// }
 /// ```
-///  # Examples
+/// # Examples
 ///
 /// Repeated uses select! until all task return.
 /// ```
@@ -125,9 +126,9 @@
 ///
 ///     assert_eq!(res.0, "first");
 ///     assert_eq!(res.1, "second");
-///  }
+/// }
 /// ```
-///  # Examples
+/// # Examples
 ///
 /// Uses 'biased' to execute four task in the specified sequence.
 /// It will poll branches with order, the first branch will be polled first.
@@ -159,9 +160,9 @@
 ///             }
 ///         }
 ///     }
-///             
+///
 ///     assert_eq!(count, 4);
-///  }
+/// }
 /// ```
 #[macro_export]
 macro_rules! select {
@@ -338,10 +339,7 @@ macro_rules! select {
 
 #[cfg(test)]
 mod select_test {
-    /// select! basic usage ut test case.
-    ///
-    /// # Title
-    /// new_select_basic
+    /// UT test cases for select! basic usage case
     ///
     /// # Brief
     /// 1. Uses select! to run three async task.
@@ -384,15 +382,13 @@ mod select_test {
         crate::block_on(handle).expect("select! fail");
     }
 
-    /// select! oneshot::channel usage ut test case.
-    ///
-    /// # Title
-    /// new_select_channel
+    /// UT test cases for select! oneshot::channel usage
     ///
     /// # Brief
     /// 1. Creates two oneshot::channel and send message.
     /// 2. Repeated uses select! until both channel return.
-    /// 3. Checks whether the returned information of the two channels is correct.
+    /// 3. Checks whether the returned information of the two channels is
+    ///    correct.
     #[test]
     #[cfg(feature = "sync")]
     fn new_select_channel() {
@@ -426,10 +422,7 @@ mod select_test {
         crate::block_on(handle).expect("select! fail");
     }
 
-    /// select! 'biased' usage ut test case.
-    ///
-    /// # Title
-    /// new_select_biased
+    /// UT test cases for select! 'biased' usage
     ///
     /// # Brief
     /// 1. Uses 'biased' to execute four task in the specified sequence.
@@ -469,10 +462,7 @@ mod select_test {
         crate::block_on(handle).expect("select! fail");
     }
 
-    /// select! match usage ut test case.
-    ///
-    /// # Title
-    /// new_select_match
+    /// UT test cases for select! match usage
     ///
     /// # Brief
     /// 1. Uses select! to run three async task.
@@ -515,14 +505,12 @@ mod select_test {
         crate::block_on(handle).expect("select! fail");
     }
 
-    /// select! precondition usage ut test case.
-    ///
-    /// # Title
-    /// new_select_precondition
+    /// UT test cases for select! precondition usage
     ///
     /// # Brief
     /// 1. Creates a struct and implement a call to the `&mut self` async fn.
-    /// 2. Uses select! to run the async fn, and sets the precondition to the struct member variable.
+    /// 2. Uses select! to run the async fn, and sets the precondition to the
+    ///    struct member variable.
     /// 3. The select! will be successfully executed.
     #[test]
     fn new_select_precondition() {
@@ -546,10 +534,7 @@ mod select_test {
         crate::block_on(handle).expect("select! fail");
     }
 
-    /// select! panic! usage ut test case.
-    ///
-    /// # Title
-    /// new_select_panic
+    /// UT test cases for select! panic! usage
     ///
     /// # Brief
     /// 1. Uses select! to run two async task with `if false`.

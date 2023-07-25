@@ -11,14 +11,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{Interest, Selector, Token};
 use std::fs::File;
 use std::io;
 use std::io::{Read, Write};
 use std::os::unix::io::FromRawFd;
 
-/// In Linux, `eventfd` is used to implement asynchronous wake-up. It is a 64-bit counter.
-/// A fixed 8-byte (64-bit) unsigned integer is written to ensure wake-up reliability.
+use crate::{Interest, Selector, Token};
+
+/// In Linux, `eventfd` is used to implement asynchronous wake-up. It is a
+/// 64-bit counter. A fixed 8-byte (64-bit) unsigned integer is written to
+/// ensure wake-up reliability.
 #[derive(Debug)]
 pub struct WakerInner {
     fd: File,

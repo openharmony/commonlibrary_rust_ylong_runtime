@@ -13,8 +13,8 @@
 
 //! build.rs file for ylong_ffrt
 
-use std::fs;
-use std::{env, path::PathBuf};
+use std::path::PathBuf;
+use std::{env, fs};
 
 fn main() {
     let library_name = "ffrt";

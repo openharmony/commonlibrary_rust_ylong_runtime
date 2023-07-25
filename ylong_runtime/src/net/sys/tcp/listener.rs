@@ -11,17 +11,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::net::{AsyncSource, TcpStream};
 use std::io;
 use std::net::SocketAddr;
+
 use ylong_io::Interest;
 
-/// An asynchronous version of [`std::net::TcpListener`]. Provides async bind/accept methods.
+use crate::net::{AsyncSource, TcpStream};
+
+/// An asynchronous version of [`std::net::TcpListener`]. Provides async
+/// bind/accept methods.
 ///
 /// # Example
 /// ```rust
-/// use ylong_runtime::net::TcpListener;
 /// use std::io;
+///
+/// use ylong_runtime::net::TcpListener;
 ///
 /// async fn io_func() -> io::Result<()> {
 ///     let addr = "127.0.0.1:8080".parse().unwrap();
@@ -37,14 +41,15 @@ pub struct TcpListener {
 impl TcpListener {
     /// A TCP socket server, asynchronously listening for connections.
     ///
-    /// After creating a `TcpListener` by binding it to a socket address, it listens
-    /// for incoming TCP connections asynchronously. These connections can be accepted by calling
-    /// [`TcpListener::accept`]
+    /// After creating a `TcpListener` by binding it to a socket address, it
+    /// listens for incoming TCP connections asynchronously. These
+    /// connections can be accepted by calling [`TcpListener::accept`]
     ///
     /// # Example
     /// ```rust
-    /// use ylong_runtime::net::TcpListener;
     /// use std::io;
+    ///
+    /// use ylong_runtime::net::TcpListener;
     ///
     /// async fn io_func() -> io::Result<()> {
     ///     let addr = "127.0.0.1:8080".parse().unwrap();
@@ -59,14 +64,15 @@ impl TcpListener {
 
     /// Asynchronously accepts a new incoming connection from this listener.
     ///
-    /// When connection gets established, the corresponding [`TcpStream`] and the
-    /// remote peer's address will be returned.
+    /// When connection gets established, the corresponding [`TcpStream`] and
+    /// the remote peer's address will be returned.
     ///
     ///
     /// # Example
     /// ```rust
-    /// use ylong_runtime::net::TcpListener;
     /// use std::io;
+    ///
+    /// use ylong_runtime::net::TcpListener;
     ///
     /// async fn io_func() -> io::Result<()> {
     ///     let addr = "127.0.0.1:8080".parse().unwrap();
@@ -84,7 +90,8 @@ impl TcpListener {
         Ok((stream, addr))
     }
 
-    // Registers the ylong_io::TcpListener's fd to the reactor, and returns the async TcpListener
+    // Registers the ylong_io::TcpListener's fd to the reactor, and returns the
+    // async TcpListener
     pub(crate) fn new(listener: ylong_io::TcpListener) -> io::Result<Self> {
         let source = AsyncSource::new(listener, None)?;
         Ok(TcpListener { source })

@@ -11,11 +11,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::futures::poll_fn;
-use crate::io::async_buf_read::AsyncBufRead;
-use crate::io::async_read::AsyncRead;
-use crate::io::poll_ready;
-use crate::io::read_buf::ReadBuf;
 use std::future::Future;
 use std::mem::MaybeUninit;
 use std::pin::Pin;
@@ -23,6 +18,12 @@ use std::slice::from_raw_parts_mut;
 use std::string::FromUtf8Error;
 use std::task::{Context, Poll};
 use std::{io, mem};
+
+use crate::futures::poll_fn;
+use crate::io::async_buf_read::AsyncBufRead;
+use crate::io::async_read::AsyncRead;
+use crate::io::poll_ready;
+use crate::io::read_buf::ReadBuf;
 
 macro_rules! take_reader {
     ($self: expr) => {
@@ -99,8 +100,8 @@ fn poll_read_to_end<R: AsyncRead + Unpin>(
     cx: &mut Context<'_>,
 ) -> Poll<io::Result<usize>> {
     loop {
-        // Allocate 32 bytes every time, if the remaining capacity is larger than 32 bytes,
-        // this will do nothing.
+        // Allocate 32 bytes every time, if the remaining capacity is larger than 32
+        // bytes, this will do nothing.
         buf.reserve(32);
         let len = buf.len();
         let mut read_buf = ReadBuf::uninit(unsafe {
@@ -378,8 +379,8 @@ where
     }
 }
 
-/// A future for reading every data from the source into a vector and splitting it
-/// into segments by a delimiter.
+/// A future for reading every data from the source into a vector and splitting
+/// it into segments by a delimiter.
 ///
 /// Returned by [`crate::io::AsyncBufReadExt::split`]
 pub struct SplitTask<R> {
@@ -422,8 +423,8 @@ where
     }
 }
 
-/// A future for reading every data from the source into a vector and splitting it
-/// into segments by row.
+/// A future for reading every data from the source into a vector and splitting
+/// it into segments by row.
 ///
 /// Returned by [`crate::io::AsyncBufReadExt::split`]
 pub struct LinesTask<R> {

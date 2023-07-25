@@ -17,13 +17,11 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
+
 use ylong_runtime::error::ErrorKind;
 use ylong_runtime::time::sleep;
 
-/// SDV test for canceling a task.
-///
-/// # Title
-/// sdv_task_cancel_simple
+/// SDV test cases for canceling a task.
 ///
 /// # Brief
 /// 1. Configure the RuntimeBuilder and start the runtime
@@ -45,10 +43,7 @@ fn sdv_task_cancel_simple() {
     ylong_runtime::block_on(handle).unwrap();
 }
 
-/// SDV test for canceling a task after its finished
-///
-/// # Title
-/// sdv_task_cancel_failed
+/// SDV test cases for canceling a task after its finished
 ///
 /// # Brief
 /// 1. Configure the RuntimeBuilder and start the runtime
@@ -88,7 +83,7 @@ impl Future for TestFuture {
     }
 }
 
-/// SDV test for multi cancel.
+/// SDV test cases for multi cancel.
 ///
 /// # Brief
 /// 1. In a loop, create a long-time task and then cancel it.

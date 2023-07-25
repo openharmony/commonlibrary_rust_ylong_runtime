@@ -11,13 +11,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::fs::file_buf::FileBuf;
-use crate::fs::{async_op, poll_ready};
-use crate::futures::poll_fn;
-use crate::io::{AsyncRead, AsyncSeek, AsyncWrite, ReadBuf};
-use crate::spawn::spawn_blocking;
-use crate::sync::Mutex;
-use crate::task::{JoinHandle, TaskBuilder};
 use std::fs::{File as SyncFile, Metadata, Permissions};
 use std::future::Future;
 use std::io;
@@ -27,7 +20,16 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
-/// An asynchronous wrapping of [`std::fs::File`]. Provides async read/write methods.
+use crate::fs::file_buf::FileBuf;
+use crate::fs::{async_op, poll_ready};
+use crate::futures::poll_fn;
+use crate::io::{AsyncRead, AsyncSeek, AsyncWrite, ReadBuf};
+use crate::spawn::spawn_blocking;
+use crate::sync::Mutex;
+use crate::task::{JoinHandle, TaskBuilder};
+
+/// An asynchronous wrapping of [`std::fs::File`]. Provides async read/write
+/// methods.
 pub struct File {
     file: Arc<SyncFile>,
     inner: Mutex<FileInner>,
@@ -323,7 +325,8 @@ impl AsyncRead for File {
             match inner.state {
                 FileState::Idle(ref mut file_buf) => {
                     let mut r_buf = file_buf.take().unwrap();
-                    // There is still remaining data from the last read, append it to read buf directly
+                    // There is still remaining data from the last read, append it to read buf
+                    // directly
                     if r_buf.remaining() != 0 {
                         r_buf.append_to(buf);
                         *file_buf = Some(r_buf);

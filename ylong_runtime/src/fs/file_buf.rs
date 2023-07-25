@@ -11,9 +11,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::io::ReadBuf;
 use std::io;
 use std::io::{Read, Write};
+
+use crate::io::ReadBuf;
 
 pub(crate) struct FileBuf {
     pub(crate) buf: Vec<u8>,

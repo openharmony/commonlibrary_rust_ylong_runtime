@@ -11,13 +11,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! cargo build --example ylong_io_tcp_server --no-default-features --features="ylong_tcp"
-//! Uses with ylong_io_tcp_server, start ylong_io_tcp_server first, then start ylong_io_tcp_client
+//! cargo build --example ylong_io_tcp_server --no-default-features
+//! --features="ylong_tcp" Uses with ylong_io_tcp_server, start
+//! ylong_io_tcp_server first, then start ylong_io_tcp_client
 
 use std::collections::HashMap;
 use std::io;
 use std::io::{Read, Write};
 use std::str::from_utf8;
+
 use ylong_io::{EventTrait, Events, Interest, Poll, TcpListener, Token};
 
 const SERVER: Token = Token(0);
@@ -53,7 +55,7 @@ fn main() -> io::Result<()> {
                 match connections.get_mut(&event.token()) {
                     Some(connection) => {
                         if event.is_writable() {
-                            //println!("server writable\n");
+                            // println!("server writable\n");
                             match connection.write(b"Hello client_from writable") {
                                 Err(err) => {
                                     println!("1.Send failed {err}");

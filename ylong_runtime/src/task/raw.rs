@@ -11,12 +11,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::executor::Schedule;
-use crate::macros::cfg_ffrt;
-use crate::task::state::TaskState;
-use crate::task::task_handle::TaskHandle;
-use crate::task::{TaskBuilder, VirtualTableType};
-use crate::ScheduleError;
 use std::cell::UnsafeCell;
 use std::future::Future;
 use std::mem;
@@ -24,6 +18,14 @@ use std::pin::Pin;
 use std::ptr::NonNull;
 use std::sync::Weak;
 use std::task::{Context, Poll, Waker};
+
+use crate::executor::Schedule;
+use crate::macros::cfg_ffrt;
+use crate::task::state::TaskState;
+use crate::task::task_handle::TaskHandle;
+use crate::task::{TaskBuilder, VirtualTableType};
+use crate::ScheduleError;
+
 cfg_ffrt! {
     use ylong_ffrt::FfrtTaskHandle;
     use crate::ffrt::ffrt_task::FfrtTaskCtx;
@@ -247,7 +249,8 @@ where
 }
 
 /// Manages task infos.
-/// `repr(C)` is necessary because we cast a pointer of [`TaskMngInfo`] into a pointer of [`Header`].
+/// `repr(C)` is necessary because we cast a pointer of [`TaskMngInfo`] into a
+/// pointer of [`Header`].
 #[repr(C)]
 pub(crate) struct TaskMngInfo<T: Future, S: Schedule> {
     /// a pointer to the heap-allocated task
@@ -418,8 +421,8 @@ where
     S: Schedule,
 {
     /// Creates non-stackful task info.
-    // TODO: builder information currently is not used yet. Might use in the future (e.g. priority),
-    //   so keep it now.
+    // TODO: builder information currently is not used yet. Might use in the future
+    // (e.g. priority),   so keep it now.
     pub(crate) fn new(
         _builder: &TaskBuilder,
         scheduler: Weak<S>,

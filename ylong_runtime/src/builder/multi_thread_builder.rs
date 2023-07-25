@@ -11,16 +11,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::io;
+use std::sync::Mutex;
+
 use crate::builder::common_builder::impl_common;
 use crate::builder::CommonBuilder;
 #[cfg(feature = "multi_instance_runtime")]
 use crate::executor::{AsyncHandle, Runtime};
-use std::io;
-use std::sync::Mutex;
 
 pub(crate) static GLOBAL_BUILDER: Mutex<Option<MultiThreadBuilder>> = Mutex::new(None);
 
-/// Runtime builder that configures a multi-threaded runtime, or the global runtime.
+/// Runtime builder that configures a multi-threaded runtime, or the global
+/// runtime.
 pub struct MultiThreadBuilder {
     pub(crate) common: CommonBuilder,
 
@@ -39,8 +41,8 @@ impl MultiThreadBuilder {
     /// Configures the global runtime.
     ///
     /// # Error
-    /// If the global runtime is already running or this method has been called before, then
-    /// it will return an `AlreadyExists` error.
+    /// If the global runtime is already running or this method has been called
+    /// before, then it will return an `AlreadyExists` error.
     pub fn build_global(self) -> io::Result<()> {
         let mut builder = GLOBAL_BUILDER.lock().unwrap();
         match *builder {
@@ -73,8 +75,7 @@ impl MultiThreadBuilder {
     /// ```
     /// use crate::ylong_runtime::builder::RuntimeBuilder;
     ///
-    /// let runtime = RuntimeBuilder::new_multi_thread()
-    ///     .worker_num(8);
+    /// let runtime = RuntimeBuilder::new_multi_thread().worker_num(8);
     /// ```
     pub fn worker_num(mut self, core_pool_size: u8) -> Self {
         if core_pool_size < 1 {
@@ -96,7 +97,8 @@ mod test {
     use crate::builder::RuntimeBuilder;
     use crate::executor::{global_default_async, AsyncHandle};
 
-    /// UT for blocking on a time sleep without initializing the runtime.
+    /// UT test cases for blocking on a time sleep without initializing the
+    /// runtime.
     ///
     /// # Brief
     /// 1. Configure the global runtime to make it have six core threads

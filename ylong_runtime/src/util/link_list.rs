@@ -11,11 +11,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! This linked list does not have ownership of nodes, and it treats the structure passed
-//! in by the user as a node for storage, so the `clear` operation does not release memory,
-//! and the `remove` operation needs to ensure that the node is in any linked list held by
-//! a caller to ensure the memory validity of pointers within the node. Users need to manage
-//! the memory of the instances associated with each node themselves.
+//! This linked list does not have ownership of nodes, and it treats the
+//! structure passed in by the user as a node for storage, so the `clear`
+//! operation does not release memory, and the `remove` operation needs to
+//! ensure that the node is in any linked list held by a caller to ensure the
+//! memory validity of pointers within the node. Users need to manage the memory
+//! of the instances associated with each node themselves.
 
 use std::ptr::NonNull;
 
@@ -68,7 +69,8 @@ unsafe impl<L: Link + Default + Sync> Sync for LinkedList<L> {}
 ///
 /// # Safety
 ///
-/// The implementation must ensure that the inserted data does not move in memory.
+/// The implementation must ensure that the inserted data does not move in
+/// memory.
 pub(crate) unsafe trait Link {
     unsafe fn node(ptr: NonNull<Self>) -> NonNull<Node<Self>>
     where
@@ -122,8 +124,9 @@ impl<L: Link + Default> LinkedList<L> {
     ///
     /// # Safety
     ///
-    /// This method can be safely used when the node is in a linked list that the caller has
-    /// unique access to or the node is not in any linked list.
+    /// This method can be safely used when the node is in a linked list that
+    /// the caller has unique access to or the node is not in any linked
+    /// list.
     #[allow(dead_code)]
     pub(crate) unsafe fn remove(node: NonNull<L>) -> Option<NonNull<L>> {
         Node::remove_node(node)
@@ -158,8 +161,9 @@ impl<L: Link + Default> Drop for LinkedList<L> {
 
 #[cfg(test)]
 mod tests {
-    use crate::util::link_list::{Link, LinkedList, Node};
     use std::ptr::{addr_of_mut, NonNull};
+
+    use crate::util::link_list::{Link, LinkedList, Node};
 
     #[derive(Default)]
     struct Entry {
@@ -195,15 +199,13 @@ mod tests {
         }
     }
 
-    /// UT test for `is_empty()` and `clear()`.
-    ///
-    /// # Title
-    /// ut_link_list_is_empty_and_clear
+    /// UT test cases for `is_empty()` and `clear()`.
     ///
     /// # Brief
-    /// 1.Create a linked list.
-    /// 2.Check if the list is empty before and after pushing nodes into the list.
-    /// 3.Check if the list is empty before and after clear the list.
+    /// 1. Create a linked list.
+    /// 2. Check if the list is empty before and after pushing nodes into the
+    /// list.
+    /// 3. Check if the list is empty before and after clear the list.
     #[test]
     fn ut_link_list_is_empty_and_clear() {
         let mut list = LinkedList::<Entry>::new();
@@ -222,15 +224,12 @@ mod tests {
         assert!(list.is_empty());
     }
 
-    /// UT test for `push_front()` and `pop_back()`.
-    ///
-    /// # Title
-    /// ut_link_list_push_and_pop
+    /// UT test cases for `push_front()` and `pop_back()`.
     ///
     /// # Brief
-    /// 1.Create a linked list.
-    /// 2.Push nodes into the list.
-    /// 3.Pop nodes from the list and check the value.
+    /// 1. Create a linked list.
+    /// 2. Push nodes into the list.
+    /// 3. Pop nodes from the list and check the value.
     #[test]
     fn ut_link_list_push_and_pop() {
         let mut list = LinkedList::<Entry>::new();
@@ -252,17 +251,14 @@ mod tests {
         assert!(list.is_empty());
     }
 
-    /// UT test for `push_front()` and `remove()`.
-    ///
-    /// # Title
-    /// ut_link_list_remove
+    /// UT test cases for `push_front()` and `remove()`.
     ///
     /// # Brief
-    /// 1.Create a linked list.
-    /// 2.Push nodes into the list.
-    /// 3.Remove the first node from the list and check the list.
-    /// 4.Remove the second node from the list and check the list.
-    /// 5.Remove the third node from the list and check the list.
+    /// 1. Create a linked list.
+    /// 2. Push nodes into the list.
+    /// 3. Remove the first node from the list and check the list.
+    /// 4. Remove the second node from the list and check the list.
+    /// 5. Remove the third node from the list and check the list.
     #[test]
     fn ut_link_list_remove() {
         let mut list = LinkedList::<Entry>::new();

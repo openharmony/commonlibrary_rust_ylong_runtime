@@ -11,12 +11,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::io;
+use std::ops::Deref;
+
+use ylong_io::{Interest, Source};
+
 use crate::macros::cfg_io;
 use crate::net::ScheduleIO;
 use crate::util::slab::Ref;
-use std::io;
-use std::ops::Deref;
-use ylong_io::{Interest, Source};
 
 cfg_io!(
     use std::task::{Context, Poll};
@@ -28,27 +30,29 @@ cfg_io!(
     use std::io::{Read, Write};
 );
 
-/// Wrapper that turns a sync `Source` io into an async one. This struct interacts with the reactor
-/// of the runtime.
+/// Wrapper that turns a sync `Source` io into an async one. This struct
+/// interacts with the reactor of the runtime.
 pub(crate) struct AsyncSource<E: Source> {
     /// Sync io that implements `Source` trait.
     io: Option<E>,
 
-    /// Entry list of the runtime's reactor, `AsyncSource` object will be registered into it
-    /// when created.
+    /// Entry list of the runtime's reactor, `AsyncSource` object will be
+    /// registered into it when created.
     pub(crate) entry: Ref<ScheduleIO>,
 }
 
 impl<E: Source> AsyncSource<E> {
-    /// Wraps a `Source` object into an `AsyncSource`. When the `AsyncSource` object is created,
-    /// it's fd will be registered into runtime's reactor.
+    /// Wraps a `Source` object into an `AsyncSource`. When the `AsyncSource`
+    /// object is created, it's fd will be registered into runtime's
+    /// reactor.
     ///
-    /// If `interest` passed in is None, the interested event for fd registration will be both
-    /// readable and writable.
+    /// If `interest` passed in is None, the interested event for fd
+    /// registration will be both readable and writable.
     ///
     /// # Error
     ///
-    /// If no reactor is found or fd registration fails, an error will be returned.
+    /// If no reactor is found or fd registration fails, an error will be
+    /// returned.
     #[cfg(not(feature = "ffrt"))]
     pub fn new(mut io: E, interest: Option<Interest>) -> io::Result<AsyncSource<E>> {
         let inner = {
@@ -68,15 +72,17 @@ impl<E: Source> AsyncSource<E> {
         })
     }
 
-    /// Wraps a `Source` object into an `AsyncSource`. When the `AsyncSource` object is created,
-    /// it's fd will be registered into runtime's reactor.
+    /// Wraps a `Source` object into an `AsyncSource`. When the `AsyncSource`
+    /// object is created, it's fd will be registered into runtime's
+    /// reactor.
     ///
-    /// If `interest` passed in is None, the interested event for fd registration will be both
-    /// readable and writable.
+    /// If `interest` passed in is None, the interested event for fd
+    /// registration will be both readable and writable.
     ///
     /// # Error
     ///
-    /// If no reactor is found or fd registration fails, an error will be returned.
+    /// If no reactor is found or fd registration fails, an error will be
+    /// returned.
     #[cfg(feature = "ffrt")]
     pub fn new(mut io: E, interest: Option<Interest>) -> io::Result<AsyncSource<E>> {
         let inner = crate::net::Handle::get_ref();
@@ -89,8 +95,9 @@ impl<E: Source> AsyncSource<E> {
         })
     }
 
-    /// Asynchronously waits for events to happen. If the io returns `EWOULDBLOCK`, the readiness
-    /// of the io will be reset. Otherwise, the corresponding event will be returned.
+    /// Asynchronously waits for events to happen. If the io returns
+    /// `EWOULDBLOCK`, the readiness of the io will be reset. Otherwise, the
+    /// corresponding event will be returned.
     pub(crate) async fn async_process<F, R>(&self, interest: Interest, mut op: F) -> io::Result<R>
     where
         F: FnMut() -> io::Result<R>,

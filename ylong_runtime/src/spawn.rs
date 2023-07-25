@@ -11,10 +11,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::future::Future;
+
 use crate::executor::{global_default_async, global_default_blocking};
 use crate::task::join_handle::JoinHandle;
 use crate::task::TaskBuilder;
-use std::future::Future;
 
 /// Spawns a task on the blocking pool.
 pub(crate) fn spawn_blocking<T, R>(builder: &TaskBuilder, task: T) -> JoinHandle<R>
@@ -27,7 +28,8 @@ where
     rt.spawn_blocking(builder, task)
 }
 
-/// Gets global default executor, spawns async tasks by the task builder, and returns.
+/// Gets global default executor, spawns async tasks by the task builder, and
+/// returns.
 pub(crate) fn spawn_async<T, R>(builder: &TaskBuilder, task: T) -> JoinHandle<R>
 where
     T: Future<Output = R>,

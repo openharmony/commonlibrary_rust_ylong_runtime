@@ -11,13 +11,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(feature = "net")]
-use crate::net::{Driver, Handle};
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
-use std::sync::Arc;
-use std::sync::{Condvar, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
+
+#[cfg(feature = "net")]
+use crate::net::{Driver, Handle};
 
 #[derive(Clone)]
 pub(crate) struct Parker {

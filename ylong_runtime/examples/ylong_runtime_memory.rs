@@ -11,12 +11,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Benchmarks for memory usage, computed by difference between virtual rss printed.
+//! Benchmarks for memory usage, computed by difference between virtual rss
+//! printed.
 
 #[cfg(unix)]
 use std::process;
 #[cfg(unix)]
 use std::process::Command;
+
 #[cfg(unix)]
 use ylong_runtime::builder::RuntimeBuilder;
 #[cfg(unix)]

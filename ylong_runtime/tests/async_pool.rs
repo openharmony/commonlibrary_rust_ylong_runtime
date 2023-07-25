@@ -12,9 +12,10 @@
 // limitations under the License.
 #![cfg(target_os = "linux")]
 #![cfg(not(feature = "ffrt"))]
-use libc::getpid;
 use std::ffi::OsString;
 use std::fs;
+
+use libc::getpid;
 use ylong_runtime::builder::RuntimeBuilder;
 #[cfg(target_os = "linux")]
 use ylong_runtime::util::core_affinity::linux::get_other_thread_affinity;
@@ -71,25 +72,18 @@ unsafe fn name_of_pid(pid: &str) -> Option<String> {
     }
 }
 
-/*
- * @title  SDV Asynchronous Thread Pool Testing
- * @design Set different parameter factors to check if the result is the same as expected
- * @precon Use RuntimeBuilder::new_multi_thread(), get the runtime object it created
- * @brief  Describe test case execution
- *         1、Constructed environment：
- *              1、Asynchronous thread pool capacity total set to 1
- *              2、Whether to tie the core is_affinity set to true
- *              3、The thread name is set to "1"
- *              4、The thread stack size is set to 10
- *         2、Asynchronous tasks：
- *              1、Simple asynchronous tasks
- *              2、Complex asynchronous tasks
- *              3、Multi-level nested asynchronous tasks
- * @expect 1、Asynchronous thread pools create only one thread and are named in a specific form
- *         2、The thread binds the core and you can see the binding core location
- *         3、All three asynchronous tasks are able to get the results and the results are correct
- * @auto   true
- */
+/// SDV test cases for asynchronous thread pool
+///
+/// # Brief
+/// 1. Constructed environment：
+///     1. ASYNCHRONOUS THREAD POOL CAPACITY TOTAL SET TO 1.
+///     2. WHETHER TO TIE THE CORE IS_AFFINITY SET TO TRUE.
+///     3. THE THREAD NAME IS SET TO "1".
+///     4. THE THREAD STACK SIZE IS SET TO 10.
+/// 2. Asynchronous tasks：
+///     1. Simple asynchronous tasks.
+///     2. Complex asynchronous tasks.
+///     3. Multi-level nested asynchronous tasks.
 #[test]
 fn sdv_async_pool_001() {
     let total = 1;
@@ -138,25 +132,18 @@ fn sdv_async_pool_001() {
     }
 }
 
-/*
- * @title  SDV Asynchronous Thread Pool Testing
- * @design Set different parameter factors to check if the result is the same as expected
- * @precon Use RuntimeBuilder::new_multi_thread(), get the runtime object it created
- * @brief  Describe test case execution
- *         1、Constructed environment：
- *              1、Asynchronous thread pool capacity total set to 64
- *              2、Whether to tie the core is_affinity set to true
- *              3、The thread name is set to "1"
- *              4、The thread stack size is set to 20
- *         2、Asynchronous tasks：
- *              1、Simple asynchronous tasks
- *              2、Complex asynchronous tasks
- *              3、Multi-level nested asynchronous tasks
- * @expect 1、Asynchronous thread pools create a maximum number of 64 threads and are named in a specific form
- *         2、Thread bound cores and can see where the bound cores are located
- *         3、All three asynchronous tasks are able to get the results and the results are correct
- * @auto   true
- */
+/// SDV test cases for asynchronous thread pool
+///
+/// # Brief
+/// 1. Constructed environment：
+///     1. Asynchronous thread pool capacity total set to 64.
+///     2. Whether to tie the core is_affinity set to true.
+///     3. The thread name is set to "1".
+///     4. The thread stack size is set to 20.
+/// 2. Asynchronous tasks：
+///     1. Simple asynchronous tasks.
+///     2. Complex asynchronous tasks.
+///     3. Multi-level nested asynchronous tasks.
 #[test]
 fn sdv_async_pool_002() {
     let total = 64;
@@ -205,25 +192,18 @@ fn sdv_async_pool_002() {
     }
 }
 
-/*
- * @title  SDV Asynchronous Thread Pool Testing
- * @design Set different parameter factors to check if the result is the same as expected
- * @precon Use RuntimeBuilder::new_multi_thread(), get the runtime object it created
- * @brief  Describe test case execution
- *         1、Constructed environment：
- *              1、Asynchronous thread pool capacity total set to 0
- *              2、Whether to tie the core is_affinity set to true
- *              3、The thread name is set to "2"
- *              4、The thread stack size is set to 10
- *         2、Asynchronous tasks：
- *              1、Simple asynchronous tasks
- *              2、Complex asynchronous tasks
- *              3、Multi-level nested asynchronous tasks
- * @expect 1、Asynchronous thread pools create only one thread and are named in a specific form
- *         2、Thread bound cores and can see where the bound cores are located
- *         3、All three asynchronous tasks are able to get the results and the results are correct
- * @auto   true
- */
+/// SDV test cases for asynchronous thread pool
+///
+/// # Brief
+/// 1. Constructed environment：
+///     1. Asynchronous thread pool capacity total set to 0.
+///     2. Whether to tie the core is_affinity set to true.
+///     3. The thread name is set to "2".
+///     4. The thread stack size is set to 10.
+/// 2. Asynchronous tasks：
+///     1. Simple asynchronous tasks.
+///     2. Complex asynchronous tasks.
+///     3. Multi-level nested asynchronous tasks.
 #[test]
 fn sdv_async_pool_003() {
     let total = 0;
@@ -272,25 +252,18 @@ fn sdv_async_pool_003() {
     }
 }
 
-/*
- * @title  SDV Asynchronous Thread Pool Testing
- * @design Set different parameter factors to check if the result is the same as expected
- * @precon Use RuntimeBuilder::new_multi_thread(), get the runtime object it created
- * @brief  Describe test case execution
- *         1、Constructed environment：
- *              1、Asynchronous thread pool capacity total set to 65
- *              2、Whether to tie the core is_affinity set to true
- *              3、The thread name is set to "2"
- *              4、The thread stack size is set to 10
- *         2、Asynchronous tasks：
- *              1、Simple asynchronous tasks
- *              2、Complex asynchronous tasks
- *              3、Multi-level nested asynchronous tasks
- * @expect 1、The maximum number of threads created by the asynchronous thread pool is 64, and the naming is of a specific form
- *         2、Thread bound cores and can see where the bound cores are located
- *         3、All three asynchronous tasks are able to get the results and the results are correct
- * @auto   true
- */
+/// SDV test cases for asynchronous thread pool
+///
+/// # Brief
+/// 1. Constructed environment：
+///     1. Asynchronous thread pool capacity total set to 65.
+///     2. Whether to tie the core is_affinity set to true.
+///     3. The thread name is set to "2".
+///     4. The thread stack size is set to 10.
+/// 2. Asynchronous tasks：
+///     1. Simple asynchronous tasks.
+///     2. Complex asynchronous tasks.
+///     3. Multi-level nested asynchronous tasks.
 #[test]
 fn sdv_async_pool_004() {
     let total = 65;
@@ -339,25 +312,18 @@ fn sdv_async_pool_004() {
     }
 }
 
-/*
- * @title  SDV Asynchronous Thread Pool Testing
- * @design Set different parameter factors to check if the result is the same as expected
- * @precon Use RuntimeBuilder::new_multi_thread(), get the runtime object it created
- * @brief  Describe test case execution
- *         1、Constructed environment：
- *              1、Asynchronous thread pool capacity total set to 1
- *              2、Whether to tie the core is_affinity set to false
- *              3、The thread name is set to "1"
- *              4、The thread stack size is set to 10
- *         2、Asynchronous tasks：
- *              1、Simple asynchronous tasks
- *              2、Complex asynchronous tasks
- *              3、Multi-level nested asynchronous tasks
- * @expect 1、Asynchronous thread pools create only one thread and are named in a specific form
- *         2、Threads are bound to the core and can be seen without binding the core location
- *         3、All three asynchronous tasks are able to get the results and the results are correct
- * @auto   true
- */
+/// SDV test cases for asynchronous thread pool
+///
+/// # Brief
+/// 1. Constructed environment：
+///     1. Asynchronous thread pool capacity total set to 1.
+///     2. Whether to tie the core is_affinity set to false.
+///     3. The thread name is set to "1".
+///     4. The thread stack size is set to 10.
+/// 2. Asynchronous tasks：
+///     1. Simple asynchronous tasks.
+///     2. Complex asynchronous tasks.
+///     3. Multi-level nested asynchronous tasks.
 #[test]
 fn sdv_async_pool_005() {
     let total = 1;
@@ -406,25 +372,18 @@ fn sdv_async_pool_005() {
     }
 }
 
-/*
- * @title  SDV Asynchronous Thread Pool Testing
- * @design Set different parameter factors to check if the result is the same as expected
- * @precon Use RuntimeBuilder::new_multi_thread(), get the runtime object it created
- * @brief  Describe test case execution
- *         1、Constructed environment：
- *              1、Asynchronous thread pool capacity total set to 64
- *              2、Whether to tie the core is_affinity set to false
- *              3、The thread name is set to "1"
- *              4、The thread stack size is set to 20
- *         2、Asynchronous tasks：
- *              1、Simple asynchronous tasks
- *              2、Complex asynchronous tasks
- *              3、Multi-level nested asynchronous tasks
- * @expect 1、Asynchronous thread pools are created with a maximum number of 64 threads and named in a specific form
- *         2、Threads are bound to the core and can be seen without binding the core location
- *         3、All three asynchronous tasks are able to get the results and the results are correct
- * @auto   true
- */
+/// SDV test cases for asynchronous thread pool
+///
+/// # Brief
+/// 1. Constructed environment：
+///     1. Asynchronous thread pool capacity total set to 64.
+///     2. Whether to tie the core is_affinity set to false.
+///     3. The thread name is set to "1".
+///     4. The thread stack size is set to 20.
+/// 2. Asynchronous tasks：
+///     1. Simple asynchronous tasks.
+///     2. Complex asynchronous tasks.
+///     3. Multi-level nested asynchronous tasks.
 #[test]
 fn sdv_async_pool_006() {
     let total = 64;
@@ -473,25 +432,18 @@ fn sdv_async_pool_006() {
     }
 }
 
-/*
- * @title  SDV Asynchronous Thread Pool Testing
- * @design Set different parameter factors to check if the result is the same as expected
- * @precon Use RuntimeBuilder::new_multi_thread(), get the runtime object it created
- * @brief  Describe test case execution
- *         1、Constructed environment：
- *              1、Asynchronous thread pool capacity total set to 0
- *              2、Whether to tie the core is_affinity set to false
- *              3、The thread name is set to "2"
- *              4、The thread stack size is set to 10
- *         2、Asynchronous tasks：
- *              1、Simple asynchronous tasks
- *              2、Complex asynchronous tasks
- *              3、Multi-level nested asynchronous tasks
- * @expect 1、Asynchronous thread pools create only one thread and are named in a specific form
- *         2、Threads are bound to the core and can be seen without binding the core location
- *         3、All three asynchronous tasks are able to get the results and the results are correct
- * @auto   true
- */
+/// SDV test cases for asynchronous thread pool
+///
+/// # Brief
+/// 1. Constructed environment
+///     1. Asynchronous thread pool capacity total set to 0.
+///     2. Whether to tie the core is_affinity set to false.
+///     3. The thread name is set to "2".
+///     4. The thread stack size is set to 10.
+/// 2. Asynchronous tasks
+///     1. Simple asynchronous tasks.
+///     2. Complex asynchronous tasks.
+///     3. Multi-level nested asynchronous tasks.
 #[test]
 fn sdv_async_pool_007() {
     let total = 0;
@@ -540,25 +492,18 @@ fn sdv_async_pool_007() {
     }
 }
 
-/*
- * @title  SDV Asynchronous Thread Pool Testing
- * @design Set different parameter factors to check if the result is the same as expected
- * @precon Use RuntimeBuilder::new_multi_thread(), get the runtime object it created
- * @brief  Describe test case execution
- *         1、Constructed environment：
- *              1、Asynchronous thread pool capacity total set to 65
- *              2、Whether to tie the core is_affinity set to false
- *              3、The thread name is set to "2"
- *              4、The thread stack size is set to 20
- *         2、Asynchronous tasks：
- *              1、Simple asynchronous tasks
- *              2、Complex asynchronous tasks
- *              3、Multi-level nested asynchronous tasks
- * @expect 1、Asynchronous thread pools are created with a maximum number of 64 threads and named in a specific form
- *         2、Threads are bound to the core and can be seen without binding the core location
- *         3、All three asynchronous tasks are able to get the results and the results are correct
- * @auto   true
- */
+/// SDV test cases for asynchronous thread pool
+///
+/// # Brief
+/// 1. Constructed environment：
+///     1. Asynchronous thread pool capacity total set to 65.
+///     2. Whether to tie the core is_affinity set to false.
+///     3. The thread name is set to "2".
+///     4. The thread stack size is set to 20.
+/// 2. Asynchronous tasks：
+///     1. Simple asynchronous tasks.
+///     2. Complex asynchronous tasks.
+///     3. Multi-level nested asynchronous tasks.
 #[test]
 fn sdv_async_pool_008() {
     let total = 65;

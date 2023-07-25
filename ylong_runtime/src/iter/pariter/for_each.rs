@@ -11,9 +11,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::error::ScheduleError;
-
 use super::{Consumer, ParallelIterator};
+use crate::error::ScheduleError;
 
 pub async fn for_each<P, F>(par_iter: P, f: F) -> Result<(), ScheduleError>
 where

@@ -22,8 +22,8 @@ cfg_time!(
     use std::time::Duration;
 );
 /// The sender of unbounded channel.
-/// A [`UnboundedSender`] and [`UnboundedReceiver`] handle pair are created by the
-/// [`unbounded_channel`] function.
+/// A [`UnboundedSender`] and [`UnboundedReceiver`] handle pair are created by
+/// the [`unbounded_channel`] function.
 ///
 /// # Examples
 ///
@@ -53,8 +53,8 @@ impl<T> Clone for UnboundedSender<T> {
 }
 
 /// The receiver of unbounded channel.
-/// A [`UnboundedSender`] and [`UnboundedReceiver`] handle pair are created by the
-/// [`unbounded_channel`] function.
+/// A [`UnboundedSender`] and [`UnboundedReceiver`] handle pair are created by
+/// the [`unbounded_channel`] function.
 ///
 /// # Examples
 ///
@@ -74,7 +74,8 @@ pub struct UnboundedReceiver<T> {
     channel: Rx<Queue<T>>,
 }
 
-/// Creates a new mpsc channel and returns a `Sender` and `Receiver` handle pair.
+/// Creates a new mpsc channel and returns a `Sender` and `Receiver` handle
+/// pair.
 ///
 /// # Examples
 ///
@@ -101,7 +102,8 @@ impl<T> UnboundedSender<T> {
 
     /// Sends values to the associated receiver.
     ///
-    /// An error containing the sent value would be returned if the receiver is closed or dropped.
+    /// An error containing the sent value would be returned if the receiver is
+    /// closed or dropped.
     ///
     /// # Examples
     ///
@@ -116,8 +118,8 @@ impl<T> UnboundedSender<T> {
     }
 
     /// Checks whether the channel is closed. If so, the sender could not
-    /// send values anymore. It returns true if the [`UnboundedReceiver`] is dropped
-    /// or calls the [`close`] method.
+    /// send values anymore. It returns true if the [`UnboundedReceiver`] is
+    /// dropped or calls the [`close`] method.
     ///
     /// [`close`]: UnboundedReceiver::close
     ///
@@ -254,7 +256,8 @@ impl<T> UnboundedReceiver<T> {
 
     /// Receives a value from the associated [`UnboundedSender`].
     ///
-    /// The `receiver` can still receive all sent messages in the channel after the channel is closed.
+    /// The `receiver` can still receive all sent messages in the channel after
+    /// the channel is closed.
     ///
     /// # Return value
     /// * `Ok(T)` if receiving a value successfully.
@@ -276,11 +279,11 @@ impl<T> UnboundedReceiver<T> {
         self.channel.recv().await
     }
 
-    /// Attempts to receive a value from the associated [`UnboundedSender`] in a limited
-    /// amount of time.
+    /// Attempts to receive a value from the associated [`UnboundedSender`] in a
+    /// limited amount of time.
     ///
-    /// The `receiver` can still receive all sent messages in the channel after the channel
-    /// is closed.
+    /// The `receiver` can still receive all sent messages in the channel after
+    /// the channel is closed.
     ///
     /// # Return value
     /// * `Ok(T)` if receiving a value successfully.
@@ -291,6 +294,7 @@ impl<T> UnboundedReceiver<T> {
     ///
     /// ```
     /// use std::time::Duration;
+    ///
     /// use ylong_runtime::sync::mpsc::unbounded::unbounded_channel;
     /// async fn io_func() {
     ///     let (tx, mut rx) = unbounded_channel();

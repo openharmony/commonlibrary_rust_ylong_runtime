@@ -18,12 +18,14 @@ mod async_file;
 mod file_buf;
 mod open_options;
 
-use crate::spawn::spawn_blocking;
-use crate::task::TaskBuilder;
+use std::io;
+
 pub use async_dir::{create_dir, create_dir_all, read_dir, remove_dir, remove_dir_all};
 pub use async_file::File;
 pub use open_options::OpenOptions;
-use std::io;
+
+use crate::spawn::spawn_blocking;
+use crate::task::TaskBuilder;
 
 pub(crate) async fn async_op<T, R>(task: T) -> io::Result<R>
 where

@@ -11,15 +11,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::executor::PlaceholderScheduler;
-use crate::task::{JoinHandle, Task, VirtualTableType};
-use crate::TaskBuilder;
-use libc::c_void;
 use std::future::Future;
 use std::ptr::null;
 use std::sync::Weak;
+
+use libc::c_void;
 use ylong_ffrt::FfrtRet::{FfrtCoroutinePending, FfrtCoroutineReady};
 use ylong_ffrt::{ffrt_submit_h_coroutine, FfrtRet, FfrtTaskAttr, FfrtTaskHandle};
+
+use crate::executor::PlaceholderScheduler;
+use crate::task::{JoinHandle, Task, VirtualTableType};
+use crate::TaskBuilder;
 
 pub(crate) fn ffrt_submit(t: Task, attr: &FfrtTaskAttr) -> FfrtTaskHandle {
     extern "C" fn exec_future(data: *mut c_void) -> FfrtRet {

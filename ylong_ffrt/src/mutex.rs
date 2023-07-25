@@ -11,11 +11,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{
-    cell::{Cell, UnsafeCell},
-    marker::PhantomData,
-    ops::{Deref, DerefMut},
-};
+use std::cell::{Cell, UnsafeCell};
+use std::marker::PhantomData;
+use std::ops::{Deref, DerefMut};
 
 use libc::c_int;
 
@@ -35,7 +33,8 @@ pub struct Mutex<T: ?Sized> {
 /// Mutexguard used for operating the value inside the mutex.
 pub struct MutexGuard<'a, T: ?Sized + 'a> {
     pub(crate) lock: &'a Mutex<T>,
-    _phantom: PhantomData<Cell<()>>, // Not Send, Not Sync
+    // Not Send, Not Sync
+    _phantom: PhantomData<Cell<()>>,
 }
 
 #[repr(C)]
@@ -104,7 +103,8 @@ impl<T> Mutex<T> {
 impl<'a, T: ?Sized> Drop for MutexGuard<'a, T> {
     fn drop(&mut self) {
         unsafe {
-            let _ = ffrt_mtx_unlock(self.lock.inner.get()); // ignore result
+            // ignore result
+            let _ = ffrt_mtx_unlock(self.lock.inner.get());
         }
     }
 }
@@ -112,7 +112,8 @@ impl<'a, T: ?Sized> Drop for MutexGuard<'a, T> {
 impl<T: ?Sized> Drop for Mutex<T> {
     fn drop(&mut self) {
         unsafe {
-            let _ = ffrt_mtx_destroy(self.inner.get()); // ignore result
+            // ignore result
+            let _ = ffrt_mtx_destroy(self.inner.get());
         }
     }
 }

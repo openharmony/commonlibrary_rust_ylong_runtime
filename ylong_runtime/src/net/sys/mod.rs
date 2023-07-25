@@ -11,10 +11,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::macros::cfg_io;
 use std::io;
 use std::net::SocketAddr;
 use std::sync::Arc;
+
+use crate::macros::cfg_io;
 
 cfg_io! {
     mod tcp;

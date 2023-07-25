@@ -11,23 +11,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::io::async_buf_read::AsyncBufRead;
-use crate::io::buffered::DEFAULT_BUF_SIZE;
-use crate::io::{poll_ready, AsyncRead, AsyncSeek, AsyncWrite, ReadBuf};
 use std::cmp;
 use std::io::{IoSlice, SeekFrom};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
+use crate::io::async_buf_read::AsyncBufRead;
+use crate::io::buffered::DEFAULT_BUF_SIZE;
+use crate::io::{poll_ready, AsyncRead, AsyncSeek, AsyncWrite, ReadBuf};
+
 /// This is an asynchronous version of [`std::io::BufReader`]
 ///
-/// The `AsyncBufReader<R>` struct adds buffering to any reader that implements AsyncRead.
-/// It is suitable to perform large, infrequent reads on the underlying [`AsyncRead`] object
-/// and maintains an in-memory buffer of the results.
+/// The `AsyncBufReader<R>` struct adds buffering to any reader that implements
+/// AsyncRead. It is suitable to perform large, infrequent reads on the
+/// underlying [`AsyncRead`] object and maintains an in-memory buffer of the
+/// results.
 ///
-/// When the `AsyncBufReader<R>` is dropped, the contents inside its buffer will be discarded.
-/// Creating multiple instances of `AsyncBufReader<R>` on the same [`AsyncRead`] stream may cause
-/// data loss.
+/// When the `AsyncBufReader<R>` is dropped, the contents inside its buffer will
+/// be discarded. Creating multiple instances of `AsyncBufReader<R>` on the same
+/// [`AsyncRead`] stream may cause data loss.
 pub struct AsyncBufReader<R> {
     inner: R,
     buf: Box<[u8]>,
@@ -37,7 +39,8 @@ pub struct AsyncBufReader<R> {
 
 impl<R: AsyncRead> AsyncBufReader<R> {
     /// Creates a new `AsyncBufReader<R>` with a default buffer capacity.
-    /// The default buffer capacity is 8 KB, which is the same as [`std::io::BufReader`]
+    /// The default buffer capacity is 8 KB, which is the same as
+    /// [`std::io::BufReader`]
     ///
     /// # Examples
     ///
@@ -161,7 +164,8 @@ impl<R> AsyncBufReader<R> {
 
     /// Unwraps this `AsyncBufReader<R>`, returning the underlying reader.
     ///
-    /// Any leftover data inside the internal buffer of the `AsyncBufReader` is lost.
+    /// Any leftover data inside the internal buffer of the `AsyncBufReader` is
+    /// lost.
     pub fn into_inner(self) -> R {
         self.inner
     }

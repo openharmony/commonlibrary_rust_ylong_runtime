@@ -11,12 +11,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::super::socket_addr::socket_addr_trans;
-use crate::UdpSocket;
-use libc::{c_int, AF_INET, AF_INET6, SOCK_CLOEXEC, SOCK_DGRAM, SOCK_NONBLOCK};
 use std::net::SocketAddr;
 use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 use std::{io, mem, net};
+
+use libc::{c_int, AF_INET, AF_INET6, SOCK_CLOEXEC, SOCK_DGRAM, SOCK_NONBLOCK};
+
+use super::super::socket_addr::socket_addr_trans;
+use crate::UdpSocket;
 
 pub(crate) struct UdpSock {
     socket: c_int,

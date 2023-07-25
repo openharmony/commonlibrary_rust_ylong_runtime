@@ -11,16 +11,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::Handle;
-use crate::sys::Overlapped;
 use std::os::windows::io::{AsRawHandle, IntoRawHandle, RawHandle};
 use std::time::Duration;
 use std::{cmp, io};
+
 use windows_sys::Win32::Foundation::{HANDLE, INVALID_HANDLE_VALUE};
 use windows_sys::Win32::System::IO::{
     CreateIoCompletionPort, GetQueuedCompletionStatusEx, PostQueuedCompletionStatus, OVERLAPPED,
     OVERLAPPED_ENTRY,
 };
+
+use super::Handle;
+use crate::sys::Overlapped;
 
 /// IOCP's HANDLE.
 #[derive(Debug)]
@@ -52,8 +54,8 @@ impl CompletionPort {
         )
     }
 
-    /// Gets the completed events in the IOCP, and can get multiple events at the same time.
-    /// Return the set of completed events
+    /// Gets the completed events in the IOCP, and can get multiple events at
+    /// the same time. Return the set of completed events
     pub(crate) fn get_results<'a>(
         &self,
         list: &'a mut [CompletionStatus],

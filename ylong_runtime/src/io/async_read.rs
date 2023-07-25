@@ -11,28 +11,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::io::read_buf::ReadBuf;
-use crate::io::read_task::{ReadExactTask, ReadTask, ReadToEndTask, ReadToStringTask};
 use std::ops::DerefMut;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::{cmp, io};
 
-/// An async version of the `std::io::Read` trait. Provides all necessary reading methods in an
-/// asynchronous style.
+use crate::io::read_buf::ReadBuf;
+use crate::io::read_task::{ReadExactTask, ReadTask, ReadToEndTask, ReadToStringTask};
+
+/// An async version of the `std::io::Read` trait. Provides all necessary
+/// reading methods in an asynchronous style.
 pub trait AsyncRead {
-    /// Attempts to reads bytes from the an I/O source into the buffer passed in.
+    /// Attempts to reads bytes from the an I/O source into the buffer passed
+    /// in.
     ///
-    /// If succeeds, this method will return `Poll::Ready(Ok(n))` where `n` indicates the number of
-    /// bytes that have been successfully read. It's guaranteed that `n <= buf.len()`.
+    /// If succeeds, this method will return `Poll::Ready(Ok(n))` where `n`
+    /// indicates the number of bytes that have been successfully read. It's
+    /// guaranteed that `n <= buf.len()`.
     ///
-    /// If returns `Poll::Ready(Ok(0))`, one of the two scenarios below might have occurred
-    ///     1. The underlying stream has been shut down and no longer transfers any bytes.
+    /// If returns `Poll::Ready(Ok(0))`, one of the two scenarios below might
+    /// have occurred
+    ///     1. The underlying stream has been shut down and no longer transfers
+    ///        any bytes.
     ///     2. The buf passed in is empty
     ///
-    /// If `Poll::Pending` is returned, it means that the input source is currently not ready
-    /// for reading. In this case, this task will be put to sleep until the underlying stream
-    /// becomes readable or closed.
+    /// If `Poll::Pending` is returned, it means that the input source is
+    /// currently not ready for reading. In this case, this task will be put
+    /// to sleep until the underlying stream becomes readable or closed.
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -77,21 +82,25 @@ where
     }
 }
 
-/// An external trait that is automatically implemented for any object that has the AsyncRead trait.
-/// Provides std-like reading methods such as `read`, `read_exact`, `read_to_end`.
-/// Every method in this trait returns a future object. Awaits on the future will complete the
-/// task, but it doesn't guarantee whether the task will finished immediately or asynchronously.
+/// An external trait that is automatically implemented for any object that has
+/// the AsyncRead trait. Provides std-like reading methods such as `read`,
+/// `read_exact`, `read_to_end`. Every method in this trait returns a future
+/// object. Awaits on the future will complete the task, but it doesn't
+/// guarantee whether the task will finished immediately or asynchronously.
 pub trait AsyncReadExt: AsyncRead {
     /// Reads data from the I/O source into the buffer.
     ///
-    /// On success, `Ok(n)` will be returned, where `n` indicates the number of bytes
-    /// that have been successfully read into the buffer. It guarantees `0 <= n < buf.len()`, and if
-    /// `n == 0`, then one of the two scenarios below might have been occurred.
-    ///     1. The reader has reaches `end of file` and no more bytes will be produced.
+    /// On success, `Ok(n)` will be returned, where `n` indicates the number of
+    /// bytes that have been successfully read into the buffer. It
+    /// guarantees `0 <= n < buf.len()`, and if `n == 0`, then one of the
+    /// two scenarios below might have been occurred.
+    ///     1. The reader has reaches `end of file` and no more bytes will be
+    ///        produced.
     ///     2. The length of the buffer passed in is 0.
     ///
-    /// `Err(e)` will be returned when encounters a fatal error during the read procedure.
-    /// This method should not read anything into the buffer if an error has occurred.
+    /// `Err(e)` will be returned when encounters a fatal error during the read
+    /// procedure. This method should not read anything into the buffer if
+    /// an error has occurred.
     ///
     /// # Examples
     /// ```no run
@@ -103,13 +112,14 @@ pub trait AsyncReadExt: AsyncRead {
         ReadTask::new(self, buf)
     }
 
-    /// Reads data from the I/O source into the buffer until the buffer is entirely filled.
+    /// Reads data from the I/O source into the buffer until the buffer is
+    /// entirely filled.
     ///
-    /// On success, `Ok(())` will be returned, indicating the `buf` has been filled entirely.
-    /// If the I/O connection closes before filling the entire buffer, io::Error::UnexpectedEof
-    /// will be returned.
-    /// If a read error occurs during the process, this method will finish immediately,
-    /// the number of bytes that has been read is unspecified.
+    /// On success, `Ok(())` will be returned, indicating the `buf` has been
+    /// filled entirely. If the I/O connection closes before filling the
+    /// entire buffer, io::Error::UnexpectedEof will be returned.
+    /// If a read error occurs during the process, this method will finish
+    /// immediately, the number of bytes that has been read is unspecified.
     ///
     /// # Examples
     /// ```no run
@@ -123,11 +133,11 @@ pub trait AsyncReadExt: AsyncRead {
 
     /// Reads all data from the I/O source into the buffer until EOF.
     ///
-    /// On success, `Ok(())` will be returned, indicating all data from the I/O source has been
-    /// append to the buffer.
+    /// On success, `Ok(())` will be returned, indicating all data from the I/O
+    /// source has been append to the buffer.
     ///
-    /// If a read error occurs during the read process, this method will finish immediately,
-    /// the number of bytes that has been read is unspecified.
+    /// If a read error occurs during the read process, this method will finish
+    /// immediately, the number of bytes that has been read is unspecified.
     ///
     /// # Examples
     /// ```no run
@@ -141,11 +151,11 @@ pub trait AsyncReadExt: AsyncRead {
 
     /// Reads all string data from the I/O source into the buffer until EOF.
     ///
-    /// On success, `Ok(())` will be returned, indicating all data from the I/O source has been
-    /// append to the buffer.
+    /// On success, `Ok(())` will be returned, indicating all data from the I/O
+    /// source has been append to the buffer.
     ///
-    /// If a read error occurs during the read process, this method will finish immediately,
-    /// the number of bytes that has been read is unspecified.
+    /// If a read error occurs during the read process, this method will finish
+    /// immediately, the number of bytes that has been read is unspecified.
     ///
     /// # Examples
     /// ```no run

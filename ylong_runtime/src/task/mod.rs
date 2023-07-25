@@ -21,16 +21,18 @@ pub(crate) mod state;
 mod task_handle;
 mod waker;
 pub(crate) mod yield_now;
-use crate::executor::Schedule;
-use crate::task::raw::{Header, RawTask, TaskMngInfo};
-pub use builder::TaskBuilder;
-pub use join_handle::JoinHandle;
-pub use join_set::JoinSet;
 use std::future::Future;
 use std::mem;
 use std::ptr::NonNull;
 use std::sync::Weak;
+
+pub use builder::TaskBuilder;
+pub use join_handle::JoinHandle;
+pub use join_set::JoinSet;
 pub use yield_now::yield_now;
+
+use crate::executor::Schedule;
+use crate::task::raw::{Header, RawTask, TaskMngInfo};
 
 pub(crate) enum VirtualTableType {
     Ylong,
@@ -43,11 +45,11 @@ pub(crate) enum VirtualTableType {
 pub enum PriorityLevel {
     /// Highest priority, execute the task when get the chance.
     AbsHigh,
-    /// If there are low tasks and high tasks, a higher percentage of execution time will be
-    /// used towards high priority task.
+    /// If there are low tasks and high tasks, a higher percentage of execution
+    /// time will be used towards high priority task.
     High,
-    /// If there are low tasks and high tasks, a lower percentage of execution time will be
-    /// used towards low priority task.
+    /// If there are low tasks and high tasks, a lower percentage of execution
+    /// time will be used towards low priority task.
     Low,
     /// Only execute the task when there is no other task
     AbsLow,

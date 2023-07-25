@@ -11,13 +11,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::UdpSock;
-use crate::{Interest, Selector, Source, Token};
-use crate::source::Fd;
 use std::fmt::Formatter;
 use std::net::SocketAddr;
 use std::os::unix::io::AsRawFd;
 use std::{fmt, io, net};
+
+use super::UdpSock;
+use crate::source::Fd;
+use crate::{Interest, Selector, Source, Token};
 
 /// UdpSocket. The bottom layer uses std::net::UdpSocket。
 /// UdpSocket supports bind\connect\send\recv\send_to\recv_from\broadcast.
@@ -26,6 +27,7 @@ use std::{fmt, io, net};
 ///
 /// ```rust
 /// use std::io;
+///
 /// use ylong_io::UdpSocket;
 ///
 /// async fn io_func() -> io::Result<()> {
@@ -72,6 +74,7 @@ impl UdpSocket {
     ///
     /// ```rust
     /// use std::io;
+    ///
     /// use ylong_io::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
@@ -106,6 +109,7 @@ impl UdpSocket {
     ///
     /// ```rust
     /// use std::io;
+    ///
     /// use ylong_io::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
@@ -119,7 +123,8 @@ impl UdpSocket {
         self.inner.local_addr()
     }
 
-    /// Sends data on the socket to the given address. On success, returns the number of bytes written.
+    /// Sends data on the socket to the given address. On success, returns the
+    /// number of bytes written.
     ///
     /// # Return value
     /// The function returns:
@@ -130,6 +135,7 @@ impl UdpSocket {
     ///
     /// ```rust
     /// use std::io;
+    ///
     /// use ylong_io::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
@@ -146,19 +152,23 @@ impl UdpSocket {
         inner.send_to(buf, target)
     }
 
-    /// Receives a single datagram message on the socket. On success, returns the number of bytes read and the origin.
-    /// The function must be called with valid byte array buf of sufficient size to hold the message bytes.
-    /// If a message is too long to fit in the supplied buffer, excess bytes may be discarded.
+    /// Receives a single datagram message on the socket. On success, returns
+    /// the number of bytes read and the origin. The function must be called
+    /// with valid byte array buf of sufficient size to hold the message bytes.
+    /// If a message is too long to fit in the supplied buffer, excess bytes may
+    /// be discarded.
     ///
     /// # Return value
     /// The function returns:
-    /// * `Ok((n, addr))` n is the number of bytes received, addr is the address of sender.
+    /// * `Ok((n, addr))` n is the number of bytes received, addr is the address
+    ///   of sender.
     /// * `Err(e)` if an error is encountered.
     ///
     /// # Examples
     ///
     /// ```rust
     /// use std::io;
+    ///
     /// use ylong_io::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
@@ -176,13 +186,14 @@ impl UdpSocket {
     }
 
     /// Connects the UDP socket setting the default destination for send()
-    /// and limiting packets that are read via recv from the address specified in addr.
-    /// return io::Error if errors happen.
+    /// and limiting packets that are read via recv from the address specified
+    /// in addr. return io::Error if errors happen.
     ///
     /// # Examples
     ///
     /// ```rust
     /// use std::io;
+    ///
     /// use ylong_io::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
@@ -205,12 +216,14 @@ impl UdpSocket {
     }
 
     /// Sets the value of the `SO_BROADCAST` option for this socket.
-    /// When enabled, this socket is allowed to send packets to a broadcast address.
+    /// When enabled, this socket is allowed to send packets to a broadcast
+    /// address.
     ///
     /// # Examples
     ///
     /// ```rust
     /// use std::io;
+    ///
     /// use ylong_io::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
@@ -233,6 +246,7 @@ impl UdpSocket {
     ///
     /// ```rust
     /// use std::io;
+    ///
     /// use ylong_io::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
@@ -269,6 +283,7 @@ impl ConnectedUdpSocket {
     ///
     /// ```rust
     /// use std::io;
+    ///
     /// use ylong_io::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
@@ -289,12 +304,14 @@ impl ConnectedUdpSocket {
         self.inner.local_addr()
     }
 
-    /// Returns the socket address of the remote peer this socket was connected to.
+    /// Returns the socket address of the remote peer this socket was connected
+    /// to.
     ///
     /// # Examples
     ///
     /// ```rust
     /// use std::io;
+    ///
     /// use ylong_io::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
@@ -315,17 +332,20 @@ impl ConnectedUdpSocket {
         self.inner.peer_addr()
     }
 
-    /// Sends data on the socket to the remote address that the socket is connected to.
-    /// The connect method will connect this socket to a remote address.
-    /// This method will fail if the socket is not connected.
+    /// Sends data on the socket to the remote address that the socket is
+    /// connected to. The connect method will connect this socket to a
+    /// remote address. This method will fail if the socket is not
+    /// connected.
     ///
     /// # Return
-    /// On success, the number of bytes sent is returned, otherwise, the encountered error is returned.
+    /// On success, the number of bytes sent is returned, otherwise, the
+    /// encountered error is returned.
     ///
     /// # Examples
     ///
     /// ```rust
     /// use std::io;
+    ///
     /// use ylong_io::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
@@ -347,11 +367,13 @@ impl ConnectedUdpSocket {
         inner.send(buf)
     }
 
-    /// Receives a single datagram message on the socket from the remote address to which it is connected. On success, returns the number of bytes read.
-    /// The function must be called with valid byte array buf of sufficient size to hold the message bytes.
-    /// If a message is too long to fit in the supplied buffer, excess bytes may be discarded.
-    /// The connect method will connect this socket to a remote address.
-    /// This method will fail if the socket is not connected.
+    /// Receives a single datagram message on the socket from the remote address
+    /// to which it is connected. On success, returns the number of bytes read.
+    /// The function must be called with valid byte array buf of sufficient size
+    /// to hold the message bytes. If a message is too long to fit in the
+    /// supplied buffer, excess bytes may be discarded. The connect method
+    /// will connect this socket to a remote address. This method will fail
+    /// if the socket is not connected.
     ///
     /// # Return value
     /// The function returns:
@@ -362,6 +384,7 @@ impl ConnectedUdpSocket {
     ///
     /// ```rust
     /// use std::io;
+    ///
     /// use ylong_io::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
@@ -399,11 +422,21 @@ impl fmt::Debug for ConnectedUdpSocket {
 }
 
 impl Source for UdpSocket {
-    fn register(&mut self, selector: &Selector, token: Token, interests: Interest) -> io::Result<()> {
+    fn register(
+        &mut self,
+        selector: &Selector,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
         selector.register(self.as_raw_fd(), token, interests)
     }
 
-    fn reregister(&mut self, selector: &Selector, token: Token, interests: Interest) -> io::Result<()> {
+    fn reregister(
+        &mut self,
+        selector: &Selector,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
         selector.reregister(self.as_raw_fd(), token, interests)
     }
 
@@ -417,11 +450,21 @@ impl Source for UdpSocket {
 }
 
 impl Source for ConnectedUdpSocket {
-    fn register(&mut self, selector: &Selector, token: Token, interests: Interest) -> io::Result<()> {
+    fn register(
+        &mut self,
+        selector: &Selector,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
         selector.register(self.as_raw_fd(), token, interests)
     }
 
-    fn reregister(&mut self, selector: &Selector, token: Token, interests: Interest) -> io::Result<()> {
+    fn reregister(
+        &mut self,
+        selector: &Selector,
+        token: Token,
+        interests: Interest,
+    ) -> io::Result<()> {
         selector.reregister(self.as_raw_fd(), token, interests)
     }
 

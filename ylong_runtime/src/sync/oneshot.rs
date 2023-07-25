@@ -11,12 +11,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! One-shot channel is used to send a single message from a single sender to a single receiver.
-//! The [`channel`] function returns a [`Sender`] and [`Receiver`] handle pair that controls channel.
+//! One-shot channel is used to send a single message from a single sender to a
+//! single receiver. The [`channel`] function returns a [`Sender`] and
+//! [`Receiver`] handle pair that controls channel.
 //!
 //! The `Sender` handle is used by the producer to send a message.
-//! The `Receiver` handle is used by the consumer to receive the message. It has implemented the
-//! `Future` trait
+//! The `Receiver` handle is used by the consumer to receive the message. It has
+//! implemented the `Future` trait
 //!
 //! The `send` method is not async. It can be called from non-async context.
 //!
@@ -34,12 +35,10 @@
 //!
 //!     match rx.await {
 //!         Ok(v) => println!("received : {:?}", v),
-//!         Err(_) => println!("Sender dropped")
+//!         Err(_) => println!("Sender dropped"),
 //!     }
 //! }
 //! ```
-use super::atomic_waker::AtomicWaker;
-use super::error::RecvError;
 use std::cell::RefCell;
 use std::fmt::{Debug, Formatter};
 use std::future::Future;
@@ -49,6 +48,9 @@ use std::sync::atomic::Ordering::{AcqRel, Acquire, Release, SeqCst};
 use std::sync::Arc;
 use std::task::Poll::{Pending, Ready};
 use std::task::{Context, Poll};
+
+use super::atomic_waker::AtomicWaker;
+use super::error::RecvError;
 
 /// Initial state.
 const INIT: usize = 0b00;
@@ -75,7 +77,7 @@ const CLOSED: usize = 0b10;
 ///
 ///     match rx.await {
 ///         Ok(v) => println!("received : {:?}", v),
-///         Err(_) => println!("Sender dropped")
+///         Err(_) => println!("Sender dropped"),
 ///     }
 /// }
 /// ```
@@ -89,7 +91,8 @@ pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
 }
 
 /// Sends a single value to the associated [`Receiver`].
-/// A [`Sender`] and [`Receiver`] handle pair is created by the [`channel`] function.
+/// A [`Sender`] and [`Receiver`] handle pair is created by the [`channel`]
+/// function.
 ///
 /// # Examples
 ///
@@ -105,12 +108,13 @@ pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
 ///
 ///     match rx.await {
 ///         Ok(v) => println!("received : {:?}", v),
-///         Err(_) => println!("Sender dropped")
+///         Err(_) => println!("Sender dropped"),
 ///     }
 /// }
 /// ```
 ///
-/// The receiver will fail with a [`RecvError`] if the sender is dropped without sending a value.
+/// The receiver will fail with a [`RecvError`] if the sender is dropped without
+/// sending a value.
 ///
 /// # Examples
 ///
@@ -124,7 +128,7 @@ pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
 ///
 ///     match rx.await {
 ///         Ok(v) => panic!("This won't happen"),
-///         Err(_) => println!("Sender dropped")
+///         Err(_) => println!("Sender dropped"),
 ///     }
 /// }
 /// ```
@@ -134,11 +138,11 @@ pub struct Sender<T> {
 }
 
 impl<T> Sender<T> {
-    /// Sends a single value to the associated [`Receiver`], returns the value back
-    /// if it fails to send.
+    /// Sends a single value to the associated [`Receiver`], returns the value
+    /// back if it fails to send.
     ///
-    /// The sender will consume itself when calling this method. It can send a single value in
-    /// synchronous code as it doesn't need waiting.
+    /// The sender will consume itself when calling this method. It can send a
+    /// single value in synchronous code as it doesn't need waiting.
     ///
     /// # Examples
     ///
@@ -154,7 +158,7 @@ impl<T> Sender<T> {
     ///
     ///     match rx.await {
     ///         Ok(v) => println!("received : {:?}", v),
-    ///         Err(_) => println!("Sender dropped")
+    ///         Err(_) => println!("Sender dropped"),
     ///     }
     /// }
     /// ```
@@ -217,10 +221,12 @@ impl<T> Drop for Sender<T> {
 }
 
 /// Receives a single value from the associated [`Sender`].
-/// A [`Sender`] and [`Receiver`] handle pair is created by the [`channel`] function.
+/// A [`Sender`] and [`Receiver`] handle pair is created by the [`channel`]
+/// function.
 ///
-/// There is no `recv` method to receive the message because the receiver itself implements the
-/// [`Future`] trait. To receive a value, `.await` the `Receiver` object directly.
+/// There is no `recv` method to receive the message because the receiver itself
+/// implements the [`Future`] trait. To receive a value, `.await` the `Receiver`
+/// object directly.
 ///
 /// # Examples
 ///
@@ -236,12 +242,13 @@ impl<T> Drop for Sender<T> {
 ///
 ///     match rx.await {
 ///         Ok(v) => println!("received : {:?}", v),
-///         Err(_) => println!("Sender dropped")
+///         Err(_) => println!("Sender dropped"),
 ///     }
 /// }
 /// ```
 ///
-/// The receiver will fail with [`RecvError`], if the sender is dropped without sending a value.
+/// The receiver will fail with [`RecvError`], if the sender is dropped without
+/// sending a value.
 ///
 /// # Examples
 ///
@@ -255,7 +262,7 @@ impl<T> Drop for Sender<T> {
 ///
 ///     match rx.await {
 ///         Ok(v) => panic!("This won't happen"),
-///         Err(_) => println!("Sender dropped")
+///         Err(_) => println!("Sender dropped"),
 ///     }
 /// }
 /// ```
@@ -267,8 +274,8 @@ pub struct Receiver<T> {
 impl<T> Receiver<T> {
     /// Attempts to receive a value from the associated [`Sender`].
     ///
-    /// The method will still receive the result if the `Sender` gets dropped after
-    /// sending the message.
+    /// The method will still receive the result if the `Sender` gets dropped
+    /// after sending the message.
     ///
     /// # Return value
     /// The function returns:
@@ -328,8 +335,8 @@ impl<T> Receiver<T> {
     /// Closes the channel, prevents the `Sender` from sending a value.
     ///
     /// The `Sender` will fail to call [`send`] after the `Receiver` called
-    /// `close`. It will do nothing if the channel is already closed or the message
-    /// has been already received.
+    /// `close`. It will do nothing if the channel is already closed or the
+    /// message has been already received.
     ///
     /// [`send`]: Sender::send
     /// [`try_recv`]: Receiver::try_recv
@@ -400,7 +407,8 @@ struct Channel<T> {
     /// The state of the channel.
     state: AtomicUsize,
 
-    /// The value passed by channel, it is set by `Sender` and read by `Receiver`.
+    /// The value passed by channel, it is set by `Sender` and read by
+    /// `Receiver`.
     value: RefCell<Option<T>>,
 
     /// The waker to notify the sender task or the receiver task.
@@ -454,16 +462,13 @@ mod tests {
     use crate::sync::error::RecvError;
     use crate::sync::oneshot;
 
-    /// UT test for `send()` and `try_recv()`.
-    ///
-    /// # Title
-    /// send_try_recv
+    /// UT test cases for `send()` and `try_recv()`.
     ///
     /// # Brief
-    /// 1.Call channel to create a sender and a receiver handle pair.
-    /// 2.Receiver tries receiving a message before the sender sends one.
-    /// 3.Receiver tries receiving a message after the sender sends one.
-    /// 4.Check if the test results are correct.
+    /// 1. Call channel to create a sender and a receiver handle pair.
+    /// 2. Receiver tries receiving a message before the sender sends one.
+    /// 3. Receiver tries receiving a message after the sender sends one.
+    /// 4. Check if the test results are correct.
     #[test]
     fn send_try_recv() {
         let (tx, mut rx) = oneshot::channel();
@@ -484,16 +489,13 @@ mod tests {
         }
     }
 
-    /// UT test for `send()` and async receive.
-    ///
-    /// # Title
-    /// send_recv_await
+    /// UT test cases for `send()` and async receive.
     ///
     /// # Brief
-    /// 1.Call channel to create a sender and a receiver handle pair.
-    /// 2.Sender sends message in ont thread.
-    /// 3.Receiver receives message in another thread.
-    /// 4.Check if the test results are correct.
+    /// 1. Call channel to create a sender and a receiver handle pair.
+    /// 2. Sender sends message in ont thread.
+    /// 3. Receiver receives message in another thread.
+    /// 4. Check if the test results are correct.
     #[test]
     fn send_recv_await() {
         let (tx, rx) = oneshot::channel();
@@ -508,17 +510,15 @@ mod tests {
         });
     }
 
-    /// UT test for `is_closed()` and `close`.
-    ///
-    /// # Title
-    /// close_rx
+    /// UT test cases for `is_closed()` and `close`.
     ///
     /// # Brief
-    /// 1.Call channel to create a sender and a receiver handle pair.
-    /// 2.Check whether the sender is closed.
-    /// 3.Close the receiver.
-    /// 4.Check whether the receiver will receive the message sent before it closed.
-    /// 5.Check if the test results are correct.
+    /// 1. Call channel to create a sender and a receiver handle pair.
+    /// 2. Check whether the sender is closed.
+    /// 3. Close the receiver.
+    /// 4. Check whether the receiver will receive the message sent before it
+    ///    closed.
+    /// 5. Check if the test results are correct.
     #[test]
     fn close_rx() {
         let (tx, mut rx) = oneshot::channel();

@@ -11,11 +11,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::io;
+
 use crate::builder::common_builder::impl_common;
 use crate::builder::CommonBuilder;
 use crate::executor::current_thread::CurrentThreadSpawner;
 use crate::executor::{AsyncHandle, Runtime};
-use std::io;
 
 /// RuntimeBuilder struct with current_thread settings.
 pub struct CurrentThreadBuilder {

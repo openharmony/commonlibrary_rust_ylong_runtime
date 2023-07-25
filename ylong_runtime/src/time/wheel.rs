@@ -11,12 +11,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::time::Clock;
-use crate::util::link_list::LinkedList;
 use std::fmt::Error;
 use std::mem;
 use std::mem::MaybeUninit;
 use std::ptr::NonNull;
+
+use crate::time::Clock;
+use crate::util::link_list::LinkedList;
 
 // In a slots, the number of slot.
 const SLOTS_NUM: usize = 64;
@@ -110,7 +111,8 @@ impl Wheel {
         significant / 6
     }
 
-    // Insert the corresponding TimerHandle into the specified position in the timing wheel.
+    // Insert the corresponding TimerHandle into the specified position in the
+    // timing wheel.
     pub(crate) fn insert(&mut self, mut clock_entry: NonNull<Clock>) -> Result<u64, Error> {
         let expiration = unsafe { clock_entry.as_ref().expiration() };
 
@@ -136,7 +138,8 @@ impl Wheel {
         let level = unsafe { clock_entry.as_ref().level() };
         self.levels[level].cancel(clock_entry);
 
-        // Caller has unique access to the linked list and the node is not in any other linked list.
+        // Caller has unique access to the linked list and the node is not in any other
+        // linked list.
         unsafe {
             LinkedList::remove(clock_entry);
         }
@@ -251,7 +254,8 @@ impl Level {
 
         let slot = ((duration >> (self.level * LEVELS_NUM)) % SLOTS_NUM as u64) as usize;
 
-        // Caller has unique access to the linked list and the node is not in any other linked list.
+        // Caller has unique access to the linked list and the node is not in any other
+        // linked list.
         unsafe {
             LinkedList::remove(clock_entry);
         }
@@ -303,7 +307,8 @@ fn slot_range(level: usize) -> u64 {
     SLOTS_NUM.pow(level as u32) as u64
 }
 
-// All the slots before this level(including this level) add up to approximately.
+// All the slots before this level(including this level) add up to
+// approximately.
 fn level_range(level: usize) -> u64 {
     SLOTS_NUM as u64 * slot_range(level)
 }
@@ -320,10 +325,7 @@ mod test {
         use std::time::Duration;
     );
 
-    /// Wheel::new ut test case.
-    ///
-    /// # Title
-    /// ut_wheel_new_test
+    /// UT test cases for Wheel::new
     ///
     /// # Brief
     /// 1. Use Wheel::new to create a Wheel Struct.
@@ -336,15 +338,14 @@ mod test {
         assert_eq!(wheel.levels.len(), LEVELS_NUM);
     }
 
-    /// Sleep Drop.
-    ///
-    /// # Title
-    /// ut_sleep_drop
+    /// UT test cases for Sleep drop.
     ///
     /// # Brief
     /// 1. Use timeout to create a Timeout Struct.
-    /// 2. Enable the Sleep Struct corresponding to the Timeout Struct to enter the Pending state.
-    /// 3. Verify the change of the internal TimerHandle during Sleep Struct drop.
+    /// 2. Enable the Sleep Struct corresponding to the Timeout Struct to enter
+    ///    the Pending state.
+    /// 3. Verify the change of the internal TimerHandle during Sleep Struct
+    ///    drop.
     #[test]
     #[cfg(feature = "net")]
     fn ut_sleep_drop() {

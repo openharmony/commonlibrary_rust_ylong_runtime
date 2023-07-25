@@ -11,9 +11,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::cfg_io;
-use crate::executor::Schedule;
-use crate::task::{JoinHandle, Task, TaskBuilder, VirtualTableType};
 use std::collections::VecDeque;
 use std::future::Future;
 use std::mem;
@@ -22,6 +19,10 @@ use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::{Acquire, Release};
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
+
+use crate::cfg_io;
+use crate::executor::Schedule;
+use crate::task::{JoinHandle, Task, TaskBuilder, VirtualTableType};
 cfg_io!(
     use std::time::Duration;
     use crate::net::Driver;
@@ -183,7 +184,7 @@ impl CurrentThreadSpawner {
     }
 }
 
-#[cfg(all(test))]
+#[cfg(test)]
 mod test {
     macro_rules! cfg_sync {
         ($($item:item)*) => {
@@ -201,11 +202,12 @@ mod test {
             )*
         }
     }
-    use crate::executor::current_thread::CurrentThreadSpawner;
-    use crate::task::{yield_now, TaskBuilder};
     use std::future::Future;
     use std::pin::Pin;
     use std::task::{Context, Poll};
+
+    use crate::executor::current_thread::CurrentThreadSpawner;
+    use crate::task::{yield_now, TaskBuilder};
 
     cfg_sync! {
         use crate::sync::Waiter;
@@ -298,15 +300,15 @@ mod test {
         }
     }
 
-    /// UT test for `spawn()`.
-    ///
-    /// # Title
-    /// ut_current_thread_block_on
+    /// UT test cases for `spawn()`.
     ///
     /// # Brief
-    /// 1.Check the running status of tasks in the queue when the yield task is awakened once.
-    /// 2.Check the running status of tasks in the queue when the yield task is awakened twice.
-    /// 3.Check the running status of tasks in the queue when the yield task is awakened three times.
+    /// 1. Check the running status of tasks in the queue when the yield task is
+    ///    awakened once.
+    /// 2. Check the running status of tasks in the queue when the yield task is
+    ///    awakened twice.
+    /// 3. Check the running status of tasks in the queue when the yield task is
+    ///    awakened three times.
     #[test]
     fn ut_current_thread_spawn() {
         let spawner = CurrentThreadSpawner::new();
@@ -328,15 +330,15 @@ mod test {
         assert_eq!(spawner.scheduler.inner.lock().unwrap().len(), 2);
     }
 
-    /// UT test for `block_on()`.
-    ///
-    /// # Title
-    /// ut_current_thread_block_on
+    /// UT test cases for `block_on()`.
     ///
     /// # Brief
-    /// 1.Check the running status of tasks in the queue when the yield task is awakened once.
-    /// 2.Check the running status of tasks in the queue when the yield task is awakened twice.
-    /// 3.Check the running status of tasks in the queue when the yield task is awakened three times.
+    /// 1. Check the running status of tasks in the queue when the yield task is
+    ///    awakened once.
+    /// 2. Check the running status of tasks in the queue when the yield task is
+    ///    awakened twice.
+    /// 3. Check the running status of tasks in the queue when the yield task is
+    ///    awakened three times.
     #[test]
     fn ut_current_thread_block_on() {
         let spawner = CurrentThreadSpawner::new();
@@ -358,14 +360,13 @@ mod test {
         assert_eq!(spawner.scheduler.inner.lock().unwrap().len(), 0);
     }
 
-    /// UT test for `spawn()` and `block_on()`.
-    ///
-    /// # Title
-    /// ut_current_thread_run_queue
+    /// UT test cases for `spawn()` and `block_on()`.
     ///
     /// # Brief
-    /// 1.Spawn two tasks before the blocked task running and check the status of two tasks.
-    /// 2.Spawn two tasks after the blocked task running and check the status of two tasks.
+    /// 1. Spawn two tasks before the blocked task running and check the status
+    ///    of two tasks.
+    /// 2. Spawn two tasks after the blocked task running and check the status
+    ///    of two tasks.
     #[test]
     #[cfg(feature = "sync")]
     fn ut_current_thread_run_queue() {
@@ -430,14 +431,11 @@ mod test {
         });
     }
 
-    /// UT test for io tasks.
-    ///
-    /// # Title
-    /// ut_current_thread_io
+    /// UT test cases for io tasks.
     ///
     /// # Brief
-    /// 1.Spawns a tcp server to read and write data for three times.
-    /// 2.Spawns a tcp client to read and write data for three times.
+    /// 1. Spawns a tcp server to read and write data for three times.
+    /// 2. Spawns a tcp client to read and write data for three times.
     #[test]
     #[cfg(feature = "net")]
     fn ut_current_thread_io() {

@@ -11,12 +11,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::error::ScheduleError;
-
+use std::iter::Sum;
 use std::ops::Add;
-use std::{iter::Sum, pin::Pin};
+use std::pin::Pin;
 
 use super::core::core;
+use crate::error::ScheduleError;
 
 mod map;
 use map::Map;
@@ -44,7 +44,8 @@ pub trait ParallelIterator: Sized + Send {
     /// Returns the number of elements in this parallel iterator.
     fn len(&self) -> usize;
 
-    /// Removes redundant elements, used in zip function, so that the two parts has the same length.
+    /// Removes redundant elements, used in zip function, so that the two parts
+    /// has the same length.
     fn reduce(self, len: usize) -> Self;
 
     /// Returns the std iterator.
@@ -78,7 +79,8 @@ pub trait ParallelIterator: Sized + Send {
         zip::zip(self, another)
     }
 
-    /// Execute the OP in parallel on each element produced by the parallel iterator.
+    /// Execute the OP in parallel on each element produced by the parallel
+    /// iterator.
     fn for_each<'a, F>(
         self,
         f: F,

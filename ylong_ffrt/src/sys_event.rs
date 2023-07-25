@@ -27,7 +27,8 @@ extern "C" {
     fn ffrt_sys_event_wait(event: FfrtSysEventHandleT, sec: i64) -> c_int;
     fn ffrt_sys_event_destroy(event: FfrtSysEventHandleT, func: DestroyFunc, arg: *mut c_void);
 
-    /// Registers the fd to ffrt's epoll. Callback will be called when io events arrived.
+    /// Registers the fd to ffrt's epoll. Callback will be called when io events
+    /// arrived.
     pub fn ffrt_poller_register(
         fd: c_int,
         events: c_uint,

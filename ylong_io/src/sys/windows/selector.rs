@@ -11,15 +11,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::sys::windows::afd;
-use crate::sys::windows::afd::{Afd, AfdGroup, AfdPollInfo};
-use crate::sys::windows::events::{
-    Events, ERROR_FLAGS, READABLE_FLAGS, READ_CLOSED_FLAGS, WRITABLE_FLAGS, WRITE_CLOSED_FLAGS,
-};
-use crate::sys::windows::io_status_block::IoStatusBlock;
-use crate::sys::windows::iocp::{CompletionPort, CompletionStatus};
-use crate::sys::NetInner;
-use crate::{Event, Interest, Token};
 use std::collections::VecDeque;
 use std::ffi::c_void;
 use std::io;
@@ -31,6 +22,7 @@ use std::ptr::null_mut;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+
 use windows_sys::Win32::Foundation::{
     ERROR_INVALID_HANDLE, ERROR_IO_PENDING, HANDLE, STATUS_CANCELLED, WAIT_TIMEOUT,
 };
@@ -39,6 +31,16 @@ use windows_sys::Win32::Networking::WinSock::{
     SIO_BSP_HANDLE_SELECT, SOCKET_ERROR,
 };
 use windows_sys::Win32::System::IO::OVERLAPPED;
+
+use crate::sys::windows::afd;
+use crate::sys::windows::afd::{Afd, AfdGroup, AfdPollInfo};
+use crate::sys::windows::events::{
+    Events, ERROR_FLAGS, READABLE_FLAGS, READ_CLOSED_FLAGS, WRITABLE_FLAGS, WRITE_CLOSED_FLAGS,
+};
+use crate::sys::windows::io_status_block::IoStatusBlock;
+use crate::sys::windows::iocp::{CompletionPort, CompletionStatus};
+use crate::sys::NetInner;
+use crate::{Event, Interest, Token};
 
 /// An wrapper to block different OS polling system.
 /// Linux: epoll
@@ -149,7 +151,8 @@ impl SelectorInner {
         }
     }
 
-    /// Process completed operation and put them into events; regular AFD events are put back into VecDeque
+    /// Process completed operation and put them into events; regular AFD events
+    /// are put back into VecDeque
     unsafe fn feed_events(
         &self,
         events: &mut Vec<Event>,
@@ -190,7 +193,8 @@ impl SelectorInner {
         epoll_event_count
     }
 
-    /// Updates each SockState in the Deque, started only when Poll::poll() is called externally
+    /// Updates each SockState in the Deque, started only when Poll::poll() is
+    /// called externally
     unsafe fn update_sockets_events(&self) -> io::Result<()> {
         let mut update_queue = self.update_queue.lock().unwrap();
         for sock in update_queue.iter_mut() {
@@ -206,8 +210,9 @@ impl SelectorInner {
         Ok(())
     }
 
-    /// No actual system call is made at register, it only starts at Poll::poll().
-    /// Return Arc<NetInternal> and put it in the asynchronous IO structure
+    /// No actual system call is made at register, it only starts at
+    /// Poll::poll(). Return Arc<NetInternal> and put it in the asynchronous
+    /// IO structure
     pub(crate) fn register(
         this: &Arc<Self>,
         raw_socket: RawSocket,
@@ -311,8 +316,9 @@ impl Drop for SelectorInner {
 enum SockPollStatus {
     /// Initial Value.
     Idle,
-    /// System function called when updating sockets_events, set from Idle to Pending. Update only when polling.
-    /// Only the socket of Pending can be cancelled.
+    /// System function called when updating sockets_events, set from Idle to
+    /// Pending. Update only when polling. Only the socket of Pending can be
+    /// cancelled.
     Pending,
     /// After calling the system api to cancel the sock, set it to Cancelled.
     Cancelled,
@@ -331,7 +337,8 @@ pub struct SockState {
     user_token: u64,
     /// user Interest
     user_interests_flags: u32,
-    /// When this socket is polled， save user_interests_flags in polling_interests_flags. Used for comparison during re-registration.
+    /// When this socket is polled， save user_interests_flags in
+    /// polling_interests_flags. Used for comparison during re-registration.
     polling_interests_flags: u32,
     /// Current Status. When this is Pending, System API calls must be made.
     poll_status: SockPollStatus,
@@ -416,10 +423,12 @@ impl SockState {
                 if (self.user_interests_flags & afd::ALL_EVENTS & !self.polling_interests_flags)
                     == 0
                 {
-                    // All the events the user is interested in are already being monitored by
-                    // the pending poll operation. It might spuriously complete because of an
-                    // event that we're no longer interested in; when that happens we'll submit
-                    // a new poll operation with the updated event mask.
+                    // All the events the user is interested in are already
+                    // being monitored by the pending poll
+                    // operation. It might spuriously complete because of an
+                    // event that we're no longer interested in; when that
+                    // happens we'll submit a new poll
+                    // operation with the updated event mask.
                 } else {
                     // A poll operation is already pending, but it's not monitoring for all the
                     // events that the user is interested in. Therefore, cancel the pending
@@ -438,7 +447,8 @@ impl SockState {
         Ok(())
     }
 
-    /// Returns true if user_interests_flags is inconsistent with polling_interests_flags.
+    /// Returns true if user_interests_flags is inconsistent with
+    /// polling_interests_flags.
     fn set_event(&mut self, flags: u32, token_data: u64) -> bool {
         self.user_interests_flags = flags | afd::POLL_CONNECT_FAIL | afd::POLL_ABORT;
         self.user_token = token_data;
@@ -452,7 +462,8 @@ impl SockState {
         self.polling_interests_flags = 0;
 
         let mut afd_events = 0;
-        // Uses the status info in IO_STATUS_BLOCK to determine the socket poll status. It is unsafe to use a pointer of IO_STATUS_BLOCK.
+        // Uses the status info in IO_STATUS_BLOCK to determine the socket poll status.
+        // It is unsafe to use a pointer of IO_STATUS_BLOCK.
         unsafe {
             if self.delete_pending {
                 return None;
@@ -462,7 +473,8 @@ impl SockState {
                 // The overlapped request itself failed in an unexpected way.
                 afd_events = afd::POLL_CONNECT_FAIL;
             } else if self.poll_info.number_of_handles < 1 {
-                // This poll operation succeeded but didn't report any socket events.
+                // This poll operation succeeded but didn't report any socket
+                // events.
             } else if self.poll_info.handles[0].events & afd::POLL_LOCAL_CLOSE != 0 {
                 // The poll operation reported that the socket was closed.
                 self.start_drop();
@@ -502,7 +514,8 @@ impl SockState {
         }
     }
 
-    /// Only can cancel SockState of SockPollStatus::Pending, Set to SockPollStatus::Cancelled.
+    /// Only can cancel SockState of SockPollStatus::Pending, Set to
+    /// SockPollStatus::Cancelled.
     fn cancel(&mut self) -> io::Result<()> {
         // Checks poll_status again.
         if self.poll_status != SockPollStatus::Pending {
@@ -513,7 +526,8 @@ impl SockState {
             self.afd.cancel(&mut *self.iosb)?;
         }
 
-        // Only here set SockPollStatus::Cancelled, SockStates has been system called to cancel
+        // Only here set SockPollStatus::Cancelled, SockStates has been system called to
+        // cancel
         self.poll_status = SockPollStatus::Cancelled;
         self.polling_interests_flags = 0;
 

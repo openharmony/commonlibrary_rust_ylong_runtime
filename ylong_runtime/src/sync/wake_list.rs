@@ -11,13 +11,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::util::slots::Slots;
-use crate::util::slots::SlotsError;
 use std::cell::UnsafeCell;
 use std::hint::spin_loop;
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::task::Waker;
+
+use crate::util::slots::{Slots, SlotsError};
 
 /// The first left most bit represents LOCKED state
 const LOCKED: usize = 1 << 0;
@@ -34,9 +34,9 @@ pub(crate) struct WakerList {
     inner: UnsafeCell<Inner>,
 }
 
-/// Safety: `WakerList` is  not `Sync` and `Send` because of `UnsafeCell`. However,
-/// we lock `WakerList` first when we try to access it. So it is safe for `WakerList` to be sent
-/// and borrowed across threads.
+/// Safety: `WakerList` is  not `Sync` and `Send` because of `UnsafeCell`.
+/// However, we lock `WakerList` first when we try to access it. So it is safe
+/// for `WakerList` to be sent and borrowed across threads.
 unsafe impl Sync for WakerList {}
 unsafe impl Send for WakerList {}
 
@@ -64,17 +64,18 @@ impl WakerList {
         inner.wake_list.remove(key)
     }
 
-    /// Wakes up one more member, no matter whether someone is being waking up at the same time.
-    /// This method is an atomic operation. If a non-atomic operation is required,
-    /// call `lock` first and then call `notify_one`.
+    /// Wakes up one more member, no matter whether someone is being waking up
+    /// at the same time. This method is an atomic operation. If a
+    /// non-atomic operation is required, call `lock` first and then call
+    /// `notify_one`.
     #[inline]
     pub fn notify_one(&self) -> bool {
         self.notify(Notify::One)
     }
 
     /// Wakes up all members in the WakerList, and return the result.
-    /// This method is an atomic operation. If a non-atomic operation is required,
-    /// call `lock` first and then call `notify_all`.
+    /// This method is an atomic operation. If a non-atomic operation is
+    /// required, call `lock` first and then call `notify_all`.
     #[inline]
     pub fn notify_all(&self) -> bool {
         self.notify(Notify::All)
@@ -89,7 +90,8 @@ impl WakerList {
         }
     }
 
-    /// Locks up the WakerList. If it has been already locked, spin loop until fetch the lock.
+    /// Locks up the WakerList. If it has been already locked, spin loop until
+    /// fetch the lock.
     pub fn lock(&self) -> Lock<'_> {
         // This condition will be false only if the flag is LOCKED.
         while self.flag.fetch_or(LOCKED, Ordering::Acquire) & LOCKED != 0 {
@@ -115,7 +117,8 @@ impl Inner {
         is_wake
     }
 
-    /// Wakes up one more member, no matter whether someone is being waking up at the same time.
+    /// Wakes up one more member, no matter whether someone is being waking up
+    /// at the same time.
     #[inline]
     pub fn notify_one(&mut self) -> bool {
         self.notify(Notify::One)
@@ -137,8 +140,8 @@ impl Drop for Lock<'_> {
     #[inline]
     fn drop(&mut self) {
         let mut flag = 0;
-        // If there're members that can be notified, set the third left most bit, which means to
-        // add NOTIFIABLE state to the flag.
+        // If there're members that can be notified, set the third left most bit, which
+        // means to add NOTIFIABLE state to the flag.
         if !self.wake_list.is_empty() {
             flag |= NOTIFIABLE;
         }
@@ -172,12 +175,11 @@ enum Notify {
 mod tests {
     use super::*;
 
-    /// UT test for WakeList::new().
-    /// # Title
-    /// ut_wakelist_new_01
+    /// UT test cases for WakeList::new().
+    ///
     /// # Brief
-    /// 1.Check the initial value of flag.
-    /// 2.Check the initial value of waiting_number.
+    /// 1. Check the initial value of flag.
+    /// 2. Check the initial value of waiting_number.
     #[test]
     fn ut_wakelist_new_01() {
         let wakelist = WakerList::new();

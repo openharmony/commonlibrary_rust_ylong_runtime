@@ -25,10 +25,11 @@ compile_error!("Feature ffrt only works on linux currently");
 
 extern crate core;
 
+use std::future::Future;
+
 use crate::error::ScheduleError;
 use crate::macros::cfg_io;
 use crate::task::{JoinHandle, Task, TaskBuilder};
-use std::future::Future;
 
 pub mod builder;
 pub mod error;

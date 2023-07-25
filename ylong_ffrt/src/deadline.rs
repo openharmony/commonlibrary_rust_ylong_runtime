@@ -11,8 +11,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::Qos;
 use libc::c_void;
+
+use super::Qos;
 
 #[must_use]
 /// Qos Interval.

@@ -11,9 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::pariter::Consumer;
-use super::pariter::ParallelIterator;
-
+use super::pariter::{Consumer, ParallelIterator};
 use crate::error::ScheduleError;
 use crate::executor::{global_default_async, AsyncHandle};
 use crate::macros::{cfg_ffrt, cfg_not_ffrt};
@@ -120,8 +118,9 @@ where
 }
 
 // Safety
-// No restriction on lifetime to static, so it must be ensured that the data pointed to is always valid until the execution is completed,
-// in other word .await the join handle after it is created.
+// No restriction on lifetime to static, so it must be ensured that the data
+// pointed to is always valid until the execution is completed, in other word
+// .await the join handle after it is created.
 #[cfg(not(feature = "ffrt"))]
 #[inline]
 unsafe fn spawn_task<P, C>(
@@ -182,8 +181,9 @@ where
 }
 
 // Safety
-// No restriction on lifetime to static, so it must be ensured that the data pointed to is always valid until the execution is completed,
-// in other word .await the join handle after it is created.
+// No restriction on lifetime to static, so it must be ensured that the data
+// pointed to is always valid until the execution is completed, in other word
+// .await the join handle after it is created.
 #[cfg(feature = "ffrt")]
 #[inline]
 unsafe fn spawn_task_ffrt<P, C>(

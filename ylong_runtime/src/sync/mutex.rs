@@ -13,22 +13,25 @@
 
 //! Mutual exclusion locks
 
-use crate::sync::semaphore_inner::SemaphoreInner;
 use std::cell::UnsafeCell;
 use std::error::Error;
 use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::ops::{Deref, DerefMut};
 
+use crate::sync::semaphore_inner::SemaphoreInner;
+
 /// An async version of [`std::sync::Mutex`]
 ///
-/// Often it's considered as normal to use [`std::sync::Mutex`] on an asynchronous environment.
-/// The primal purpose of this async mutex is to protect shared reference of io, which contains
-/// a lot await point during reading and writing. If you only wants to protect a data across
-/// different threads, [`std::sync::Mutex`] will probably gain you better performance.
+/// Often it's considered as normal to use [`std::sync::Mutex`] on an
+/// asynchronous environment. The primal purpose of this async mutex is to
+/// protect shared reference of io, which contains a lot await point during
+/// reading and writing. If you only wants to protect a data across
+/// different threads, [`std::sync::Mutex`] will probably gain you better
+/// performance.
 ///
-/// When using across different futures, users need to wrap the mutex inside an Arc,
-/// just like the use of [`std::sync::Mutex`].
+/// When using across different futures, users need to wrap the mutex inside an
+/// Arc, just like the use of [`std::sync::Mutex`].
 pub struct Mutex<T: ?Sized> {
     /// Semaphore to provide mutual exclusion
     sem: SemaphoreInner,
@@ -60,7 +63,6 @@ impl<T: Sized> Mutex<T> {
     /// use ylong_runtime::sync::mutex::Mutex;
     ///
     /// let _a = Mutex::new(2);
-    ///
     /// ```
     pub fn new(t: T) -> Mutex<T> {
         Mutex {
@@ -73,13 +75,15 @@ impl<T: Sized> Mutex<T> {
 impl<T: ?Sized> Mutex<T> {
     /// Locks the mutex.
     ///
-    /// If the mutex is already held by others, asynchronously waits for it to release.
+    /// If the mutex is already held by others, asynchronously waits for it to
+    /// release.
     ///
     /// # Examples
     ///
     /// ```
-    /// use ylong_runtime::sync::mutex::Mutex;
     /// use std::sync::Arc;
+    ///
+    /// use ylong_runtime::sync::mutex::Mutex;
     ///
     /// let _res = ylong_runtime::block_on(async {
     ///     let lock = Arc::new(Mutex::new(2));
@@ -97,19 +101,20 @@ impl<T: ?Sized> Mutex<T> {
 
     /// Attempts to get the mutex.
     ///
-    /// If the lock is already held by others, LockError will be returned. Otherwise,
-    /// the mutex guard will be returned.
+    /// If the lock is already held by others, LockError will be returned.
+    /// Otherwise, the mutex guard will be returned.
     ///
     /// # Examples
     ///
     /// ```
-    /// use ylong_runtime::sync::mutex::Mutex;
     /// use std::sync::Arc;
+    ///
+    /// use ylong_runtime::sync::mutex::Mutex;
     ///
     /// let _res = ylong_runtime::block_on(async {
     ///     let mutex = Arc::new(Mutex::new(0));
     ///     match mutex.try_lock() {
-    ///         Ok(lock) => println!("{}",lock),
+    ///         Ok(lock) => println!("{}", lock),
     ///         Err(_) => {}
     ///     };
     /// });
@@ -124,8 +129,9 @@ impl<T: ?Sized> Mutex<T> {
     /// Gets the mutable reference of the data protected by the lock without
     /// actually holding the lock.
     ///
-    /// This method takes the mutable reference of the mutex, so there is no need to actually
-    /// lock the mutex -- the mutable borrow statically guarantees no locks exist.
+    /// This method takes the mutable reference of the mutex, so there is no
+    /// need to actually lock the mutex -- the mutable borrow statically
+    /// guarantees no locks exist.
     pub fn get_mut(&mut self) -> &mut T {
         unsafe { &mut *self.data.get() }
     }
@@ -177,40 +183,33 @@ impl<T: ?Sized> DerefMut for MutexGuard<'_, T> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::{block_on, spawn};
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
     use std::thread;
     use std::time::Duration;
 
-    /*
-     * @title  UT test case for Mutex::new() interface
-     * @design The design of this use case is carried out by the conditional coverage test method
-     * @precon None
-     * @brief  Test case execution steps：
-     *         1. Creating a Concurrent Mutual Exclusion Lock
-     *         2. Verify the state of the lock object and the size of the internal value of the lock object
-     * @expect Mutex structure body state is UNLOCKED, data is preset value 10
-     * @auto  Yes
-     */
+    use super::*;
+    use crate::{block_on, spawn};
+
+    /// UT test cases for Mutex::new() interface
+    ///
+    /// # Brief
+    /// 1. Creating a Concurrent Mutual Exclusion Lock
+    /// 2. Verify the state of the lock object and the size of the internal
+    ///    value of the lock object
     #[test]
     fn ut_mutex_new_01() {
         let lock = Mutex::new(10);
         assert_eq!(lock.data.into_inner(), 10);
     }
 
-    /*
-     * @title  UT test case for Mutex::lock() interface
-     * @design The design of this use case is carried out by the conditional coverage test method
-     * @precon None
-     * @brief  Test case execution steps：
-     *         1. Creating a concurrent read/write lock
-     *         2. Modification of data in the concurrent mutex lock
-     *         3. Check the value in the changed concurrent mutex lock and check the status bit of the lock
-     * @expect Mutex structure body state is LOCKED, data value is 11
-     * @auto  Yes
-     */
+    /// UT test cases for Mutex::lock() interface
+    ///
+    /// # Brief
+    /// 1. Creating a concurrent read/write lock
+    /// 2. Modification of data in the concurrent mutex lock
+    /// 3. Check the value in the changed concurrent mutex lock and check the
+    ///    status bit of the lock
     #[test]
     fn ut_mutex_lock_01() {
         let mutex = Mutex::new(10);
@@ -221,18 +220,13 @@ mod tests {
         });
     }
 
-    /*
-     * @title  UT test case for Mutex::try_lock() interface
-     * @design The design of this use case is carried out by the conditional coverage test method
-     * @precon None
-     * @brief  Test case execution steps：
-     *         1. Creating a Concurrent Mutual Exclusion Lock
-     *         2. Call try_lock() to try to get the lock
-     *         3. Operation on in-lock values
-     *         4. Calibrate in-lock values
-     * @expect data value is 110
-     * @auto  Yes
-     */
+    /// UT test cases for Mutex::try_lock() interface
+    ///
+    /// # Brief
+    /// 1. Creating a Concurrent Mutual Exclusion Lock
+    /// 2. Call try_lock() to try to get the lock
+    /// 3. Operation on in-lock values
+    /// 4. Calibrate in-lock values
     #[test]
     fn ut_mutex_try_lock_01() {
         let mutex = Mutex::new(10);
@@ -241,18 +235,14 @@ mod tests {
         assert_eq!(*lock, 110);
     }
 
-    /*
-     * @title  UT test case for Mutex::try_lock() interface
-     * @design The design of this use case is carried out by the conditional coverage test method
-     * @precon None
-     * @brief  Test case execution steps：
-     *         1. Creating a Concurrent Mutual Exclusion Lock
-     *         2. First build a concurrent process to hold the lock and sleep after obtaining the lock to hold the lock for a long time
-     *         3. Call try_lock() to try to get a lock
-     *         4. Check try_lock return value is None
-     * @expect lock2 is None
-     * @auto  Yes
-     */
+    /// UT test cases for Mutex::try_lock() interface
+    ///
+    /// # Brief  
+    /// 1. Creating a Concurrent Mutual Exclusion Lock
+    /// 2. First build a concurrent process to hold the lock and sleep after
+    ///    obtaining the lock to hold the lock for a long time
+    /// 3. Call try_lock() to try to get a lock
+    /// 4. Check try_lock return value is None
     #[test]
     fn ut_mutex_try_lock_02() {
         let mutex = Arc::new(Mutex::new(10));
@@ -277,18 +267,14 @@ mod tests {
         flag.store(false, Ordering::SeqCst);
     }
 
-    /*
-     * @title  UT test case for Mutex::unlock() interface
-     * @design The design of this use case is carried out by the conditional coverage test method
-     * @precon None
-     * @brief  Test case execution steps：
-     *         1. Creating a Concurrent Mutual Exclusion Lock
-     *         2. Perform locking operation
-     *         3. Call the drop() method to release the lock
-     *         4. Verify the status of the concurrent mutex lock before, after and after unlocking
-     * @expect Mutex structure unlocked state is UNLOCKED, when locking state is LOCKED, after unlocking state is UNLOCKED
-     * @auto  Yes
-     */
+    /// UT test cases for Mutex::unlock() interface
+    ///
+    /// # Brief  
+    /// 1. Creating a Concurrent Mutual Exclusion Lock
+    /// 2. Perform locking operation
+    /// 3. Call the drop() method to release the lock
+    /// 4. Verify the status of the concurrent mutex lock before, after and
+    ///    after unlocking
     #[test]
     fn ut_mutex_unlock_01() {
         let mutex = Mutex::new(10);

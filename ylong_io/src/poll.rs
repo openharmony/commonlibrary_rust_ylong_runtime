@@ -11,9 +11,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{Events, Interest, Selector, Source, Token};
 use std::io;
 use std::time::Duration;
+
+use crate::{Events, Interest, Selector, Source, Token};
 
 /// Registers and deregisters an io's fd
 pub struct Poll {
@@ -28,9 +29,11 @@ impl Poll {
         })
     }
 
-    /// Gets all interested io events within a time limit and writes them into `event`.
+    /// Gets all interested io events within a time limit and writes them into
+    /// `event`.
     ///
-    /// If `timeout` is none, then it will block the current thread until an event arrives.
+    /// If `timeout` is none, then it will block the current thread until an
+    /// event arrives.
     pub fn poll(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
         self.selector.select(events, timeout)
     }
@@ -51,7 +54,8 @@ impl Poll {
         source.reregister(&self.selector, token, interests)
     }
 
-    /// De-registers the I/O source's fd so the Poll will no longer monitor its io events.
+    /// De-registers the I/O source's fd so the Poll will no longer monitor its
+    /// io events.
     pub fn deregister<S>(&self, source: &mut S) -> io::Result<()>
     where
         S: Source + ?Sized,

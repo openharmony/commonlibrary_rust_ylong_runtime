@@ -25,16 +25,13 @@ mod thread;
 pub use condition_variable::*;
 pub use config::*;
 pub use deadline::*;
-pub use ffrt_set_wake_flag;
-pub use ffrt_submit_h_coroutine;
-pub use ffrt_task_get;
+use libc::{c_int, c_void};
 pub use mutex::*;
 pub use sleep::*;
 pub use sys_event::*;
 pub use task::*;
 pub use thread::*;
-
-use libc::{c_int, c_void};
+pub use {ffrt_set_wake_flag, ffrt_submit_h_coroutine, ffrt_task_get};
 
 #[repr(C)]
 /// Qos levels.

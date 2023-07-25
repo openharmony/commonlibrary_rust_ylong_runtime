@@ -17,11 +17,12 @@
 //! `CurrentThread`: Runtime which runs on the current thread.
 //! `MultiThread`: Runtime which runs on multiple threads.
 //!
-//! After configuring the builder, a call to `build` will return the actual runtime instance.
-//! [`MultiThreadBuilder`] could also be used for configuring the global singleton runtime.
+//! After configuring the builder, a call to `build` will return the actual
+//! runtime instance. [`MultiThreadBuilder`] could also be used for configuring
+//! the global singleton runtime.
 //!
-//! For thread pool, the builder allows the user to set the thread number, stack size and
-//! name prefix of each thread.
+//! For thread pool, the builder allows the user to set the thread number, stack
+//! size and name prefix of each thread.
 
 pub(crate) mod common_builder;
 #[cfg(feature = "current_thread_runtime")]
@@ -31,22 +32,24 @@ pub(crate) mod multi_thread_builder;
 use std::fmt::Debug;
 use std::io;
 use std::sync::Arc;
+#[cfg(any(feature = "net", feature = "time"))]
+use std::sync::Once;
+
+#[cfg(feature = "current_thread_runtime")]
+pub use current_thread_builder::CurrentThreadBuilder;
+pub use multi_thread_builder::MultiThreadBuilder;
 
 pub(crate) use crate::builder::common_builder::CommonBuilder;
 use crate::error::ScheduleError;
 use crate::executor::blocking_pool::BlockPoolSpawner;
 #[cfg(any(feature = "net", feature = "time"))]
 use crate::executor::netpoller::NetLooper;
-#[cfg(feature = "current_thread_runtime")]
-pub use current_thread_builder::CurrentThreadBuilder;
-pub use multi_thread_builder::MultiThreadBuilder;
-#[cfg(any(feature = "net", feature = "time"))]
-use std::sync::Once;
 crate::macros::cfg_not_ffrt!(
     use crate::executor::async_pool::AsyncPoolSpawner;
 );
 
-/// A callback function to be executed in different stages of a thread's life-cycle
+/// A callback function to be executed in different stages of a thread's
+/// life-cycle
 pub type CallbackHook = Arc<dyn Fn() + Send + Sync + 'static>;
 
 /// Schedule Policy.
@@ -56,17 +59,18 @@ pub enum ScheduleAlgo {
     FifoBound,
 }
 
-/// Builder to build the runtime. Provides methods to customize the runtime, such
-/// as setting thread pool size, worker thread stack size, work thread prefix and etc.
+/// Builder to build the runtime. Provides methods to customize the runtime,
+/// such as setting thread pool size, worker thread stack size, work thread
+/// prefix and etc.
 ///
-/// If `multi_instance_runtime` or `current_thread_runtime` feature is turned on:
-/// After setting the RuntimeBuilder, a call to build will initialize the actual runtime
-/// and returns its instance. If there is an invalid parameter during the build, an error
-/// would be returned.
+/// If `multi_instance_runtime` or `current_thread_runtime` feature is turned
+/// on: After setting the RuntimeBuilder, a call to build will initialize the
+/// actual runtime and returns its instance. If there is an invalid parameter
+/// during the build, an error would be returned.
 ///
 /// Otherwise:
-/// RuntimeBuilder will not have the `build()` method, instead, this builder should be
-/// passed to set the global executor.
+/// RuntimeBuilder will not have the `build()` method, instead, this builder
+/// should be passed to set the global executor.
 ///
 /// # Examples
 ///
@@ -81,15 +85,14 @@ pub enum ScheduleAlgo {
 ///     .worker_stack_size(1024 * 300)
 ///     .build()
 ///     .unwrap();
-///
 /// ```
 pub struct RuntimeBuilder;
 
 impl RuntimeBuilder {
     /// Initializes a new RuntimeBuilder with current_thread settings.
     ///
-    /// All tasks will run on the current thread, which means it does not create any other
-    /// worker threads.
+    /// All tasks will run on the current thread, which means it does not create
+    /// any other worker threads.
     ///
     /// # Examples
     ///
@@ -107,8 +110,9 @@ impl RuntimeBuilder {
 
     /// Initializes a new RuntimeBuilder with multi_thread settings.
     ///
-    /// When running, worker threads will be created according to the builder configuration,
-    /// and tasks will be allocated and run in the newly created thread pool.
+    /// When running, worker threads will be created according to the builder
+    /// configuration, and tasks will be allocated and run in the newly
+    /// created thread pool.
     ///
     /// # Examples
     ///
@@ -163,31 +167,27 @@ pub(crate) fn initialize_reactor() -> io::Result<()> {
     Ok(())
 }
 
-#[cfg(all(test))]
+#[cfg(test)]
 mod test {
     use crate::builder::RuntimeBuilder;
     #[cfg(not(feature = "ffrt"))]
     use crate::builder::ScheduleAlgo;
 
-    /*
-     * @title  RuntimeBuilder::new_multi_thread() UT test
-     * @design The function has no input, no exception branch, direct check function, return value
-     * @precon Use RuntimeBuilder::new_multi_thread(), get its creation object
-     * @brief  Describe test case execution
-     *         1、Checks if the object name property is None
-     *         2、Checks if the object core_pool_size property is None
-     *         3、Checks if the object is_steal property is true
-     *         4、Checks if the object is_affinity property is true
-     *         5、Checks if the object permanent_blocking_thread_num property is 4
-     *         6、Checks if the object max_pool_size property is Some(50)
-     *         7、Checks if the object keep_alive_time property is None
-     *         8、Checks if the object schedule_algo property is ScheduleAlgo::FifoBound
-     *         9、Checks if the object stack_size property is None
-     *         10、Checks if the object after_start property is None
-     *         11、Checks if the object before_stop property is None
-     * @expect The function has no entry, no exception branch, and the initialization parameters should correspond to each other
-     * @auto   true
-     */
+    /// UT test cases for RuntimeBuilder::new_multi_thread()
+    ///
+    /// # Brief
+    /// 1. Checks if the object name property is None
+    /// 2. Checks if the object core_pool_size property is None
+    /// 3. Checks if the object is_steal property is true
+    /// 4. Checks if the object is_affinity property is true
+    /// 5. Checks if the object permanent_blocking_thread_num property is 4
+    /// 6. Checks if the object max_pool_size property is Some(50)
+    /// 7. Checks if the object keep_alive_time property is None
+    /// 8. Checks if the object schedule_algo property is
+    ///    ScheduleAlgo::FifoBound
+    /// 9. Checks if the object stack_size property is None
+    /// 10. Checks if the object after_start property is None
+    /// 11. Checks if the object before_stop property is None
     #[test]
     fn ut_thread_pool_builder_new() {
         let thread_pool_builder = RuntimeBuilder::new_multi_thread();
@@ -204,15 +204,10 @@ mod test {
         assert_eq!(thread_pool_builder.common.stack_size, None);
     }
 
-    /*
-     * @title  RuntimeBuilder::name() UT test
-     * @design The function has no input, no exception branch, direct check function, return value
-     * @precon Use RuntimeBuilder::new_multi_thread(), get its creation object
-     * @brief  Describe test case execution
-     *         1、Checks if the object name property is modified value
-     * @expect The function entry has no invalid value, no exception branch, and the modified name property should be Some(worker_name)
-     * @auto   true
-     */
+    /// UT test cases for RuntimeBuilder::name()
+    ///
+    /// # Brief
+    /// 1. Checks if the object name property is modified value
     #[test]
     fn ut_thread_pool_builder_name() {
         let name = String::from("worker_name");
@@ -220,23 +215,13 @@ mod test {
         assert_eq!(thread_pool_builder.common.worker_name, Some(name));
     }
 
-    /*
-     * @title  RuntimeBuilder::core_pool_size() UT test
-     * @design Input 1: core_pool_size
-     *               Valid value range: core_pool_size >= 1 && core_pool_size <= 64
-     *               Invalid value range: core_pool_size < 1 || core_pool_size > 64
-     *         No abnormal branches
-     * @precon Use RuntimeBuilder::new_multi_thread(), get its creation object
-     * @brief  Describe test case execution
-     *         1、core_pool_size set to 1, Check if the return value is Some(1)
-     *         2、core_pool_size set to 64, Check if the return value is Some(64)
-     *         3、core_pool_size set to 0, Check if the return value is Some(1)
-     *         4、core_pool_size set to 65, Check if the return value is Some(64)
-     * @expect Value of core_pool_size property after modification
-     *         Some(core_pool_size) in the valid range
-     *         Modified to a valid value close to the invalid value range
-     * @auto   true
-     */
+    /// UT test cases for RuntimeBuilder::core_pool_size()
+    ///
+    /// # Brief
+    /// 1. core_pool_size set to 1, Check if the return value is Some(1)
+    /// 2. core_pool_size set to 64, Check if the return value is Some(64)
+    /// 3. core_pool_size set to 0, Check if the return value is Some(1)
+    /// 4. core_pool_size set to 65, Check if the return value is Some(64)
     #[test]
     fn ut_thread_pool_builder_core_pool_size() {
         let thread_pool_builder = RuntimeBuilder::new_multi_thread().worker_num(1);
@@ -252,20 +237,11 @@ mod test {
         assert_eq!(thread_pool_builder.core_thread_size, Some(64));
     }
 
-    /*
-     * @title  RuntimeBuilder::stack_size() UT test
-     * @design Input 1: stack_size
-     *               Valid value range: stack_size > 0
-     *               Invalid value range: stack_size = 0
-     * @precon Use RuntimeBuilder::new_multi_thread(), get its creation object
-     * @brief  Describe test case execution
-     *         1、stack_size set to 0, Check if the return value is Some(1)
-     *         2、stack_size set to 1, Check if the return value is Some(1)
-     * @expect Modified stack_size property value
-     *         Some(stack_size) in the range of valid values
-     *         Modified to a valid value close to the invalid value range
-     * @auto   true
-     */
+    /// UT test cases for RuntimeBuilder::stack_size()
+    ///
+    /// # Brief
+    /// 1. stack_size set to 0, Check if the return value is Some(1)
+    /// 2. stack_size set to 1, Check if the return value is Some(1)
     #[test]
     fn ut_thread_pool_builder_stack_size() {
         let thread_pool_builder = RuntimeBuilder::new_multi_thread().worker_stack_size(0);
@@ -276,20 +252,18 @@ mod test {
     }
 }
 
-#[cfg(all(test))]
+#[cfg(test)]
 #[cfg(feature = "current_thread_runtime")]
 mod current_thread_test {
     use crate::builder::RuntimeBuilder;
 
-    /// UT test for new_current_thread.
-    ///
-    /// # Title
-    /// ut_thread_pool_builder_current_thread
+    /// UT test cases for new_current_thread.
     ///
     /// # Brief
-    /// 1. Verify the result when multiple tasks are inserted to the current thread at a time.
+    /// 1. Verify the result when multiple tasks are inserted to the current
+    ///    thread at a time.
     /// 2. Insert the task for multiple times, wait until the task is complete,
-    /// verify the result, and then perform the operation again.
+    ///    verify the result, and then perform the operation again.
     /// 3. Spawn nest thread.
     #[test]
     fn ut_thread_pool_builder_current_thread() {
@@ -325,20 +299,15 @@ mod current_thread_test {
 }
 
 #[cfg(not(feature = "ffrt"))]
-#[cfg(all(test))]
+#[cfg(test)]
 mod ylong_executor_test {
     use crate::builder::{RuntimeBuilder, ScheduleAlgo};
 
-    /*
-     * @title  ThreadPoolBuilder::is_affinity() UT test
-     * @design The function has no input, no exception branch, direct check function, return value
-     * @precon Use ThreadPoolBuilder::new(), get its creation object
-     * @brief  Describe test case execution
-     *         1、is_affinity set to true, check if it is a modified value
-     *         2、is_affinity set to false, check if it is a modified value
-     * @expect The function entry has no invalid values, no exception branches, and the value of the is_affinity property should be is_affinity after modification
-     * @auto   true
-     */
+    /// UT test cases for ThreadPoolBuilder::is_affinity()
+    ///
+    /// # Brief
+    /// 1. is_affinity set to true, check if it is a modified value
+    /// 2. is_affinity set to false, check if it is a modified value
     #[test]
     fn ut_thread_pool_builder_is_affinity() {
         let thread_pool_builder = RuntimeBuilder::new_multi_thread().is_affinity(true);
@@ -348,22 +317,17 @@ mod ylong_executor_test {
         assert!(!thread_pool_builder.common.is_affinity);
     }
 
-    /*
-     * @title  RuntimeBuilder::blocking_permanent_thread_num() UT test
-     * @design Input 1: blocking_permanent_thread_num
-     *               Valid value range: blocking_permanent_thread_num >= 1 && blocking_permanent_thread_num <= max_blocking_pool_size
-     *               Invalid value range: blocking_permanent_thread_num < 1 || blocking_permanent_thread_num > max_blocking_pool_size
-     * @precon Use RuntimeBuilder::new_multi_thread(), get its creation object
-     * @brief  Describe test case execution
-     *         1、permanent_blocking_thread_num set to 1, check if the return value is 1
-     *         2、permanent_blocking_thread_num set to max_thread_num, check if the return value is max_blocking_pool_size
-     *         3、permanent_blocking_thread_num set to 0, check if the return value is 1
-     *         4、permanent_blocking_thread_num set to max_thread_num + 1, Check if the return value O is max_blocking_pool_size
-     * @expect Modified permanent_blocking_thread_num property value
-     *         In the valid range is permanent_blocking_thread_num
-     *         Modified to a valid value close to the invalid value range
-     * @auto   true
-     */
+    /// UT test cases for RuntimeBuilder::blocking_permanent_thread_num()
+    ///
+    /// # Brief        
+    /// 1. permanent_blocking_thread_num set to 1, check if the return value is
+    ///    1.
+    /// 2. permanent_blocking_thread_num set to max_thread_num, check if the
+    ///    return value is max_blocking_pool_size.
+    /// 3. permanent_blocking_thread_num set to 0, check if the return value is
+    ///    1.
+    /// 4. permanent_blocking_thread_num set to max_thread_num + 1, Check if the
+    ///    return value O is max_blocking_pool_size.
     #[test]
     fn ut_thread_pool_builder_permanent_blocking_thread_num() {
         let thread_pool_builder =
@@ -393,22 +357,13 @@ mod ylong_executor_test {
         );
     }
 
-    /*
-     * @title  RuntimeBuilder::max_pool_size() UT test
-     * @design Input 1: max_pool_size
-     *               Valid value range: max_pool_size >= 1 && max_pool_size <= 64
-     *               Invalid value range: max_pool_size < 1 || max_pool_size > 64
-     * @precon Use RuntimeBuilder::new_multi_thread(), get its creation object
-     * @brief  Describe test case execution
-     *         1、max_pool_size set to 1, check if the return value is Some(1)
-     *         2、max_pool_size set to 64, check if the return value is Some(64)
-     *         3、max_pool_size set to 0, check if the return value is Some(1)
-     *         4、max_pool_size set to 65, check if the return value is Some(64)
-     * @expect Value of max_pool_size property after modification
-     *         max_pool_size within the valid values
-     *         Modified to a valid value close to the invalid value range
-     * @auto   true
-     */
+    /// UT test cases for RuntimeBuilder::max_pool_size()
+    ///
+    /// # Brief
+    /// 1. max_pool_size set to 1, check if the return value is Some(1)
+    /// 2. max_pool_size set to 64, check if the return value is Some(64)
+    /// 3. max_pool_size set to 0, check if the return value is Some(1)
+    /// 4. max_pool_size set to 65, check if the return value is Some(64)
     #[test]
     fn ut_thread_pool_builder_max_pool_size() {
         let thread_pool_builder = RuntimeBuilder::new_multi_thread().max_blocking_pool_size(1);
@@ -436,16 +391,13 @@ mod ylong_executor_test {
         );
     }
 
-    /*
-     * @title  RuntimeBuilder::keep_alive_time() UT test
-     * @design The function has no invalid values in the input, no exception branch, direct check function, return value
-     * @precon Use RuntimeBuilder::new_multi_thread(), get its creation object
-     * @brief  Describe test case execution
-     *         1、keep_alive_time set to 0, check if the return value is Some(Duration::from_secs(0))
-     *         2、keep_alive_time set to 1, check if the return value is Some(Duration::from_secs(1))
-     * @expect The function entry has no invalid value, no exception branch, and the value of the keep_alive_time property should be Some(keep_alive_time) after modification
-     * @auto   true
-     */
+    /// UT test cases for RuntimeBuilder::keep_alive_time()
+    ///
+    /// # Brief
+    /// 1. keep_alive_time set to 0, check if the return value is
+    ///    Some(Duration::from_secs(0))
+    /// 2. keep_alive_time set to 1, check if the return value is
+    ///    Some(Duration::from_secs(1))
     #[test]
     fn ut_thread_pool_builder_keep_alive_time() {
         use std::time::Duration;
@@ -467,17 +419,12 @@ mod ylong_executor_test {
         );
     }
 
-    /*
-     * @title  RuntimeBuilder::schedule_algo() UT test
-     * @design The function has no invalid values in the input, no exception branch, direct check function, return value
-     * @precon Use RuntimeBuilder::new_multi_thread(), get its creation object
-     * @brief  Describe test case execution
-     *         1、schedule_algo set to FifoBound, check if it is the modified value
-     *         2、schedule_algo set to FifoUnbound, check if it is the modified value
-     *         3、schedule_algo set to Priority, check if it is the modified value
-     * @expect The function entry has no invalid values, no exception branches, and the modified schedule_algo property should be schedule_algo
-     * @auto   true
-     */
+    /// UT test cases for RuntimeBuilder::schedule_algo()
+    ///         
+    /// # Brief
+    /// 1. schedule_algo set to FifoBound, check if it is the modified value
+    /// 2. schedule_algo set to FifoUnbound, check if it is the modified value
+    /// 3. schedule_algo set to Priority, check if it is the modified value
     #[cfg(not(feature = "ffrt"))]
     #[test]
     fn ut_thread_pool_builder_schedule_algo_test() {

@@ -11,11 +11,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::error::ErrorKind;
-use crate::macros::cfg_not_ffrt;
-/// Task state, include SCHEDULED  RUNNING  COMPLETED CLOSED and so on and transform method
+/// Task state, include SCHEDULED  RUNNING  COMPLETED CLOSED and so on and
+/// transform method
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed};
+
+use crate::error::ErrorKind;
+use crate::macros::cfg_not_ffrt;
 
 /// Task is currently running
 const RUNNING: usize = 0b0001;
@@ -37,8 +39,8 @@ const RC_SHIFT: usize = RC_MASK.count_zeros() as usize;
 /// Reference count
 const REF_ONE: usize = 1 << RC_SHIFT;
 
-/// Initial state contains two ref count, one is held by join_handle, another one is held by
-/// task itself.
+/// Initial state contains two ref count, one is held by join_handle, another
+/// one is held by task itself.
 const INIT: usize = CARE_JOIN_HANDLE | SCHEDULING | (REF_ONE * 2);
 
 #[inline]
@@ -75,8 +77,8 @@ pub(crate) fn is_running(cur: usize) -> bool {
     cur & RUNNING == RUNNING
 }
 
-// A task need to satisfy these state requirements in order to get pushed back to
-// the schedule list.
+// A task need to satisfy these state requirements in order to get pushed back
+// to the schedule list.
 pub(crate) fn need_enqueue(cur: usize) -> bool {
     (cur & SCHEDULING != SCHEDULING) && (cur & RUNNING != RUNNING) && (cur & FINISHED != FINISHED)
 }
@@ -109,7 +111,8 @@ impl TaskState {
 
     /// Turns the task state into running. Contains CAS operations.
     ///
-    /// Fails when the task is already running, scheduling or is already finished.
+    /// Fails when the task is already running, scheduling or is already
+    /// finished.
     pub(crate) fn turning_to_running(&self) -> StateAction {
         let mut cur = self.get_current_state();
         loop {
@@ -279,7 +282,8 @@ impl TaskState {
         }
     }
 
-    /// Turns off the CARE_JOIN_HANDLE bit of the task state. Contains CAS operations.
+    /// Turns off the CARE_JOIN_HANDLE bit of the task state. Contains CAS
+    /// operations.
     ///
     /// Fails when the task is already finished.
     pub(crate) fn turn_to_un_join_handle(&self) -> Result<usize, ()> {
@@ -323,38 +327,30 @@ impl TaskState {
     }
 }
 
-#[cfg(all(test))]
+#[cfg(test)]
 mod test {
+    use std::sync::atomic::Ordering::{Acquire, Release};
+
     use crate::task::state::{
         StateAction, TaskState, CANCELED, CARE_JOIN_HANDLE, FINISHED, INIT, JOIN_WAKER, REF_ONE,
         RUNNING, SCHEDULING,
     };
-    use std::sync::atomic::Ordering::{Acquire, Release};
 
-    /*
-     * @title  TaskState::new() ut test
-     * @design No entry, no exception branch
-     * @precon After calling the TaskState::new() function, get its creation object
-     * @brief  Describe test case execution
-     *         1、Verify that the status of the initialized completed task is INIT
-     * @expect The modified task status attribute value should be INIT
-     * @auto   true
-     */
+    /// UT test cases for TaskState::new()
+    ///
+    /// # Brief
+    /// 1. Verify that the status of the initialized completed task is INIT
     #[test]
     fn ut_task_state_new() {
         let task_state = TaskState::new();
         assert_eq!(task_state.0.load(Acquire), INIT);
     }
 
-    /*
-     * @title  TaskState::dec_ref() ut test
-     * @design No entry, no exception branch
-     * @precon After calling the TaskState::new() function, get its creation object
-     * @brief  Describe test case execution
-     *         1、Verify that the status of the initialized completed task is INIT.wrapping_sub(REF_ONE)
-     * @expect The modified task status attribute value should be INIT.wrapping_sub(REF_ONE)
-     * @auto   true
-     */
+    /// UT test cases for TaskState::dec_ref()
+    ///
+    /// # Brief
+    /// 1. Verify that the status of the initialized completed task is
+    ///    INIT.wrapping_sub(REF_ONE) value should be INIT.wrapping_sub(REF_ONE)
     #[test]
     fn ut_task_state_dec_ref() {
         let task_state = TaskState::new();
@@ -362,15 +358,11 @@ mod test {
         assert_eq!(task_state.0.load(Acquire), INIT.wrapping_sub(REF_ONE))
     }
 
-    /*
-     * @title  TaskState::inc_ref() ut test
-     * @design No entry, no exception branch
-     * @precon After calling the TaskState::new() function, get its creation object
-     * @brief  Describe test case execution
-     *         1、Verify that the status of the initialized completed task is INIT.wrapping_add(REF_ONE)
-     * @expect The modified task status attribute value should be INIT.wrapping_add(REF_ONE)
-     * @auto   true
-     */
+    /// UT test cases for TaskState::inc_ref()
+    ///
+    /// # Brief
+    /// 1. Verify that the status of the initialized completed task is
+    ///    INIT.wrapping_add(REF_ONE)
     #[test]
     fn ut_task_state_inc_ref() {
         let task_state = TaskState::new();
@@ -378,34 +370,27 @@ mod test {
         assert_eq!(task_state.0.load(Acquire), INIT.wrapping_add(REF_ONE));
     }
 
-    /*
-     * @title  TaskState::get_current_state() ut test
-     * @design No entry, no exception branch
-     * @precon After calling the TaskState::new() function, get its creation object
-     * @brief  Describe test case execution
-     *         1、Verify that the status of the initialized completed task is INIT
-     * @expect The modified task status attribute value should be current task status value
-     * @auto   true
-     */
+    /// UT test cases for TaskState::get_current_state()
+    ///
+    /// # Brief
+    /// 1. Verify that the status of the initialized completed task is INIT
     #[test]
     fn ut_task_state_get_current_state() {
         let task_state = TaskState::new();
         assert_eq!(task_state.get_current_state(), INIT);
     }
 
-    /*
-     * @title  TaskState::turning_to_running() ut test
-     * @design No entry, exception branch exists
-     * @precon After calling the TaskState::new() function, get its creation object
-     * @brief  Describe test case execution
-     *         1、(cur & RUNNING == RUNNING) || (cur & FINISHED == FINISHED) == true,
-     *            Represents the current state is already running state or has ended the state, the state does not information is not correct, directly return failure
-     *         2、(cur & RUNNING == RUNNING) || (cur & FINISHED == FINISHED) == false,
-     *            cur & SCHEDULING != SCHEDULING == true,
-     *            means the current state is not schedule state, and the status information is not correct, so it returns an error directly
-     * @expect Performing a state transition in an error state will return an error, but the correct situation should cause the state to be modified to RUNNING
-     * @auto   true
-     */
+    /// UT test cases for TaskState::turning_to_running()
+    ///
+    /// # Brief
+    /// 1. (cur & RUNNING == RUNNING) || (cur & FINISHED == FINISHED) == true,
+    ///    represents the current state is already running state or has ended
+    ///    the state, the state does not information is not correct, directly
+    ///    return failure
+    /// 2. (cur & RUNNING == RUNNING) || (cur & FINISHED == FINISHED) == false,
+    ///    cur & SCHEDULING != SCHEDULING == true, means the current state is
+    ///    not schedule state, and the status information is not correct, so it
+    ///    returns an error directly
     #[test]
     fn ut_task_state_turning_to_running() {
         let task_state = TaskState::new();
@@ -424,17 +409,15 @@ mod test {
         }
     }
 
-    /*
-     * @title  TaskState::turning_to_finish() ut test
-     * @design No entry, exception branch exists
-     * @precon After calling the TaskState::new() function, get its creation object
-     * @brief  Describe test case execution
-     *         1、cur & FINISHED == FINISHED == true, Represents the current state is already the end state, the state does not information is not correct, directly return failure
-     *         2、cur & FINISHED == FINISHED == false, cur & RUNNING != RUNNING == true,
-     *            means the current state is not running, and the status information is not correct, so the error is returned directly
-     * @expect Performing a state transition in an error state will return an error, but should cause the state to be modified to FINISHED in the correct case
-     * @auto   true
-     */
+    /// UT test cases for TaskState::turning_to_finish()
+    ///
+    /// # Brief
+    /// 1. cur & FINISHED == FINISHED == true, Represents the current state is
+    ///    already the end state, the state does not information is not correct,
+    ///    directly return failure
+    /// 2. cur & FINISHED == FINISHED == false, cur & RUNNING != RUNNING ==
+    ///    true, means the current state is not running, and the status
+    ///    information is not correct, so the error is returned directly
     #[test]
     fn ut_task_state_turning_to_finish() {
         let task_state = TaskState::new();
@@ -448,31 +431,19 @@ mod test {
         assert!(task_state.turning_to_finish().is_err());
     }
 
-    /*
-     * @title  TaskState::turning_to_idle() ut test
-     * @design No entry, exception branch exists
-     * @precon After calling the TaskState::new() function, get its creation object
-     * @brief  Describe test case execution
-     *         1、cur & FINISHED == FINISHED == true, Represents the current state is already the end state, the state does not information is not correct, directly return failure
-     *         2、cur & CANCELLED == CANCELLED == false, cur & RUNNING != RUNNING == true,
-     *            means that the current state is not running and the status information is not correct, directly panic
-     *         3、cur & CANCELLED == CANCELLED == false,
-     *            cur & RUNNING != RUNNING == false, is_scheduling(next) == false
-     * @expect Performing a state transition in the wrong state will return an error, but the correct situation should cause the state to be modified to SCHEDULING
-     * @auto   true
-     */
-
-    /// ut test for turning_to_idle
+    /// UT test cases for turning_to_idle
     ///
     /// # Brief
     /// 1. Create a TaskState, set it to Canceled & Running
-    /// 2. Call turning_to_idle, check if return value equals to StateAction::canceled
+    /// 2. Call turning_to_idle, check if return value equals to
+    ///    StateAction::canceled
     /// 3. Create a TaskState, set it to init
-    /// 4. Call turning_to_idle, check if return value equals to StateAction::Failed
+    /// 4. Call turning_to_idle, check if return value equals to
+    ///    StateAction::Failed
     /// 5. Create a TaskState, set it to Running and not scheduling
-    /// 6. Call turning_to_idle, check if return value equals to StateAction::Success
+    /// 6. Call turning_to_idle, check if return value equals to
+    ///    StateAction::Success
     /// 7. Create a TaskState, set it to Running and scheduling
-    /// 8
     #[test]
     fn ut_task_state_turning_to_idle() {
         let task_state = TaskState::new();
@@ -514,15 +485,10 @@ mod test {
         }
     }
 
-    /*
-     * @title  TaskState::turn_to_scheduling() ut test
-     * @design No entry, no exception branch
-     * @precon After calling the TaskState::new() function, get its creation object
-     * @brief  Describe test case execution
-     *         1、Check if the state transition is SCHEDULING
-     * @expect The correct case should make the state modified to SCHEDULING
-     * @auto   true
-     */
+    /// UT test cases for TaskState::turn_to_scheduling()
+    ///
+    /// # Brief
+    /// 1. Check if the state transition is SCHEDULING
     #[test]
     fn ut_task_state_turning_to_scheduling() {
         let task_state = TaskState::new();
@@ -531,18 +497,16 @@ mod test {
         assert_eq!(task_state.turn_to_scheduling(), test_state);
     }
 
-    /*
-     * @title  TaskState::turn_to_un_set_waker() ut test
-     * @design No entry, exception branch exists
-     * @precon After calling the TaskState::new() function, get its creation object
-     * @brief  Describe test case execution
-     *         1、!is_care_join_handle(cur) || !is_set_waker(cur) == true, means that the current state is neither focused on hooks nor set waker
-     *         2、!is_care_join_handle(cur) || !is_set_waker(cur) == false, cur & FINISHED == FINISHED == true,
-     *            means the current status is FINISHED, directly return failure
-     *         3、!is_care_join_handle(cur) || !is_set_waker(cur) == false, cur & FINISHED == FINISHED == false
-     * @expect The correct case should make the status change to not set yet JOIN_WAKER
-     * @auto   true
-     */
+    /// UT test cases for TaskState::turn_to_un_set_waker()
+    ///
+    /// # Brief
+    /// 1. !is_care_join_handle(cur) || !is_set_waker(cur) == true, means that
+    ///    the current state is neither focused on hooks nor set waker
+    /// 2. !is_care_join_handle(cur) || !is_set_waker(cur) == false, cur &
+    ///    FINISHED == FINISHED == true, means the current status is FINISHED,
+    ///    directly return failure
+    /// 3. !is_care_join_handle(cur) || !is_set_waker(cur) == false, cur &
+    ///    FINISHED == FINISHED == false
     #[test]
     fn ut_task_state_turn_to_un_set_waker() {
         let task_state = TaskState::new();
@@ -569,17 +533,16 @@ mod test {
         assert!(task_state.turn_to_un_set_waker().is_ok());
     }
 
-    /*
-     * @title  TaskState::turn_to_set_waker() ut test
-     * @design No entry, exception branch exists
-     * @precon After calling the TaskState::new() function, get its creation object
-     * @brief  Describe test case execution
-     *         1、!is_care_join_handle(cur) || is_set_waker(cur) == true, means that the current state is neither concerned with hooks, has set waker
-     *         2、!is_care_join_handle(cur) || is_set_waker(cur) == false, cur & FINISHED == FINISHED == true, means the current status is FINISHED, directly return failure
-     *         3、!is_care_join_handle(cur) || is_set_waker(cur) == false, cur & FINISHED == FINISHED == false
-     * @expect The correct case should make the status change to JOIN_WAKER
-     * @auto   true
-     */
+    /// UT test cases for TaskState::turn_to_set_waker()
+    ///
+    /// # Brief
+    /// 1. !is_care_join_handle(cur) || is_set_waker(cur) == true, means that
+    ///    the current state is neither concerned with hooks, has set waker
+    /// 2. !is_care_join_handle(cur) || is_set_waker(cur) == false, cur &
+    ///    FINISHED == FINISHED == true, means the current status is FINISHED,
+    ///    directly return failure
+    /// 3. !is_care_join_handle(cur) || is_set_waker(cur) == false, cur &
+    ///    FINISHED == FINISHED == false
     #[test]
     fn ut_task_state_turn_to_set_waker() {
         let task_state = TaskState::new();
@@ -606,16 +569,12 @@ mod test {
         assert!(task_state.turn_to_set_waker().is_ok());
     }
 
-    /*
-     * @title  TaskState::turn_to_un_join_handle() ut test
-     * @design No entry, exception branch exists
-     * @precon After calling the TaskState::new() function, get its creation object
-     * @brief  Describe test case execution
-     *         1、cur & FINISHED == FINISHED == true, means the current state is FINISHED state, directly return failure
-     *         2、cur & FINISHED == FINISHED == false
-     * @expect The correct situation should make the status change to not set yet CARE_JOIN_HANDLE
-     * @auto   true
-     */
+    /// UT test cases for TaskState::turn_to_un_join_handle()
+    ///
+    /// # Brief
+    /// 1. cur & FINISHED == FINISHED == true, means the current state is
+    ///    FINISHED state, directly return failure
+    /// 2. cur & FINISHED == FINISHED == false
     #[test]
     fn ut_task_state_turn_to_un_join_handle() {
         let task_state = TaskState::new();
@@ -631,15 +590,11 @@ mod test {
         assert!(task_state.turn_to_un_join_handle().is_ok());
     }
 
-    /*
-     * @title  TaskState::try_turning_to_un_join_handle() ut test
-     * @design No entry, no exception branch
-     * @precon After calling the TaskState::new() function, get its creation object
-     * @brief  Describe test case execution
-     *         1、After calling this function, check if the status is modified to CARE_JOIN_HANDLE
-     * @expect The correct case should make the state modified to CARE_JOIN_HANDLE
-     * @auto   true
-     */
+    /// UT test cases for TaskState::try_turning_to_un_join_handle()
+    ///
+    /// # Brief
+    /// 1. After calling this function, check if the status is modified to
+    ///    CARE_JOIN_HANDLE
     #[test]
     fn ut_task_state_turning_to_un_join_handle() {
         let task_state = TaskState::new();

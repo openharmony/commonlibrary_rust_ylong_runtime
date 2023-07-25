@@ -11,14 +11,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::sys::windows::udp::UdpSock;
-use crate::sys::NetState;
-use crate::{Interest, Selector, Source, Token};
-use crate::source::Fd;
 use std::fmt::Formatter;
 use std::net::SocketAddr;
 use std::os::windows::io::AsRawSocket;
 use std::{fmt, io, net};
+
+use crate::source::Fd;
+use crate::sys::windows::udp::UdpSock;
+use crate::sys::NetState;
+use crate::{Interest, Selector, Source, Token};
 
 /// A UDP socket.
 pub struct UdpSocket {
@@ -54,7 +55,9 @@ impl UdpSocket {
     /// let receiver_addr = "127.0.0.1:8082".parse().unwrap();
     ///
     /// let sender = UdpSocket::bind(sender_addr).expect("Bind Socket Failed!");
-    /// let connected_sender = sender.connect(receiver_addr).expect("Connect Socket Failed!");
+    /// let connected_sender = sender
+    ///     .connect(receiver_addr)
+    ///     .expect("Connect Socket Failed!");
     /// ```
     pub fn connect(self, addr: SocketAddr) -> io::Result<ConnectedUdpSocket> {
         let socket = ConnectedUdpSocket::from_std(self);
@@ -76,18 +79,22 @@ impl UdpSocket {
     ///
     /// ```no_run
     /// use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+    ///
     /// use ylong_io::UdpSocket;
     ///
     /// let sender_addr = "127.0.0.1:8081".parse().unwrap();
     /// let socket = UdpSocket::bind(sender_addr).expect("Bind Socket Failed!");
-    /// assert_eq!(socket.local_addr().unwrap(),
-    ///            SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 8081)));
+    /// assert_eq!(
+    ///     socket.local_addr().unwrap(),
+    ///     SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 8081))
+    /// );
     /// ```
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
         self.inner.local_addr()
     }
 
-    /// Sends data on the socket to the given address. On success, returns the number of bytes written.
+    /// Sends data on the socket to the given address. On success, returns the
+    /// number of bytes written.
     ///
     /// # Examples
     ///
@@ -98,14 +105,17 @@ impl UdpSocket {
     /// let receiver_addr = "127.0.0.1:8082".parse().unwrap();
     ///
     /// let socket = UdpSocket::bind(sender_addr).expect("Bind Socket Failed!");
-    /// socket.send_to(&[0; 10], receiver_addr).expect("Send Socket Failed!");
+    /// socket
+    ///     .send_to(&[0; 10], receiver_addr)
+    ///     .expect("Send Socket Failed!");
     /// ```
     pub fn send_to(&self, buf: &[u8], target: SocketAddr) -> io::Result<usize> {
         self.state
             .try_io(|inner| inner.send_to(buf, target), &self.inner)
     }
 
-    /// Receives a single datagram message on the socket. On success, returns the number of bytes read and the origin.
+    /// Receives a single datagram message on the socket. On success, returns
+    /// the number of bytes read and the origin.
     ///
     /// # Examples
     ///
@@ -116,8 +126,7 @@ impl UdpSocket {
     ///
     /// let socket = UdpSocket::bind(sender_addr).expect("Bind Socket Failed!");
     /// let mut buf = [0; 10];
-    /// let (number_of_bytes, src_addr) = socket.recv_from(&mut buf)
-    ///                                         .expect("Didn't receive data");
+    /// let (number_of_bytes, src_addr) = socket.recv_from(&mut buf).expect("Didn't receive data");
     /// let filled_buf = &mut buf[..number_of_bytes];
     /// ```
     pub fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
@@ -134,7 +143,9 @@ impl UdpSocket {
     /// let sender_addr = "127.0.0.1:8081".parse().unwrap();
     ///
     /// let socket = UdpSocket::bind(sender_addr).expect("couldn't bind to address");
-    /// socket.set_broadcast(false).expect("set_broadcast call failed");
+    /// socket
+    ///     .set_broadcast(false)
+    ///     .expect("set_broadcast call failed");
     /// ```
     pub fn set_broadcast(&self, on: bool) -> io::Result<()> {
         self.inner.set_broadcast(on)
@@ -150,7 +161,9 @@ impl UdpSocket {
     /// let sender_addr = "127.0.0.1:8081".parse().unwrap();
     ///
     /// let socket = UdpSocket::bind(sender_addr).expect("couldn't bind to address");
-    /// socket.set_broadcast(false).expect("set_broadcast call failed");
+    /// socket
+    ///     .set_broadcast(false)
+    ///     .expect("set_broadcast call failed");
     /// assert_eq!(socket.broadcast().unwrap(), false);
     /// ```
     pub fn broadcast(&self) -> io::Result<bool> {
@@ -180,37 +193,48 @@ impl ConnectedUdpSocket {
     ///
     /// ```no_run
     /// use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+    ///
     /// use ylong_io::UdpSocket;
     ///
     /// let sender_addr = "127.0.0.1:8081".parse().unwrap();
     /// let receiver_addr = "127.0.0.1:8082".parse().unwrap();
     ///
     /// let sender = UdpSocket::bind(sender_addr).expect("Bind Socket Failed!");
-    /// let connected_sender = sender.connect(receiver_addr).expect("Connect Socket Failed!");
+    /// let connected_sender = sender
+    ///     .connect(receiver_addr)
+    ///     .expect("Connect Socket Failed!");
     ///
-    /// assert_eq!(connected_sender.local_addr().unwrap(),
-    ///            SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 8081)));
+    /// assert_eq!(
+    ///     connected_sender.local_addr().unwrap(),
+    ///     SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 8081))
+    /// );
     /// ```
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
         self.inner.local_addr()
     }
 
-    /// Returns the socket address of the remote peer to which the socket is connected.
+    /// Returns the socket address of the remote peer to which the socket is
+    /// connected.
     ///
     /// # Examples
     ///
     /// ```no_run
     /// use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+    ///
     /// use ylong_io::UdpSocket;
     ///
     /// let sender_addr = "127.0.0.1:8081".parse().unwrap();
     /// let receiver_addr = "127.0.0.1:8082".parse().unwrap();
     ///
     /// let sender = UdpSocket::bind(sender_addr).expect("Bind Socket Failed!");
-    /// let connected_sender = sender.connect(receiver_addr).expect("Connect Socket Failed!");
+    /// let connected_sender = sender
+    ///     .connect(receiver_addr)
+    ///     .expect("Connect Socket Failed!");
     ///
-    /// assert_eq!(connected_sender.peer_addr().unwrap(),
-    ///            SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 8082)));
+    /// assert_eq!(
+    ///     connected_sender.peer_addr().unwrap(),
+    ///     SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 8082))
+    /// );
     /// ```
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
         self.inner.peer_addr()
@@ -227,14 +251,19 @@ impl ConnectedUdpSocket {
     /// let receiver_addr = "127.0.0.1:8082".parse().unwrap();
     ///
     /// let socket = UdpSocket::bind(sender_addr).expect("couldn't bind to address");
-    /// let connected_sender = socket.connect(receiver_addr).expect("connect function failed");
-    /// connected_sender.send(&[0, 1, 2]).expect("couldn't send message");
+    /// let connected_sender = socket
+    ///     .connect(receiver_addr)
+    ///     .expect("connect function failed");
+    /// connected_sender
+    ///     .send(&[0, 1, 2])
+    ///     .expect("couldn't send message");
     /// ```
     pub fn send(&self, buf: &[u8]) -> io::Result<usize> {
         self.state.try_io(|inner| inner.send(buf), &self.inner)
     }
 
-    /// Receives a single datagram message on the socket from the remote address to which it is connected. On success, returns the number of bytes read.
+    /// Receives a single datagram message on the socket from the remote address
+    /// to which it is connected. On success, returns the number of bytes read.
     ///
     /// # Examples
     ///
@@ -245,7 +274,9 @@ impl ConnectedUdpSocket {
     /// let receiver_addr = "127.0.0.1:8082".parse().unwrap();
     ///
     /// let socket = UdpSocket::bind(sender_addr).expect("couldn't bind to address");
-    /// let connected_sender = socket.connect(receiver_addr).expect("connect function failed");
+    /// let connected_sender = socket
+    ///     .connect(receiver_addr)
+    ///     .expect("connect function failed");
     /// let mut buf = [0; 10];
     /// match connected_sender.recv(&mut buf) {
     ///     Ok(received) => println!("received {} bytes {:?}", received, &buf[..received]),

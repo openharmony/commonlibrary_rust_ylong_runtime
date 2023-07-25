@@ -11,10 +11,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::fs::{async_op, File};
 use std::fs::OpenOptions as SyncOpenOptions;
 use std::io;
 use std::path::Path;
+
+use crate::fs::{async_op, File};
 
 /// An asynchronous version of the [`std::fs::OpenOptions`];
 ///
@@ -25,19 +26,22 @@ use std::path::Path;
 ///
 /// async fn open_with_options() {
 ///     let file = OpenOptions::new()
-///             .read(true)
-///             .write(true)
-///             .create(true)
-///             .open("foo.txt").await;
+///         .read(true)
+///         .write(true)
+///         .create(true)
+///         .open("foo.txt")
+///         .await;
 /// }
 /// ```
 #[derive(Clone, Debug)]
 pub struct OpenOptions(SyncOpenOptions);
 
 impl OpenOptions {
-    /// Creates a blank new set of options ready for configuration when opening a file.
+    /// Creates a blank new set of options ready for configuration when opening
+    /// a file.
     ///
-    /// All options are initially set to `false` just like [`std::fs::OpenOptions::new`].
+    /// All options are initially set to `false` just like
+    /// [`std::fs::OpenOptions::new`].
     ///
     /// # Examples
     ///
@@ -81,8 +85,8 @@ impl OpenOptions {
     /// This option, when true, will indicate that the file should be
     /// `write`-able if opened.
     ///
-    /// If the file already exists, any write calls on it will overwrite its previous
-    /// contents, without truncating it.
+    /// If the file already exists, any write calls on it will overwrite its
+    /// previous contents, without truncating it.
     ///
     /// This method's behavior is the same as [`std::fs::OpenOptions::write`].
     ///
@@ -105,20 +109,23 @@ impl OpenOptions {
     /// This option, when true, means that writes will append to a file instead
     /// of overwriting previous contents.
     ///
-    /// Note that when setting `.append(true)`, file write access will also be turned on
+    /// Note that when setting `.append(true)`, file write access will also be
+    /// turned on
     ///
-    /// For most filesystems, the operating system guarantees that all writes are
-    /// atomic: no writes get mangled because another thread or process writes at the same
-    /// time.
+    /// For most filesystems, the operating system guarantees that all writes
+    /// are atomic: no writes get mangled because another thread or process
+    /// writes at the same time.
     ///
-    /// User should write all data that belongs together in one operation during appending.
-    /// This can be done by concatenating strings before passing them to [`write()`],
-    /// or using a buffered writer (with a buffer of adequate size),
-    /// and calling [`flush()`] when the message is written completely.
+    /// User should write all data that belongs together in one operation during
+    /// appending. This can be done by concatenating strings before passing
+    /// them to [`write()`], or using a buffered writer (with a buffer of
+    /// adequate size), and calling [`flush()`] when the message is written
+    /// completely.
     ///
     /// If a file is opened with both read and append access, beware that after
-    /// opening and every write, the position for reading may be set at the end of the file.
-    /// So, before writing, save the current position, and restore it before the next read.
+    /// opening and every write, the position for reading may be set at the end
+    /// of the file. So, before writing, save the current position, and
+    /// restore it before the next read.
     ///
     /// This method's behavior is the same as [`std::fs::OpenOptions::append`].
     ///
@@ -148,13 +155,14 @@ impl OpenOptions {
     /// Sets the option for truncating a file's previous content.
     ///
     /// If a file is successfully opened with this option set, it will truncate
-    /// the file to 0 length if it already exists. Any already-existed content in
-    /// this file will be dropped.
+    /// the file to 0 length if it already exists. Any already-existed content
+    /// in this file will be dropped.
     ///
-    /// The file must be opened with write access for truncate to work, which is different
-    /// from append mode.
+    /// The file must be opened with write access for truncate to work, which is
+    /// different from append mode.
     ///
-    /// This method's behavior is the same as [`std::fs::OpenOptions::truncate`].
+    /// This method's behavior is the same as
+    /// [`std::fs::OpenOptions::truncate`].
     ///
     /// # Examples
     ///
@@ -162,7 +170,11 @@ impl OpenOptions {
     /// use ylong_runtime::fs::OpenOptions;
     ///
     /// async fn open_with_truncate() {
-    ///     let file = OpenOptions::new().write(true).truncate(true).open("foo.txt").await;
+    ///     let file = OpenOptions::new()
+    ///         .write(true)
+    ///         .truncate(true)
+    ///         .open("foo.txt")
+    ///         .await;
     /// }
     /// ```
     pub fn truncate(&mut self, truncate: bool) -> &mut Self {
@@ -170,8 +182,8 @@ impl OpenOptions {
         self
     }
 
-    /// Sets the option to create a new file if it doesn't already exist, or simply open
-    /// it if it does exist.
+    /// Sets the option to create a new file if it doesn't already exist, or
+    /// simply open it if it does exist.
     ///
     /// In order for the file to be created, [`OpenOptions::write`] or
     /// [`OpenOptions::append`] access must be set to true.
@@ -184,7 +196,11 @@ impl OpenOptions {
     /// use ylong_runtime::fs::OpenOptions;
     ///
     /// async fn open_with_create() {
-    ///     let file = OpenOptions::new().write(true).create(true).open("foo.txt").await;
+    ///     let file = OpenOptions::new()
+    ///         .write(true)
+    ///         .create(true)
+    ///         .open("foo.txt")
+    ///         .await;
     /// }
     /// ```
     pub fn create(&mut self, create: bool) -> &mut Self {
@@ -194,13 +210,15 @@ impl OpenOptions {
 
     /// Sets the option to create a new file.
     ///
-    /// If the file already exists, opening the file with the option set will cause an error.
+    /// If the file already exists, opening the file with the option set will
+    /// cause an error.
     ///
-    /// No file is allowed to exist at the target location, also no (dangling) symlink. In this
-    /// way, if the call succeeds, the file returned is guaranteed to be new.
+    /// No file is allowed to exist at the target location, also no (dangling)
+    /// symlink. In this way, if the call succeeds, the file returned is
+    /// guaranteed to be new.
     ///
-    /// This option guarantees the operation of checking whether a file exists and creating
-    /// a new one is atomic.
+    /// This option guarantees the operation of checking whether a file exists
+    /// and creating a new one is atomic.
     ///
     /// If `.create_new(true)` is set, [`.create()`] and [`.truncate()`] are
     /// ignored.
@@ -211,7 +229,8 @@ impl OpenOptions {
     /// [`.create(true)`]: OpenOptions::create
     /// [`.truncate(true)`]: OpenOptions::truncate
     ///
-    /// This method's behavior is the same as [`std::fs::OpenOptions::create_new`].
+    /// This method's behavior is the same as
+    /// [`std::fs::OpenOptions::create_new`].
     ///
     /// # Examples
     ///
@@ -219,7 +238,11 @@ impl OpenOptions {
     /// use ylong_runtime::fs::OpenOptions;
     ///
     /// async fn open_with_create_new() {
-    ///     let file = OpenOptions::new().write(true).create_new(true).open("foo.txt").await;
+    ///     let file = OpenOptions::new()
+    ///         .write(true)
+    ///         .create_new(true)
+    ///         .open("foo.txt")
+    ///         .await;
     /// }
     /// ```
     pub fn create_new(&mut self, create_new: bool) -> &mut Self {
@@ -227,29 +250,34 @@ impl OpenOptions {
         self
     }
 
-    /// Asynchronously opens a file at `path` with the options specified by `self`.
+    /// Asynchronously opens a file at `path` with the options specified by
+    /// `self`.
     ///
     /// # Errors
     ///
     /// This method's behavior is the same as [`std::fs::OpenOptions::open`].
     ///
-    /// * [`NotFound`]: The specified file does not exist and neither `create` or
-    ///   `create_new` is set.
-    /// * [`NotFound`]: One of the directory components of the file path doesn't exist.
-    /// * [`PermissionDenied`]: The user lacks permission to get the specified access
-    ///   rights for the file.
-    /// * [`PermissionDenied`]: The user lacks permission to open one of the directory
-    ///   components of the specified path.
-    /// * [`AlreadyExists`]: `create_new` was specified and the file already exists.
-    /// * [`InvalidInput`]: Invalid combinations of open options (truncate without
-    ///   write access, no access mode set, etc.).
+    /// * [`NotFound`]: The specified file does not exist and neither `create`
+    ///   or `create_new` is set.
+    /// * [`NotFound`]: One of the directory components of the file path doesn't
+    ///   exist.
+    /// * [`PermissionDenied`]: The user lacks permission to get the specified
+    ///   access rights for the file.
+    /// * [`PermissionDenied`]: The user lacks permission to open one of the
+    ///   directory components of the specified path.
+    /// * [`AlreadyExists`]: `create_new` was specified and the file already
+    ///   exists.
+    /// * [`InvalidInput`]: Invalid combinations of open options (truncate
+    ///   without write access, no access mode set, etc.).
     ///
-    /// The following errors don't match any existing [`io::ErrorKind`] at the moment:
-    /// * One of the directory components of the specified file path was not,
-    ///   in fact, a directory.
-    /// * Filesystem-level errors: full disk, write permission requested on a read-only
-    ///   file system, exceeded disk quota, too many open files, too long filename,
-    ///   too many symbolic links in the specified path (Unix-like systems only), etc.
+    /// The following errors don't match any existing [`io::ErrorKind`] at the
+    /// moment:
+    /// * One of the directory components of the specified file path was not, in
+    ///   fact, a directory.
+    /// * Filesystem-level errors: full disk, write permission requested on a
+    ///   read-only file system, exceeded disk quota, too many open files, too
+    ///   long filename, too many symbolic links in the specified path
+    ///   (Unix-like systems only), etc.
     ///
     /// [`NotFound`]: std::io::ErrorKind::NotFound
     /// [`PermissionDenied`]: std::io::ErrorKind::PermissionDenied
@@ -275,13 +303,11 @@ impl OpenOptions {
 mod test {
     use crate::fs::OpenOptions;
 
-    /// UT test for Openoption.
-    ///
-    /// # Title
-    /// ut_set_openoption
-    ///
+    /// UT test cases for Openoption.
+
     /// # Brief
-    /// 1. Call `read`、`write`、`append`、`truncate`、`create`、`create_new` function, passing in the specified parameters.
+    /// 1. Call `read`、`write`、`append`、`truncate`、`create`、`create_new`
+    ///    function, passing in the specified parameters.
     /// 2. Check if the settings are correct.
     #[cfg(target_os = "linux")]
     #[test]

@@ -24,18 +24,19 @@ use crate::sync::semaphore_inner::SemaphoreInner;
 ///
 /// ```
 /// use std::sync::Arc;
+///
 /// use ylong_runtime::sync::waiter::Waiter;
 ///
 /// let waiter = Arc::new(Waiter::new());
 /// let waiter2 = waiter.clone();
 ///
 /// let _ = ylong_runtime::block_on(async {
-///      let handle = ylong_runtime::spawn(async move {
+///     let handle = ylong_runtime::spawn(async move {
 ///         waiter2.wait().await;
-///      });
-///      waiter.wake_one();
-///      let _ = handle.await;
-///  });
+///     });
+///     waiter.wake_one();
+///     let _ = handle.await;
+/// });
 /// ```
 pub struct Waiter {
     sem: SemaphoreInner,
@@ -65,6 +66,7 @@ impl Waiter {
     ///
     /// ```
     /// use std::sync::Arc;
+    ///
     /// use ylong_runtime::sync::waiter::Waiter;
     ///
     /// let waiter = Arc::new(Waiter::new());
@@ -75,7 +77,7 @@ impl Waiter {
     ///     });
     ///     waiter.wake_one();
     ///     let _ = handle.await;
-    ///  });
+    /// });
     /// ```
     pub async fn wait(&self) {
         // The result of `acquire()` will be `Err()` only when the semaphore is closed.
@@ -88,15 +90,16 @@ impl Waiter {
     /// If this method gets called when there is no task waiting on this Waiter,
     /// then the next task called `wait` on it will not get blocked.
     ///
-    /// If this method gets called multiple times, only one task will get passed straightly
-    /// when calling `wait`. Any other task still has to asynchronously wait for it to be
-    /// released.
+    /// If this method gets called multiple times, only one task will get passed
+    /// straightly when calling `wait`. Any other task still has to
+    /// asynchronously wait for it to be released.
     ///
     ///
     /// # Examples
     ///
     /// ```
     /// use std::sync::Arc;
+    ///
     /// use ylong_runtime::sync::waiter::Waiter;
     ///
     /// let waiter = Arc::new(Waiter::new());
@@ -107,7 +110,7 @@ impl Waiter {
     ///     });
     ///     waiter.wake_one();
     ///     let _ = handle.await;
-    ///  });
+    /// });
     /// ```
     pub fn wake_one(&self) {
         self.sem.release_notify();
@@ -115,8 +118,9 @@ impl Waiter {
 
     /// Notifies all tasks waiting on it.
     ///
-    /// Unlike `wake_one`, if this method gets called when there is no task waiting on this wake,
-    /// then the next task called `wait` on it will `still` get blocked.
+    /// Unlike `wake_one`, if this method gets called when there is no task
+    /// waiting on this wake, then the next task called `wait` on it will
+    /// `still` get blocked.
     ///
     /// # Examples
     ///

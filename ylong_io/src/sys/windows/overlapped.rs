@@ -11,9 +11,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::Event;
 use std::fmt;
+
 use windows_sys::Win32::System::IO::OVERLAPPED_ENTRY;
+
+use crate::Event;
 
 #[repr(C)]
 pub(crate) struct Overlapped {

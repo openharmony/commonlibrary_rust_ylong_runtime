@@ -17,8 +17,8 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-/// A future object that wraps a [`Fn`]. Awaits on this function will executed this
-/// underlying function.
+/// A future object that wraps a [`Fn`]. Awaits on this function will executed
+/// this underlying function.
 pub struct PollFn<F> {
     f: F,
 }
