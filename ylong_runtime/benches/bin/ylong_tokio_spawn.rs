@@ -11,7 +11,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Benchmarks for task memory usage, computed by difference between virtual rss printed.
+//! Benchmarks for task memory usage, computed by difference between virtual rss
+//! printed.
 use std::thread::{sleep, spawn};
 use std::time::Duration;
 

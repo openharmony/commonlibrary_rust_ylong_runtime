@@ -12,6 +12,7 @@
 // limitations under the License.
 
 use core::ops;
+
 use ylong_io::Interest;
 
 const READABLE: usize = 0b0_01;
@@ -212,19 +213,17 @@ crate::macros::cfg_ffrt! {
     }
 }
 
-/*
-* @title  ready from_event function ut test
-* @design conditions of use override
-* @precon none
-* @brief  1. Create an event
-*         2. Call from_event
-*         3. Verify the returned results
-* @expect 1. Event readable to get readable Ready instances
-*         2. Event writable, call writable Ready instances
-*         3. Event Read Close, Call Read Close Ready Instance
-*         4. Event Write Close, Call Write Close Ready Instance
-* @auto  Yes
-*/
+// @title  ready from_event function ut test
+// @design conditions of use override
+// @precon none
+// @brief  1. Create an event
+//         2. Call from_event
+//         3. Verify the returned results
+// @expect 1. Event readable to get readable Ready instances
+//         2. Event writable, call writable Ready instances
+//         3. Event Read Close, Call Read Close Ready Instance
+//         4. Event Write Close, Call Write Close Ready Instance
+// @auto  Yes
 #[test]
 #[cfg(feature = "tcp")]
 fn ut_ready_from_event() {
@@ -278,32 +277,23 @@ fn ut_ready_from_event() {
     }
 }
 
-/*
-* @title  ready from_usize function ut test
-* @design Use path override
-* @precon None
-* @brief  1. Enter a usize, call from_usize
-*         2. Verify the returned results
-* @expect 1. Generate a Ready that is passed into usize
-* @auto  Yes
-*/
+/// UT test cases for ready from_usize function
+///
+/// # Brief  
+/// 1. Enter a usize, call from_usize
+/// 2. Verify the returned results
 #[test]
 fn ut_ready_from_usize() {
     let ready = Ready::from_usize(0x01);
     assert_eq!(ready.0, 0x01);
 }
 
-/*
-* @title  ready is_empty function ut test
-* @design Use path override
-* @precon None
-* @brief  1. Create a Ready
-*         2. Call is_empty
-*         3. Verify the returned results
-* @expect 1. Empty Ready instances, return true
-*         2. Non-empty Ready instances, return false
-* @auto  Yes
-*/
+/// UT test cases for ready is_empty function
+///
+/// # Brief
+/// 1. Create a Ready
+/// 2. Call is_empty
+/// 3. Verify the returned results
 #[test]
 fn ut_ready_is_empty() {
     let ready = Ready::from_usize(0x00);
@@ -313,17 +303,12 @@ fn ut_ready_is_empty() {
     assert!(!ready.is_empty());
 }
 
-/*
-* @title  ready is_readable function ut test
-* @design Use path override
-* @precon None
-* @brief  1. Create a Ready
-*         2. Call is_readable
-*         3. Verify the returned results
-* @expect 1. Readable Ready instances that return true
-*         2. Non-readable Ready instance that returns false
-* @auto  Yes
-*/
+/// UT test cases for ready is_readable function
+///
+/// # Brief  
+/// 1. Create a Ready
+/// 2. Call is_readable
+/// 3. Verify the returned results
 #[test]
 fn ut_ready_is_readable() {
     let ready = Ready::from_usize(0x01);
@@ -333,17 +318,12 @@ fn ut_ready_is_readable() {
     assert!(!ready.is_readable());
 }
 
-/*
-* @title  ready is_writable function ut test
-* @design Use path override
-* @precon None
-* @brief  1. Create a Ready
-*         2. Call is_writable
-*         3. Verify the returned results
-* @expect 1. Writable Ready instances that return true
-*         2. Non-writable Ready instance that returns false
-* @auto  Yes
-*/
+/// UT test cases for ready is_writable function
+///
+/// # Brief  
+/// 1. Create a Ready
+/// 2. Call is_writable
+/// 3. Verify the returned results
 #[test]
 fn ut_ready_is_writable() {
     let ready = Ready::from_usize(0x02);
@@ -353,17 +333,12 @@ fn ut_ready_is_writable() {
     assert!(!ready.is_writable());
 }
 
-/*
-* @title  ready is_read_closed function ut test
-* @design Use path override
-* @precon None
-* @brief  1. Create a Ready
-*         2. Call is_read_closed
-*         3. Verify the returned results
-* @expect 1. Read the closed Ready instance and return true
-*         2. Ready instances that are not read off, return false
-* @auto  Yes
-*/
+/// UT test cases for ready is_read_closed function
+///
+/// # Brief  
+/// 1. Create a Ready
+/// 2. Call is_read_closed
+/// 3. Verify the returned results
 #[test]
 fn ut_ready_is_read_closed() {
     let ready = Ready::from_usize(0x04);
@@ -373,17 +348,12 @@ fn ut_ready_is_read_closed() {
     assert!(!ready.is_read_closed());
 }
 
-/*
-* @title  ready is_write_closed function ut test
-* @design Use path override
-* @precon None
-* @brief  1. Create a Ready
-*         2. Call is_write_closed
-*         3. Verify the returned results
-* @expect 1. Write closed Ready instances, return true
-*         2. Ready instances that are not written off return false
-* @auto  Yes
-*/
+/// UT test cases for ready is_write_closed function
+///
+/// # Brief  
+/// 1. Create a Ready
+/// 2. Call is_write_closed
+/// 3. Verify the returned results
 #[test]
 fn ut_ready_is_write_closed() {
     let ready = Ready::from_usize(0x08);
@@ -393,33 +363,24 @@ fn ut_ready_is_write_closed() {
     assert!(!ready.is_write_closed());
 }
 
-/*
-* @title  ready as_usize function ut test
-* @design Use path override
-* @precon None
-* @brief  1. Create a Ready
-*         2. Call as_usize
-*         3. Verify the returned results
-* @expect 1. Get the usize in Ready
-* @auto  Yes
-*/
+/// UT test cases for ready as_usize function
+///
+/// # Brief  
+/// 1. Create a Ready
+/// 2. Call as_usize
+/// 3. Verify the returned results
 #[test]
 fn ut_ready_as_usize() {
     let ready = Ready::from_usize(0x08);
     assert_eq!(ready.as_usize(), 0x08);
 }
 
-/*
-* @title  ready from_interest function ut test
-* @design Use path override
-* @precon None
-* @brief  1. Create a Interest instances
-*         2. Call from_interest
-*         3. Verify the returned results
-* @expect 1. Create a readable Interest instances, get readable + read off Ready instances
-*         2. Create a writable Interest instances, get writable + write off Ready instances
-* @auto  Yes
-*/
+/// UT test cases for ready from_interest function
+///
+/// # Brief  
+/// 1. Create a Interest instances
+/// 2. Call from_interest
+/// 3. Verify the returned results
 #[test]
 fn ut_ready_from_interest() {
     let interest = Interest::READABLE;
@@ -431,16 +392,12 @@ fn ut_ready_from_interest() {
     assert_eq!(ready.as_usize(), 0b1010);
 }
 
-/*
-* @title  ready intersection function ut test
-* @design Use path override
-* @precon None
-* @brief  1. Create a Interest instances and a Ready instances
-*         2. Call intersection
-*         3. Verify the returned results
-* @expect 1. Get Ready instances of an intersection
-* @auto  Yes
-*/
+/// UT test cases for ready intersection function
+///
+/// # Brief  
+/// 1. Create a Interest instances and a Ready instances
+/// 2. Call intersection
+/// 3. Verify the returned results
 #[test]
 fn ut_ready_intersection() {
     let interest = Interest::READABLE;
@@ -449,17 +406,12 @@ fn ut_ready_intersection() {
     assert_eq!(res.0, 0b0101);
 }
 
-/*
-* @title  ready satisfies function ut test
-* @design Use path override
-* @precon None
-* @brief  1. Create a Interest instances, and a Ready instances
-*         2. Call satisfies
-*         3. Verify the returned results
-* @expect 1. Returns true if ready satisfies Interest
-          2. Returns false if ready not satisfies Interest
-* @auto  Yes
-*/
+/// UT test cases for ready satisfies function
+///
+/// # Brief  
+/// 1. Create a Interest instances, and a Ready instances
+/// 2. Call satisfies
+/// 3. Verify the returned results
 #[test]
 fn ut_ready_satisfies() {
     let interest = Interest::READABLE;
@@ -470,16 +422,12 @@ fn ut_ready_satisfies() {
     assert!(!ready.satisfies(interest));
 }
 
-/*
-* @title  ready bitor function ut test
-* @design Use path override
-* @precon None
-* @brief  1. Create two Ready instances
-*         2. Call bitor or use | logical operators
-*         3. Verify the returned results
-* @expect 1. Get an or result of Ready
-* @auto  Yes
-*/
+/// UT test cases for ready bitor function
+///
+/// # Brief
+/// 1. Create two Ready instances
+/// 2. Call bitor or use | logical operators
+/// 3. Verify the returned results
 #[test]
 fn ut_ready_bitor() {
     let ready1 = Ready::from_usize(0b1010);
@@ -488,16 +436,12 @@ fn ut_ready_bitor() {
     assert_eq!(ready3.0, 0b1111);
 }
 
-/*
-* @title  ready bitor_assign function ut test
-* @design Use path override
-* @precon None
-* @brief  1. Create two Ready instances
-*         2. Call bitor_assign or use |= logical operators
-*         3. Verify the returned results
-* @expect 1. Get a Ready of or equal to the result of the operation
-* @auto  Yes
-*/
+/// UT test cases for ready bitor_assign function
+///
+/// # Brief  
+/// 1. Create two Ready instances
+/// 2. Call bitor_assign or use |= logical operators
+/// 3. Verify the returned results
 #[test]
 fn ut_ready_bitor_assign() {
     let mut ready1 = Ready::from_usize(0b1010);
@@ -506,16 +450,12 @@ fn ut_ready_bitor_assign() {
     assert_eq!(ready1.0, 0b1111);
 }
 
-/*
-* @title  ready bitand function ut test
-* @design Use path override
-* @precon None
-* @brief  1. Create two Ready instances
-*         2. Call bitand or use & logical operators
-*         3. Verify the returned results
-* @expect 1. Get a Ready with the result of the operation
-* @auto  Yes
-*/
+/// UT test cases for ready bitand function
+///
+/// # Brief  
+/// 1. Create two Ready instances
+/// 2. Call bitand or use & logical operators
+/// 3. Verify the returned results
 #[test]
 fn ut_ready_bitand() {
     let ready1 = Ready::from_usize(0b1010);
@@ -524,16 +464,12 @@ fn ut_ready_bitand() {
     assert_eq!(ready.0, 0b0000);
 }
 
-/*
-* @title  ready bitsub function ut test
-* @design Use path override
-* @precon None
-* @brief  1. Create two Ready instances
-*         2. Call bitsub or use - logical operators
-*         3. Verify the returned results
-* @expect 1. Get a Ready with the values ready1 & !ready2
-* @auto  Yes
-*/
+/// UT test cases for ready bitsub function
+///
+/// # Brief  
+/// 1. Create two Ready instances
+/// 2. Call bitsub or use - logical operators
+/// 3. Verify the returned results
 #[test]
 fn ut_ready_bitsub() {
     let ready1 = Ready::from_usize(0b1111);
@@ -542,15 +478,11 @@ fn ut_ready_bitsub() {
     assert_eq!(ready.0, 0b1010);
 }
 
-/*
-* @title  ready_event new function ut test
-* @design Use path override
-* @precon None
-* @brief  1. Call new
-*         2. Verify the returned results
-* @expect 1. Get a ready_event instances
-* @auto  Yes
-*/
+/// UT test cases for ready_event new function
+///
+/// # Brief  
+/// 1. Call new
+/// 2. Verify the returned results
 #[test]
 fn ut_ready_event_new() {
     let ready_event = ReadyEvent::new(1u8, Ready::from_usize(0b0101));
@@ -558,32 +490,24 @@ fn ut_ready_event_new() {
     assert_eq!(ready_event.ready.0, 0b0101);
 }
 
-/*
-* @title  ready_event get_tick function ut test
-* @design Use path override
-* @precon None
-* @brief  1. Create a ready_event
-*         2. Call get_tick
-*         3. Verify the returned results
-* @expect 1. Get the tick of ready_event
-* @auto  Yes
-*/
+/// UT test cases for ready_event get_tick function
+///
+/// # Brief  
+/// 1. Create a ready_event
+/// 2. Call get_tick
+/// 3. Verify the returned results
 #[test]
 fn ut_ready_event_get_tick() {
     let ready_event = ReadyEvent::new(1u8, Ready::from_usize(0b0101));
     assert_eq!(ready_event.get_tick(), 1u8);
 }
 
-/*
-* @title  ready_event get_ready function ut test
-* @design Use path override
-* @precon None
-* @brief  1. Create a ready_event
-*         2. Call get_ready
-*         3. Verify the returned results
-* @expect 1. Get the ready of ready_event
-* @auto  Yes
-*/
+/// UT test cases for ready_event get_ready function
+///
+/// # Brief  
+/// 1. Create a ready_event
+/// 2. Call get_ready
+/// 3. Verify the returned results
 #[test]
 fn ut_ready_event_get_ready() {
     let ready_event = ReadyEvent::new(1u8, Ready::from_usize(0b0101));

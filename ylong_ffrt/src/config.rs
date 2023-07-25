@@ -21,7 +21,8 @@ impl Config {
     pub fn new() -> Config {
         unsafe {
             let p = ffrt_config_create();
-            ffrt_config_init(p); // should check return value
+            // should check return value
+            ffrt_config_init(p);
             Config(p)
         }
     }

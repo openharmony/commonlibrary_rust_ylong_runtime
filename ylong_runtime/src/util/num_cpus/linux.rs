@@ -13,8 +13,9 @@
 
 //! num_cpu linux wrapping
 
-use libc::{sysconf, _SC_NPROCESSORS_CONF, _SC_NPROCESSORS_ONLN};
 use std::os::raw::c_long;
+
+use libc::{sysconf, _SC_NPROCESSORS_CONF, _SC_NPROCESSORS_ONLN};
 
 /// Gets the number of CPU cores via linux syscall
 ///
@@ -25,12 +26,13 @@ use std::os::raw::c_long;
 ///
 /// #[cfg(target_os = "linux")]
 /// let cpus = num_cpus::linux::get_cpu_num_online();
-///```
+/// ```
 pub fn get_cpu_num_online() -> c_long {
     unsafe { sysconf(_SC_NPROCESSORS_ONLN) }
 }
 
-/// Gets the number of CPU cores via linux syscall, including disabled cpu states
+/// Gets the number of CPU cores via linux syscall, including disabled cpu
+/// states
 ///
 /// # Example 2
 ///
@@ -39,7 +41,7 @@ pub fn get_cpu_num_online() -> c_long {
 ///
 /// #[cfg(target_os = "linux")]
 /// let cpus = num_cpus::linux::get_cpu_num_configured();
-///```
+/// ```
 pub fn get_cpu_num_configured() -> c_long {
     unsafe { sysconf(_SC_NPROCESSORS_CONF) }
 }

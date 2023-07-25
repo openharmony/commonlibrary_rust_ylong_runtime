@@ -30,7 +30,8 @@
 //!
 //! When a piece of data in `slab` is no longer in use and is freed,
 //! the space where the current data store is located should be reused,
-//! and this operation will be used in conjunction with the allocation operation.
+//! and this operation will be used in conjunction with the allocation
+//! operation.
 //!
 //! ### Allocate
 //!
@@ -63,18 +64,20 @@ const NUM_PAGES: usize = 19;
 const PAGE_INITIAL_SIZE: usize = 32;
 const PAGE_INDEX_SHIFT: u32 = PAGE_INITIAL_SIZE.trailing_zeros() + 1;
 
-/// trait bounds mechanism, so that the binder must implement the `Entry` and `Default` trait methods
+/// trait bounds mechanism, so that the binder must implement the `Entry` and
+/// `Default` trait methods
 pub trait Entry: Default {
     /// Resets the entry.
     fn reset(&self);
 }
-// #################################################################################################
+
 /// Reference to data stored in `slab`
 pub struct Ref<T> {
     value: *const Value<T>,
 }
 
-/// Release operation of data stored in `slab` for reuse in the next allocated space
+/// Release operation of data stored in `slab` for reuse in the next allocated
+/// space
 impl<T> Drop for Ref<T> {
     fn drop(&mut self) {
         unsafe {
@@ -94,7 +97,6 @@ impl<T> Deref for Ref<T> {
 
 unsafe impl<T: Sync> Sync for Ref<T> {}
 unsafe impl<T: Sync> Send for Ref<T> {}
-// #################################################################################################
 
 /// The Address of the stored data.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -122,11 +124,11 @@ impl Address {
         Address(src)
     }
 }
-// #################################################################################################
 
 /// Amortized allocation for homogeneous data types.
 pub struct Slab<T> {
-    /// Essentially a two-dimensional array, the constituent units in the container
+    /// Essentially a two-dimensional array, the constituent units in the
+    /// container
     pages: [Arc<Page<T>>; NUM_PAGES],
 }
 
@@ -143,9 +145,11 @@ impl<T: Entry> Slab<T> {
             pages: Default::default(),
         };
 
-        // The minimum number of `slots` that can fit in a `page` at initialization, where the default value is 32
+        // The minimum number of `slots` that can fit in a `page` at initialization,
+        // where the default value is 32
         let mut len = PAGE_INITIAL_SIZE;
-        // The sum of the lengths of all `pages` before this `page`, i.e. the sum of `len`
+        // The sum of the lengths of all `pages` before this `page`, i.e. the sum of
+        // `len`
         let mut prev_len: usize = 0;
 
         for page in &mut slab.pages {
@@ -170,8 +174,11 @@ impl<T: Entry> Slab<T> {
     /// Space allocation for containers
     ///
     /// # Safety
-    /// 1. The essence of space allocation to the container is actually to allocate each page of the container for the operation
-    /// 2. Before allocating each page of the container, we will try to get lock permission to prevent multiple threads from having permission to modify the state
+    /// 1. The essence of space allocation to the container is actually to
+    ///    allocate each page of the container for the operation
+    /// 2. Before allocating each page of the container, we will try to get lock
+    ///    permission to prevent multiple threads from having permission to
+    ///    modify the state
     ///
     /// Using pointers
     pub unsafe fn allocate(&self) -> Option<(Address, Ref<T>)> {
@@ -226,18 +233,28 @@ impl<T: Entry> Slab<T> {
         }
     }
 
-    /// Used to clean up the resources in the `Slab` container after a specific number of loops, which is one of the most important uses of this container
+    /// Used to clean up the resources in the `Slab` container after a specific
+    /// number of loops, which is one of the most important uses of this
+    /// container
     ///
     /// # Safety
-    /// Releasing resources here does not release resources that are being used or have not yet been allocated
-    /// 1. The release of each page will initially determine if the resources on the current page are being used or if the current page has not been allocated
-    /// 2. Next, it will determine whether the `slots` of the current page are owned by other threads to prevent its resources from changing to the used state
-    /// 3. Finally, the checks are performed again, with the same checks as in the first step, to prevent state changes and ensure that no errors or invalid releases are made
+    /// Releasing resources here does not release resources that are being used
+    /// or have not yet been allocated
+    /// 1. The release of each page will initially determine if the resources on
+    ///    the current page are being used or if the current page has not been
+    ///    allocated
+    /// 2. Next, it will determine whether the `slots` of the current page are
+    ///    owned by other threads to prevent its resources from changing to the
+    ///    used state
+    /// 3. Finally, the checks are performed again, with the same checks as in
+    ///    the first step, to prevent state changes and ensure that no errors or
+    ///    invalid releases are made
     ///
     /// Using atomic variables
     pub unsafe fn compact(&mut self) {
         for (_, page) in (self.pages[1..]).iter().enumerate() {
-            // The `slots` of the current `page` are being used, or the current `page` is not allocated and not cleaned up.
+            // The `slots` of the current `page` are being used, or the current `page` is
+            // not allocated and not cleaned up.
             if page.used.load(Relaxed) != 0 || !page.allocated.load(Relaxed) {
                 continue;
             }
@@ -248,7 +265,8 @@ impl<T: Entry> Slab<T> {
                 _ => continue,
             };
 
-            // Check again, if the `slots` of the current `page` are being used, or if the current `page` is not allocated, do not clean up.
+            // Check again, if the `slots` of the current `page` are being used, or if the
+            // current `page` is not allocated, do not clean up.
             if slots.used > 0 || slots.slots.capacity() == 0 {
                 continue;
             }
@@ -263,7 +281,7 @@ impl<T: Entry> Slab<T> {
         }
     }
 }
-// #################################################################################################
+
 struct Page<T> {
     // Number of `slots` currently being used
     pub used: AtomicUsize,
@@ -271,7 +289,8 @@ struct Page<T> {
     pub allocated: AtomicBool,
     // The number of `slots` that `page` can hold
     pub len: usize,
-    // The sum of the lengths of all `pages` before the `page`, i.e. the sum of the number of `slots`
+    // The sum of the lengths of all `pages` before the `page`, i.e. the sum of the number of
+    // `slots`
     pub prev_len: usize,
     // `Slots`
     pub slots: Mutex<Slots<T>>,
@@ -281,7 +300,8 @@ unsafe impl<T: Sync> Sync for Page<T> {}
 unsafe impl<T: Sync> Send for Page<T> {}
 
 impl<T> Page<T> {
-    // Get the location of the `slot` in the current `page` based on the current `Address`.
+    // Get the location of the `slot` in the current `page` based on the current
+    // `Address`.
     fn slot(&self, addr: Address) -> usize {
         addr.0 - self.prev_len
     }
@@ -364,7 +384,7 @@ impl<T> Default for Page<T> {
         }
     }
 }
-// #################################################################################################
+
 struct Slots<T> {
     pub slots: Vec<Slot<T>>,
     pub head: usize,
@@ -407,7 +427,7 @@ impl<T> Slots<T> {
         // }
     }
 }
-// #################################################################################################
+
 #[derive(Debug)]
 struct Slot<T> {
     pub value: UnsafeCell<Value<T>>,
@@ -423,7 +443,7 @@ impl<T> Slot<T> {
         Ref { value }
     }
 }
-// #################################################################################################
+
 #[derive(Debug)]
 struct Value<T> {
     pub value: T,
@@ -438,11 +458,12 @@ impl<T> Value<T> {
     }
 }
 
-#[cfg(all(test))]
+#[cfg(test)]
 mod test {
-    use crate::util::slab::{Address, Entry, Slab, NUM_PAGES, PAGE_INITIAL_SIZE};
     use std::sync::atomic::AtomicUsize;
     use std::sync::atomic::Ordering::SeqCst;
+
+    use crate::util::slab::{Address, Entry, Slab, NUM_PAGES, PAGE_INITIAL_SIZE};
 
     struct Foo {
         cnt: AtomicUsize,
@@ -464,15 +485,11 @@ mod test {
         }
     }
 
-    /*
-     * @title  Slab::new() ut test
-     * @design The function has no input, no exception branch, direct check function, return value
-     * @precon After calling Slab::new() to initialize the container, get its object
-     * @brief  Describe test case execution
-     *         1、Check the parameters for completion of initialization, such as the number of pages to be checked, the length of each page
-     * @expect 1、The initialization of the completed parameters should be the same as the expected value
-     * @auto   true
-     */
+    /// UT test cases for Slab::new()
+    ///
+    /// # Brief
+    /// 1. Check the parameters for completion of initialization, such as the
+    ///    number of pages to be checked, the length of each page.
     #[test]
     fn ut_slab_new() {
         let slab = Slab::<Foo>::new();
@@ -483,15 +500,11 @@ mod test {
         }
     }
 
-    /*
-     * @title  Slab::for_each() ut test
-     * @design The function has no invalid input, no exception branch, direct check function, return value
-     * @precon After calling Slab::new() to initialize the container, get its object
-     * @brief  Describe test case execution
-     *         1、To deposit data into the container, call this function to verify that the data is correctly deposited
-     * @expect 1、The data is correctly stored and can be matched one by one
-     * @auto   true
-     */
+    /// UT test cases for Slab::for_each()
+    ///
+    /// # Brief
+    /// 1. To deposit data into the container, call this function to verify that
+    ///    the data is correctly deposited stored and can be matched one by one.
     #[test]
     fn ut_slab_for_each() {
         let mut slab = Slab::<Foo>::new();
@@ -518,19 +531,12 @@ mod test {
         });
     }
 
-    /*
-     * @title  Slab::get() ut test
-     * @design The function has no invalid input, there is an exception branch, direct check function, return value
-     *         1、No space has been allocated for the current address
-     *         2、Space is allocated at the current address
-     * @precon After calling Slab::new() to initialize the container, get its object
-     * @brief  Describe test case execution
-     *         1、Allocate container space and deposit data, get the data address, and see if the data can be fetched
-     *         2、Create invalid data address to see if data can be obtained
-     * @expect 1、Valid data addresses can correctly acquire data
-     *         2、Invalid data address does not acquire data correctly
-     * @auto   true
-     */
+    /// UT test cases for Slab::get()
+    ///
+    /// # Brief
+    /// 1. Allocate container space and deposit data, get the data address,and
+    ///    see if the data can be fetched.
+    /// 2. Create invalid data address to see if data can be obtained.
     #[test]
     fn ut_slab_get() {
         let mut slab = Slab::<Foo>::new();
@@ -544,18 +550,13 @@ mod test {
         }
     }
 
-    /*
-     * @title  Slab::compact() ut test
-     * @design The function has no invalid input, there is an exception branch, direct check function, return value
-     *         1、No space has been allocated for the current address
-     *         2、Space is allocated at the current address
-     * @precon After calling Slab::new() to initialize the container, get its object
-     * @brief  Describe test case execution
-     *         1、Pages with allocated space on the first page are not set to unallocated even if they are not used.
-     *         2、Pages other than the first page, once assigned and unused, will be set to unassigned status
-     * @expect Whether it is set to unassigned or not is related to the page assignment status and usage status
-     * @auto   true
-     */
+    /// UT test cases for Slab::compact()
+    ///
+    /// # Brief
+    /// 1. Pages with allocated space on the first page are not set to
+    ///    unallocated even if they are not used.
+    /// 2. Pages other than the first page, once assigned and unused, will be
+    ///    set to unassigned status.
     #[test]
     fn ut_slab_compact() {
         let mut slab = Slab::<Foo>::new();

@@ -13,13 +13,14 @@
 
 //! An asynchronous version of [`std::sync::RwLock`]
 
-use crate::sync::semaphore_inner::SemaphoreInner;
-use crate::sync::LockError;
 use std::cell::UnsafeCell;
 use std::fmt;
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::AtomicI64;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
+
+use crate::sync::semaphore_inner::SemaphoreInner;
+use crate::sync::LockError;
 
 const MAX_READS: i64 = i64::MAX >> 2;
 
@@ -36,7 +37,6 @@ const MAX_READS: i64 = i64::MAX >> 2;
 /// ```
 /// use ylong_runtime::sync::rwlock::RwLock;
 ///
-///
 /// ylong_runtime::block_on(async {
 ///     let lock = RwLock::new(0);
 ///
@@ -51,7 +51,6 @@ const MAX_READS: i64 = i64::MAX >> 2;
 ///     let mut w = lock.write().await;
 ///     *w += 1;
 ///     assert_eq!(*w, 1);
-///
 /// });
 /// ```
 pub struct RwLock<T: ?Sized> {
@@ -92,11 +91,11 @@ impl<T: Sized> RwLock<T> {
 impl<T: ?Sized> RwLock<T> {
     /// Asynchronously acquires the read lock.
     ///
-    /// If there is a writer holding the write lock, then this method will wait asynchronously
-    /// for the write lock to get released.
+    /// If there is a writer holding the write lock, then this method will wait
+    /// asynchronously for the write lock to get released.
     ///
-    /// But if the write lock is not held, it's ok for multiple readers to hold the read lock
-    /// concurrently.
+    /// But if the write lock is not held, it's ok for multiple readers to hold
+    /// the read lock concurrently.
     ///
     ///
     ///
@@ -120,8 +119,9 @@ impl<T: ?Sized> RwLock<T> {
         RwLockReadGuard(self)
     }
 
-    /// Attempts to get the read lock. If another writer is holding the write lock, then
-    /// None will be returned. Otherwise, the ReadMutexGuard will be returned.
+    /// Attempts to get the read lock. If another writer is holding the write
+    /// lock, then None will be returned. Otherwise, the ReadMutexGuard will
+    /// be returned.
     ///
     /// # Examples
     ///
@@ -157,8 +157,8 @@ impl<T: ?Sized> RwLock<T> {
 
     /// Asynchronously acquires the write lock.
     ///
-    /// If there is other readers or writers, then this method will wait asynchronously
-    /// for them to get released.
+    /// If there is other readers or writers, then this method will wait
+    /// asynchronously for them to get released.
     ///
     /// # Examples
     ///
@@ -177,9 +177,9 @@ impl<T: ?Sized> RwLock<T> {
         // `RwLock` will not close, so the result of `acquire()` must be `Ok(())`.
         self.write_mutex.acquire().await.unwrap();
         let read_count = self.read_count.fetch_sub(MAX_READS, Release);
-        // If the `read_count` is not 0, it indicates that there is currently a reader holding
-        // a read lock. If the `read_wait` is 0 after addition, it indicates that all readers have
-        // been dropped.
+        // If the `read_count` is not 0, it indicates that there is currently a reader
+        // holding a read lock. If the `read_wait` is 0 after addition, it
+        // indicates that all readers have been dropped.
         if read_count >= 0 && self.read_wait.fetch_add(read_count, Release) != -read_count {
             self.write_sem.acquire().await.unwrap();
         }
@@ -235,9 +235,9 @@ impl<T: ?Sized> RwLock<T> {
 
     /// Gets the mutable reference of the data protected by the lock.
     ///
-    /// This method takes the mutable reference of the RwLock, so there is no need to actually
-    /// lock the RwLock -- the mutable borrow statically guarantees no locks exist.
-    /// ```
+    /// This method takes the mutable reference of the RwLock, so there is no
+    /// need to actually lock the RwLock -- the mutable borrow statically
+    /// guarantees no locks exist. ```
     /// use ylong_runtime::sync::rwlock::RwLock;
     ///
     /// ylong_runtime::block_on(async {
@@ -257,7 +257,8 @@ pub struct RwLockReadGuard<'a, T: ?Sized>(&'a RwLock<T>);
 unsafe impl<T: ?Sized + Send> Send for RwLockReadGuard<'_, T> {}
 unsafe impl<T: ?Sized + Sync> Sync for RwLockReadGuard<'_, T> {}
 
-/// Releases the read lock. Wakes any waiting writer if it's the last one holding the read lock.
+/// Releases the read lock. Wakes any waiting writer if it's the last one
+/// holding the read lock.
 impl<T: ?Sized> RwLockReadGuard<'_, T> {
     fn unlock(&mut self) {
         if self.0.read_count.fetch_sub(1, Release) < 0
@@ -301,7 +302,8 @@ pub struct RwLockWriteGuard<'a, T: ?Sized>(&'a RwLock<T>);
 unsafe impl<T: ?Sized + Send> Send for RwLockWriteGuard<'_, T> {}
 unsafe impl<T: ?Sized + Sync> Sync for RwLockWriteGuard<'_, T> {}
 
-/// Wakes all waiting readers first and releases the write lock when WriteGuard is dropped.
+/// Wakes all waiting readers first and releases the write lock when WriteGuard
+/// is dropped.
 impl<T: ?Sized> Drop for RwLockWriteGuard<'_, T> {
     fn drop(&mut self) {
         let read_count = self.0.read_count.fetch_add(MAX_READS, Release) + MAX_READS;
@@ -337,20 +339,17 @@ impl<T: ?Sized> DerefMut for RwLockWriteGuard<'_, T> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::{block_on, spawn};
     use std::sync::Arc;
 
-    /*
-     * @title  Rwlock::new() ut test
-     * @design The design of this use case is carried out by the conditional coverage test method.
-     * @precon Create a test structure with two members: flag, num
-     * @brief  Test case execution steps：
-     *         1. Create a concurrent read/write lock with structure and value as input parameters
-     *         2. Verify the contents of the read/write lock
-     * @expect The flag inside the Test structure in lock is true, num is 1, and the value in lock2 is 0
-     * @auto  Yes
-     */
+    use super::*;
+    use crate::{block_on, spawn};
+
+    /// UT test cases for Rwlock::new()
+    ///
+    /// # Brief  
+    /// 1. Create a concurrent read/write lock with structure and value as input
+    ///    parameters
+    /// 2. Verify the contents of the read/write lock
     #[test]
     fn ut_rwlock_new_01() {
         pub struct Test {
@@ -366,17 +365,12 @@ mod tests {
         });
     }
 
-    /*
-     * @title  Rwlock::read() ut test
-     * @design The design of this use case is carried out by the conditional coverage test method.
-     * @precon None
-     * @brief  Test case execution steps：
-     *         1. Creating a concurrent read/write lock
-     *         2. Calling the read() function
-     *         3. Verify the value of the read() function dereference
-     * @expect The value in lock is 100
-     * @auto  Yes
-     */
+    /// UT test cases for Rwlock::read()
+    ///
+    /// # Brief  
+    /// 1. Creating a concurrent read/write lock
+    /// 2. Calling the read() function
+    /// 3. Verify the value of the read() function dereference
     #[test]
     fn ut_rwlock_read_01() {
         block_on(async {
@@ -386,17 +380,14 @@ mod tests {
         });
     }
 
-    /*
-     * @title  Rwlock::read() ut test
-     * @design The design of this use case is carried out by the conditional coverage test method.
-     * @precon None
-     * @brief  Test case execution steps：
-     *         1. Creating a concurrent read/write lock
-     *         2. Call the write() function to make changes to the concurrent read/write lock data
-     *         3. Call the read() function to verify the value in the read/write lock of the concurrent process
-     * @expect The modified value in lock is 101
-     * @auto  Yes
-     */
+    /// UT test cases for Rwlock::read()
+    ///
+    /// # Brief
+    /// 1. Creating a concurrent read/write lock
+    /// 2. Call the write() function to make changes to the concurrent
+    ///    read/write lock data
+    /// 3. Call the read() function to verify the value in the read/write lock
+    ///    of the concurrent process
     #[test]
     fn ut_rwlock_read_02() {
         let lock = Arc::new(RwLock::new(100));
@@ -413,17 +404,12 @@ mod tests {
         });
     }
 
-    /*
-     * @title  Rwlock::try_read() ut test
-     * @design The design of this use case is carried out by the conditional coverage test method.
-     * @precon None
-     * @brief  Test case execution steps：
-     *         1. Creating a concurrent read/write lock
-     *         2. Call try_read()
-     *         3. Verify the value of the return value dereference
-     * @expect res resolves the reference value to 100
-     * @auto  Yes
-     */
+    /// UT test cases for Rwlock::try_read()
+    ///
+    /// # Brief  
+    /// 1. Creating a concurrent read/write lock
+    /// 2. Call try_read()
+    /// 3. Verify the value of the return value dereference
     #[test]
     fn ut_rwlock_try_read_01() {
         let lock = RwLock::new(100);
@@ -431,18 +417,14 @@ mod tests {
         assert_eq!(*res, 100);
     }
 
-    /*
-     * @title  Rwlock::try_read() ut test
-     * @design The design of this use case is carried out by the conditional coverage test method.
-     * @precon None
-     * @brief  Test case execution steps：
-     *         1. Creating a concurrent read/write lock
-     *         2. Create a thread to call the write method to hold the lock, and then sleep to hold the lock for a long time
-     *         3. Call try_read() to try to get a lock
-     *         4. Check the try_read return value
-     * @expect res is None
-     * @auto  Yes
-     */
+    /// UT test cases for Rwlock::try_read()
+    ///
+    /// # Brief  
+    /// 1. Creating a concurrent read/write lock
+    /// 2. Create a thread to call the write method to hold the lock, and then
+    ///    sleep to hold the lock for a long time
+    /// 3. Call try_read() to try to get a lock
+    /// 4. Check the try_read return value
     #[test]
     fn ut_rwlock_try_read_02() {
         let lock = Arc::new(RwLock::new(100));
@@ -456,17 +438,13 @@ mod tests {
         assert!(res2.is_ok());
     }
 
-    /*
-     * @title  Rwlock::write() ut test
-     * @design The design of this use case is carried out by the conditional coverage test method.
-     * @precon None
-     * @brief  Test case execution steps：
-     *         1. Creating a concurrent read/write lock
-     *         2. Create a call to the write interface to modify the value inside the concurrent read/write lock
-     *         3. Verify the value of the concurrent read/write lock
-     * @expect The unreferenced value of a is 200
-     * @auto  Yes
-     */
+    /// UT test cases for Rwlock::write()
+    ///
+    /// # Brief  
+    /// 1. Creating a concurrent read/write lock
+    /// 2. Create a call to the write interface to modify the value inside the
+    ///    concurrent read/write lock
+    /// 3. Verify the value of the concurrent read/write lock
     #[test]
     fn ut_rwlock_write_01() {
         let lock = Arc::new(RwLock::new(100));
@@ -477,18 +455,17 @@ mod tests {
         });
     }
 
-    /*
-     * @title  Rwlock::write() ut test
-     * @design The design of this use case is carried out by the conditional coverage test method.
-     * @precon None
-     * @brief  Test case execution steps：
-     *         1. Creating a concurrent read/write lock
-     *         2. First create a thread to obtain a write lock, modify the data in the concurrent read/write lock, and then hibernate to ensure that the lock is held for a long time
-     *         3. Create two co-processes one to get a read lock and one to get a write lock, so that there is both a reader and a writer requesting the lock
-     *         4. Verify the value inside the concurrent read/write lock when the concurrent read/write lock is obtained
-     * @expect aa's dereference is 300
-     * @auto  Yes
-     */
+    /// UT test cases for Rwlock::write()
+    ///
+    /// # Brief
+    /// 1. Creating a concurrent read/write lock
+    /// 2. First create a thread to obtain a write lock, modify the data in the
+    ///    concurrent read/write lock, and then hibernate to ensure that the
+    ///    lock is held for a long time
+    /// 3. Create two co-processes one to get a read lock and one to get a write
+    ///    lock, so that there is both a reader and a writer requesting the lock
+    /// 4. Verify the value inside the concurrent read/write lock when the
+    ///    concurrent read/write lock is obtained
     #[test]
     fn ut_rwlock_write_test_02() {
         let lock = Arc::new(RwLock::new(100));
@@ -513,17 +490,13 @@ mod tests {
         block_on(handle2).unwrap();
     }
 
-    /*
-     * @title  Rwlock::try_write() ut test
-     * @design The design of this use case is carried out by the conditional coverage test method.
-     * @precon None
-     * @brief  Test case execution steps：
-     *         1. Creating a concurrent read/write lock
-     *         2. Call try_write() to try to get a write lock and modify the value in it
-     *         3. Verify the value in the read/write lock of the concurrent process
-     * @expect The dereference of aa is 200
-     * @auto  Yes
-     */
+    /// UT test cases for Rwlock::try_write()
+    ///
+    /// # Brief
+    /// 1. Creating a concurrent read/write lock
+    /// 2. Call try_write() to try to get a write lock and modify the value in
+    ///    it
+    /// 3. Verify the value in the read/write lock of the concurrent process
     #[test]
     fn ut_rwlock_try_write_01() {
         let lock = RwLock::new(100);
@@ -532,16 +505,11 @@ mod tests {
         assert_eq!(*aa, 200);
     }
 
-    /*
-     * @title  Rwlock::try_write() ut test
-     * @design The design of this use case is carried out by the conditional coverage test method.
-     * @precon None
-     * @brief  Test case execution steps：
-     *         1. Creating a concurrent read/write lock
-     *         2. Execute command cargo test ut_rwlock_try_write_02
-     * @expect res is None
-     * @auto  Yes
-     */
+    /// UT test cases for Rwlock::try_write()
+    ///
+    /// # Brief
+    /// 1. Creating a concurrent read/write lock
+    /// 2. Execute command cargo test ut_rwlock_try_write_02
     #[test]
     fn ut_rwlock_try_write_02() {
         let lock = Arc::new(RwLock::new(100));
@@ -555,16 +523,12 @@ mod tests {
         assert!(res2.is_ok());
     }
 
-    /*
-     * @title  Rwlock::into_inner() ut test
-     * @design The design of this use case is carried out by the conditional coverage test method.
-     * @precon None
-     * @brief  Describe the test case execution, an example of which is as follows:
-     *         1. Add a temporary library path to the project directory export LD_LIBRARY_PATH=$(pwd)/platform
-     *         2. Execute command cargo test ut_rwlock_into_inner_01
-     * @expect The value after the lock call function is 10
-     * @auto  Yes
-     */
+    /// UT test cases for Rwlock::into_inner()
+    ///
+    /// # Brief
+    /// 1. Add a temporary library path to the project directory export
+    ///    LD_LIBRARY_PATH=$(pwd)/platform
+    /// 2. Execute command cargo test ut_rwlock_into_inner_01
     #[test]
     fn ut_rwlock_into_inner_01() {
         let lock = RwLock::new(10);

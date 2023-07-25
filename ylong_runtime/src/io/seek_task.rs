@@ -11,11 +11,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::io::AsyncSeek;
 use std::future::Future;
 use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+
+use crate::io::AsyncSeek;
 
 /// A future for seeking the io.
 ///

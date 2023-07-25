@@ -11,11 +11,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::time::Duration;
+
 use crate::builder::CallbackHook;
 #[cfg(not(feature = "ffrt"))]
 use crate::builder::ScheduleAlgo;
 use crate::executor::blocking_pool::BLOCKING_MAX_THEAD_NUM;
-use std::time::Duration;
 
 const BLOCKING_PERMANENT_THREAD_NUM: u8 = 0;
 
@@ -71,10 +72,11 @@ impl CommonBuilder {
 macro_rules! impl_common {
     ($self:ident) => {
         #[cfg(not(feature = "ffrt"))]
-        use crate::builder::ScheduleAlgo;
-        #[cfg(not(feature = "ffrt"))]
         use std::sync::Arc;
         use std::time::Duration;
+
+        #[cfg(not(feature = "ffrt"))]
+        use crate::builder::ScheduleAlgo;
 
         impl $self {
             /// Sets the name prefix for all worker threads.
@@ -104,8 +106,8 @@ macro_rules! impl_common {
                 self
             }
 
-            /// Sets the number of threads that the runtime could spawn additionally besides the core
-            /// thread pool.
+            /// Sets the number of threads that the runtime could spawn additionally
+            /// besides the core thread pool.
             ///
             /// The boundary is 1-64.
             pub fn max_blocking_pool_size(mut self, max_blocking_pool_size: u8) -> Self {
@@ -126,8 +128,8 @@ macro_rules! impl_common {
                 self
             }
 
-            /// Sets the stack size for every worker thread that gets spawned by the runtime.
-            /// The minimum stack size is 1.
+            /// Sets the stack size for every worker thread that gets spawned by the
+            /// runtime. The minimum stack size is 1.
             pub fn worker_stack_size(mut self, stack_size: usize) -> Self {
                 if stack_size < 1 {
                     self.common.stack_size = Some(1);
@@ -137,8 +139,8 @@ macro_rules! impl_common {
                 self
             }
 
-            /// Sets how long will the thread be kept alive inside the blocking pool after
-            /// it becomes idle.
+            /// Sets how long will the thread be kept alive inside the blocking pool
+            /// after it becomes idle.
             pub fn keep_alive_time(mut self, keep_alive_time: Duration) -> Self {
                 self.common.keep_alive_time = Some(keep_alive_time);
                 self

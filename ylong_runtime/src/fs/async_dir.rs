@@ -11,10 +11,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::fs::{async_op, poll_ready};
-use crate::futures::poll_fn;
-use crate::spawn::spawn_blocking;
-use crate::{JoinHandle, TaskBuilder};
 use std::collections::VecDeque;
 use std::ffi::OsString;
 use std::fs::{FileType, Metadata};
@@ -27,6 +23,11 @@ use std::sync::Arc;
 use std::task::Poll::Ready;
 use std::task::{Context, Poll};
 
+use crate::fs::{async_op, poll_ready};
+use crate::futures::poll_fn;
+use crate::spawn::spawn_blocking;
+use crate::{JoinHandle, TaskBuilder};
+
 const BLOCK_SIZE: usize = 32;
 
 /// Creates a new directory at the given path.
@@ -35,18 +36,20 @@ const BLOCK_SIZE: usize = 32;
 ///
 /// # Errors
 ///
-/// In the following situations, the function will return an error, but is not limited
-/// to just these cases:
+/// In the following situations, the function will return an error, but is not
+/// limited to just these cases:
 ///
 /// * The path has already been used.
 /// * No permission to create directory at the given path.
-/// * A parent directory in the path does not exist. In this case, use [`create_dir_all`] to create
-///   the missing parent directory and the target directory at the same time.
+/// * A parent directory in the path does not exist. In this case, use
+///   [`create_dir_all`] to create the missing parent directory and the target
+///   directory at the same time.
 ///
 /// # Examples
 ///
 /// ```no_run
 /// use std::io;
+///
 /// use ylong_runtime::fs;
 /// async fn fs_func() -> io::Result<()> {
 ///     fs::create_dir("/parent/dir").await?;
@@ -64,8 +67,8 @@ pub async fn create_dir<P: AsRef<Path>>(path: P) -> io::Result<()> {
 ///
 /// # Errors
 ///
-/// In the following situations, the function will return an error, but is not limited
-/// to just these cases:
+/// In the following situations, the function will return an error, but is not
+/// limited to just these cases:
 ///
 /// * The path has already been used.
 /// * No permission to create directory at the given path.
@@ -75,6 +78,7 @@ pub async fn create_dir<P: AsRef<Path>>(path: P) -> io::Result<()> {
 ///
 /// ```no_run
 /// use std::io;
+///
 /// use ylong_runtime::fs;
 /// async fn fs_func() -> io::Result<()> {
 ///     fs::create_dir_all("/parent/dir").await?;
@@ -92,8 +96,8 @@ pub async fn create_dir_all<P: AsRef<Path>>(path: P) -> io::Result<()> {
 ///
 /// # Errors
 ///
-/// In the following situations, the function will return an error, but is not limited
-/// to just these cases:
+/// In the following situations, the function will return an error, but is not
+/// limited to just these cases:
 ///
 /// * The directory does not exist.
 /// * The given path is not a directory.
@@ -104,6 +108,7 @@ pub async fn create_dir_all<P: AsRef<Path>>(path: P) -> io::Result<()> {
 ///
 /// ```no_run
 /// use std::io;
+///
 /// use ylong_runtime::fs;
 /// async fn fs_func() -> io::Result<()> {
 ///     fs::remove_dir("/parent/dir").await?;
@@ -129,6 +134,7 @@ pub async fn remove_dir<P: AsRef<Path>>(path: P) -> io::Result<()> {
 ///
 /// ```no_run
 /// use std::io;
+///
 /// use ylong_runtime::fs;
 /// async fn fs_func() -> io::Result<()> {
 ///     fs::remove_dir_all("/parent/dir").await?;
@@ -154,6 +160,7 @@ pub async fn remove_dir_all<P: AsRef<Path>>(path: P) -> io::Result<()> {
 ///
 /// ```no_run
 /// use std::io;
+///
 /// use ylong_runtime::fs;
 /// async fn fs_func() -> io::Result<()> {
 ///     let mut dir = fs::read_dir("/parent/dir").await?;
@@ -254,6 +261,7 @@ impl ReadDir {
     ///
     /// ```no_run
     /// use std::io;
+    ///
     /// use ylong_runtime::fs;
     /// async fn fs_func() -> io::Result<()> {
     ///     let mut dir = fs::read_dir("/parent/dir").await?;
@@ -280,12 +288,13 @@ impl DirEntry {
     ///
     /// ```no_run
     /// use std::io;
+    ///
     /// use ylong_runtime::fs;
     ///
     /// async fn fs_func() -> io::Result<()> {
     ///     let mut dir = fs::read_dir("/parent/dir").await?;
     ///     while let Some(entry) = dir.next().await? {
-    ///          println!("{:?}", entry.path());
+    ///         println!("{:?}", entry.path());
     ///     }
     ///     Ok(())
     /// }
@@ -307,12 +316,13 @@ impl DirEntry {
     ///
     /// ```no_run
     /// use std::io;
+    ///
     /// use ylong_runtime::fs;
     ///
-    /// async fn fs_func() -> io::Result<()>{
+    /// async fn fs_func() -> io::Result<()> {
     ///     let mut dir = fs::read_dir("/parent/dir").await?;
     ///     while let Some(entry) = dir.next().await? {
-    ///          println!("{:?}", entry.file_name());
+    ///         println!("{:?}", entry.file_name());
     ///     }
     ///     Ok(())
     /// }
@@ -330,14 +340,15 @@ impl DirEntry {
     ///
     /// ```no_run
     /// use std::io;
+    ///
     /// use ylong_runtime::fs;
     ///
     /// async fn fs_func() -> io::Result<()> {
     ///     let mut dir = fs::read_dir("/parent/dir").await?;
     ///     while let Some(entry) = dir.next().await? {
-    ///          if let Ok(metadata) = entry.metadata().await {
+    ///         if let Ok(metadata) = entry.metadata().await {
     ///             println!("{:?}", metadata.permissions());
-    ///          }
+    ///         }
     ///     }
     ///     Ok(())
     /// }
@@ -356,14 +367,15 @@ impl DirEntry {
     ///
     /// ```no_run
     /// use std::io;
+    ///
     /// use ylong_runtime::fs;
     ///
     /// async fn fs_func() -> io::Result<()> {
     ///     let mut dir = fs::read_dir("/parent/dir").await?;
     ///     while let Some(entry) = dir.next().await? {
-    ///          if let Ok(file_type) = entry.file_type().await {
+    ///         if let Ok(file_type) = entry.file_type().await {
     ///             println!("{:?}", file_type);
-    ///          }
+    ///         }
     ///     }
     ///     Ok(())
     /// }

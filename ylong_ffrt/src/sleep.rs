@@ -11,9 +11,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use libc::timespec;
 use std::ffi::{c_int, c_long};
 use std::time::Duration;
+
+use libc::timespec;
 
 /// Yields the current task.
 pub fn task_yield() {

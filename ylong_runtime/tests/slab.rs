@@ -15,6 +15,7 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::{Arc, Mutex};
 use std::thread;
+
 use ylong_runtime::util::slab::{Entry, Slab};
 
 struct TestEntry {
@@ -37,18 +38,13 @@ impl Entry for TestEntry {
     }
 }
 
-/*
- * @title  Slab SDV test
- * @design The entire Slab as a container, the use of scenarios are mainly add, delete, change and check
- * @precon After calling Slab::new() to initialize the container, get its object
- * @brief  Describe test case execution
- *         1、Inserting large amounts of data into a container
- *         2、Make changes to these inserted data
- *         3、Modified data by address verification
- *         4、Multiplexing mechanism after calibration is released
- * @expect Data validation successful
- * @auto   true
-// */
+/// SDV test cases for Slab
+///
+/// # Brief
+/// 1. Inserting large amounts of data into a container.
+/// 2. Make changes to these inserted data.
+/// 3. Modified data by address verification.
+/// 4. Multiplexing mechanism after calibration is released.
 #[test]
 fn sdv_slab_insert_move() {
     let mut slab = Slab::<TestEntry>::new();
@@ -76,7 +72,8 @@ fn sdv_slab_insert_move() {
 
         assert_eq!(1, slab.get(addr1).unwrap().id.load(SeqCst));
 
-        // Allocate again, but then the allocated `slot` should use the previously destructured `slot`
+        // Allocate again, but then the allocated `slot` should use the previously
+        // destructured `slot`
         let (addr3, test_entry3) = alloc.allocate().unwrap();
         // Comparison, equal is successful
         assert_eq!(addr3, addr1);
@@ -95,20 +92,16 @@ fn sdv_slab_insert_move() {
     }
 }
 
-/*
- * @title  Slab SDV test
- * @design The entire Slab as a container, the use of scenarios are mainly add, delete, change and check
- * @precon After calling Slab::new() to initialize the container, get its object
- * @brief  Describe test case execution
- *         1、Inserting large amounts of data into a container
- *         2、Verify by address that the data is in the correct location
- * @expect Data validation successful
- * @auto   true
- */
+/// SDV test cases for Slab
+///
+/// # Brief
+/// 1. Inserting large amounts of data into a container
+/// 2. Verify by address that the data is in the correct location
 #[test]
 fn sdv_slab_insert_many() {
     unsafe {
-        // Verify that `page` is being allocated properly in the case of a large number of inserts.
+        // Verify that `page` is being allocated properly in the case of a large number
+        // of inserts.
         let mut slab = Slab::<TestEntry>::new();
         let alloc = slab.handle();
         let mut entries = vec![];
@@ -139,16 +132,11 @@ fn sdv_slab_insert_many() {
     }
 }
 
-/*
- * @title  Slab SDV test
- * @design The entire Slab as a container, the use of scenarios are mainly add, delete, change and check
- * @precon After calling Slab::new() to initialize the container, get its object
- * @brief  Describe test case execution
- *         1、Inserting large amounts of data into a container
- *         2、Verify by address that the data is in the correct location
- * @expect Data validation successful
- * @auto   true
- */
+/// SDV test cases for Slab
+///
+/// # Brief
+/// 1. Inserting large amounts of data into a container
+/// 2. Verify by address that the data is in the correct location
 #[test]
 fn sdv_slab_insert_drop_reverse() {
     unsafe {
@@ -175,15 +163,11 @@ fn sdv_slab_insert_drop_reverse() {
     }
 }
 
-/*
- * @title  Slab SDV test
- * @design The entire Slab as a container, the use of scenarios are mainly add, delete, change and check
- * @precon After calling Slab::new() to initialize the container, get its object
- * @brief  Describe test case execution
- *         1、Multi-threaded allocation of container space, inserting data into it, and verifying that the function is correct
- * @expect Data validation successful
- * @auto   true
- */
+/// SDV test cases for Slab
+///
+/// # Brief
+/// 1. Multi-threaded allocation of container space, inserting data into it, and
+///    verifying that the function is correct
 #[test]
 fn sdv_slab_multi_allocate() {
     // Multi-threaded either allocating space, or modifying values.
@@ -241,21 +225,19 @@ fn sdv_slab_multi_allocate() {
     }
 }
 
-/*
- * @title  Slab SDV test
- * @design The entire Slab as a container, the use of scenarios are mainly add, delete, change and check
- * @precon After calling Slab::new() to initialize the container, get its object
- * @brief  Describe test case execution
- *         1、Multi-threaded allocation of container space, inserting data into it, and verifying that the function is correct
- *         2、Free up some of the data space and check if the data is reused in the multi-threaded case
- * @expect Data validation successful
- * @auto   true
- */
+/// SDV test cases for Slab
+///
+/// # Brief
+/// 1. Multi-threaded allocation of container space, inserting data into it, and
+///    verifying that the function is correct
+/// 2. Free up some of the data space and check if the data is reused in the
+///    multi-threaded case
 #[test]
 fn sdv_slab_multi_allocate_drop() {
     // allocate space and free the used `slot` in the multi-threaded case.
     // retaining the address of the freed `slot` and allocating it again.
-    // the address after reallocation is the same as the address of the previously freed `slot`.
+    // the address after reallocation is the same as the address of the previously
+    // freed `slot`.
     let slab = Slab::<TestEntry>::new();
     let thread_one_alloc = slab.handle();
     let thread_two_alloc = slab.handle();

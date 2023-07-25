@@ -177,7 +177,8 @@ fn sdv_multi_future_in_async() {
     }
 }
 
-// Calling other `async` blocks within an `async` block has a multiple call relationship
+// Calling other `async` blocks within an `async` block has a multiple call
+// relationship
 #[test]
 fn sdv_multi_async_in_async() {
     let core_pool_size = 4;

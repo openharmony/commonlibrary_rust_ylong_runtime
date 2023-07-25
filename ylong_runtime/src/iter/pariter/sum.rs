@@ -11,11 +11,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::error::ScheduleError;
 use core::ops::Add;
 use std::iter::Sum;
 
 use super::{Consumer, ParallelIterator};
+use crate::error::ScheduleError;
 
 pub async fn sum<P>(par_iter: P) -> Result<P::Item, ScheduleError>
 where

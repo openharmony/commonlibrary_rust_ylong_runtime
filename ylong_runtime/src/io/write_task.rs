@@ -11,12 +11,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::io::AsyncWrite;
 use std::future::Future;
 use std::io;
 use std::io::IoSlice;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+
+use crate::io::AsyncWrite;
 
 macro_rules! take_writer {
     ($self: expr) => {

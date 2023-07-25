@@ -13,11 +13,12 @@
 
 //! Wraps Linux core-affinity syscalls.
 
-use crate::util::num_cpus::get_cpu_num;
-use libc::{cpu_set_t, sched_getaffinity, sched_setaffinity, CPU_ISSET, CPU_SET};
-use std::io::Error;
-use std::io::Result;
+use std::io::{Error, Result};
 use std::mem::{size_of, zeroed};
+
+use libc::{cpu_set_t, sched_getaffinity, sched_setaffinity, CPU_ISSET, CPU_SET};
+
+use crate::util::num_cpus::get_cpu_num;
 
 /// Sets the tied core cpu of the current thread.
 ///
@@ -50,7 +51,7 @@ pub fn set_current_affinity(cpu: usize) -> Result<()> {
 /// ```rust
 /// use ylong_runtime::util::core_affinity;
 ///
-/// let cpus:Vec<usize> = core_affinity::get_current_affinity();
+/// let cpus: Vec<usize> = core_affinity::get_current_affinity();
 /// assert!(cpus.len() > 0);
 /// ```
 /// # Example 2
@@ -60,7 +61,7 @@ pub fn set_current_affinity(cpu: usize) -> Result<()> {
 ///
 /// let ret = core_affinity::set_current_affinity(0).is_ok();
 /// assert!(ret);
-/// let cpus:Vec<usize> = core_affinity::get_current_affinity();
+/// let cpus: Vec<usize> = core_affinity::get_current_affinity();
 /// assert_eq!(cpus.len(), 1);
 /// ```
 pub fn get_current_affinity() -> Vec<usize> {
@@ -78,7 +79,8 @@ pub fn get_current_affinity() -> Vec<usize> {
     }
 }
 
-/// Gets the cores bound to the specified thread, or return all available cpu's if no cores are bound
+/// Gets the cores bound to the specified thread, or return all available cpu's
+/// if no cores are bound
 ///
 /// sched_setaffinity function under linux
 pub fn get_other_thread_affinity(pid: i32) -> Vec<usize> {

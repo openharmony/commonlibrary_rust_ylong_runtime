@@ -11,8 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::IntoParIter;
-use super::ParIter;
+use super::{IntoParIter, ParIter};
 
 impl<'a, T, const N: usize> IntoParIter for &'a [T; N] {
     type Data = &'a [T];

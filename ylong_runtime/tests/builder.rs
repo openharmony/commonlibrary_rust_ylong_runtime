@@ -12,6 +12,7 @@
 // limitations under the License.
 
 use std::sync::{Arc, Mutex};
+
 use ylong_runtime::builder::RuntimeBuilder;
 
 // async task
@@ -19,16 +20,13 @@ async fn test_future(num: usize) -> usize {
     num
 }
 
-/// SDV test for `after_start()`.
-///
-/// # Title
-/// sdv_set_builder_after_start
+/// SDV test cases for `after_start()`.
 ///
 /// # Brief
-/// 1.Create Runtime.
-/// 2.Sender calls after_start() to set variable x to 1.
-/// 3.Executing an async task.
-/// 4.Check if the test results are correct.
+/// 1. Create Runtime.
+/// 2. Sender calls after_start() to set variable x to 1.
+/// 3. Executing an async task.
+/// 4. Check if the test results are correct.
 #[test]
 fn sdv_set_builder_after_start() {
     let x = Arc::new(Mutex::new(0));
@@ -51,16 +49,13 @@ fn sdv_set_builder_after_start() {
     assert_eq!(*a, 1);
 }
 
-/// SDV test for `before_stop()`.
-///
-/// # Title
-/// sdv_set_builder_before_stop
+/// SDV test cases for `before_stop()`.
 ///
 /// # Brief
-/// 1.Create Runtime.
-/// 2.Sender calls after_start() to set variable x to 1.
-/// 3.Executing an async task.
-/// 4.Check if the test results are correct.
+/// 1. Create Runtime.
+/// 2. Sender calls after_start() to set variable x to 1.
+/// 3. Executing an async task.
+/// 4. Check if the test results are correct.
 #[test]
 fn sdv_set_builder_before_stop() {
     let x = Arc::new(Mutex::new(0));

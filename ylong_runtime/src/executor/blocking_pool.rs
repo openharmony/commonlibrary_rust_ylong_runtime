@@ -12,20 +12,19 @@
 // limitations under the License.
 
 use std::collections::VecDeque;
+use std::future::Future;
 use std::option::Option::Some;
+use std::pin::Pin;
 use std::sync::{Arc, Condvar, Mutex, Weak};
+use std::task::{Context, Poll};
 use std::thread;
 use std::time::Duration;
 
 use crate::builder::{CallbackHook, CommonBuilder};
 use crate::error::{ErrorKind, ScheduleError};
 use crate::executor::PlaceholderScheduler;
-use crate::task::TaskBuilder;
-use crate::task::VirtualTableType;
+use crate::task::{TaskBuilder, VirtualTableType};
 use crate::{task, JoinHandle};
-use std::future::Future;
-use std::pin::Pin;
-use std::task::{Context, Poll};
 
 pub(crate) const BLOCKING_THREAD_QUIT_WAIT_TIME: Duration = Duration::from_secs(3);
 
@@ -358,25 +357,20 @@ where
     }
 }
 
-#[cfg(all(test))]
+#[cfg(test)]
 mod test {
-    use crate::builder::RuntimeBuilder;
-    use crate::executor::blocking_pool::BlockPoolSpawner;
-    use crate::executor::PlaceholderScheduler;
-    use crate::task::Task;
-    use crate::task::VirtualTableType;
     use std::sync::Weak;
     use std::time::Duration;
 
-    /*
-     * @title  BlockPoolSpawner::new() UT test
-     * @design The function has no invalid values in the input, no exception branch, direct check function, return value
-     * @precon Use BlockPoolSpawner::new(), Get its creation object
-     * @brief  Describe test case execution
-     *         1、Checking the parameters after initialization is completed
-     * @expect The function entry has no invalid value, no exception branch, and the property value should be related to the entry after the initialization is completed
-     * @auto   true
-     */
+    use crate::builder::RuntimeBuilder;
+    use crate::executor::blocking_pool::BlockPoolSpawner;
+    use crate::executor::PlaceholderScheduler;
+    use crate::task::{Task, VirtualTableType};
+
+    /// UT test cases for BlockPoolSpawner::new()
+    ///
+    /// # Brief
+    /// 1. Checking the parameters after initialization is completed.
     #[test]
     fn ut_blocking_pool_new() {
         let thread_pool_builder =
@@ -400,17 +394,17 @@ mod test {
         );
     }
 
-    /*
-     * @title  BlockPoolSpawner::shutdown() UT test
-     * @design The function entry has no invalid value, there is an exception branch, direct check function, return value
-     * @precon Use BlockPoolSpawner::new(), Get its creation object
-     * @brief  Describe test case execution
-     *         1、When shared.shutdown is false, the thread is safely exited without a timeout
-     *         2、When shared.shutdown is false, the thread is not safely exited in case of timeout
-     *         3、When shared.shutdown is true, BlockPoolSpawner::shutdown returns directly, representing that the blocking thread pool has safely exited
-     * @expect The function entry has no invalid value, no exception branch, and the property value should be related to the entry after the initialization is completed
-     * @auto   true
-     */
+    /// UT test cases for BlockPoolSpawner::shutdown()
+    ///
+    /// # Brief
+    /// 1. When shared.shutdown is false, the thread is safely exited without a
+    ///    timeout
+    /// 2. When shared.shutdown is false, the thread is not safely exited in
+    ///    case of timeout
+    /// 3. When shared.shutdown is true, BlockPoolSpawner::shutdown returns
+    ///    directly, representing that the blocking thread pool has safely
+    ///    exited
+
     #[test]
     fn ut_blocking_pool_shutdown() {
         let thread_pool_builder = RuntimeBuilder::new_multi_thread();
@@ -438,17 +432,14 @@ mod test {
         assert!(!blocking_pool.shutdown(Duration::from_secs(0)));
     }
 
-    /*
-     * @title  BlockPoolSpawner::create_permanent_threads() UT test
-     * @design The function has no input parameters, there is an exception branch, direct check function, return value
-     * @precon Use BlockPoolSpawner::new(), Get its creation object
-     * @brief  Describe test case execution
-     *         1、self.inner.is_permanent == true, self.inner.worker_name.clone() != None, self.inner.stack_size != None
-     *         2、self.inner.is_permanent == true, self.inner.worker_name.clone() == None, self.inner.stack_size == None
-     *         3、self.inner.is_permanent == false
-     * @expect The function entry has no invalid value, no exception branch, and the property value should be related to the entry after the initialization is completed. Compare whether the naming under different branches corresponds to each other.
-     * @auto   true
-     */
+    /// UT test cases for BlockPoolSpawner::create_permanent_threads()
+    ///
+    /// # Brief
+    /// 1. self.inner.is_permanent == true, self.inner.worker_name.clone() !=
+    ///    None, self.inner.stack_size != None
+    /// 2. self.inner.is_permanent == true, self.inner.worker_name.clone() ==
+    ///    None, self.inner.stack_size == None
+    /// 3. self.inner.is_permanent == false
     #[test]
     fn ut_blocking_pool_spawner_create_permanent_threads() {
         let thread_pool_builder =
@@ -511,24 +502,26 @@ mod test {
         );
     }
 
-    /*
-     * @title  BlockPoolSpawner::spawn() UT test
-     * @design The function has no input parameters, there is an exception branch, direct check function, return value
-     * @precon Use BlockPoolSpawner::new(), Get its creation object
-     * @brief  Describe test case execution
-     *         1、shared.shutdown == true, return directly.
-     *         2、shared.shutdown == false, shared.idle_thread_num != 0
-     *         3、shared.shutdown == false, shared.idle_thread_num == 0, shared.total_thread_num == self.inner.max_pool_size
-     *         4、shared.shutdown == false, shared.idle_thread_num == 0, shared.total_thread_num != self.inner.max_pool_size, self.inner.worker_name.clone() != None
-     *         5、shared.shutdown == false, shared.idle_thread_num == 0, shared.total_thread_num != self.inner.max_pool_size, self.inner.worker_name.clone() == None
-     * @expect The function entry has no invalid value, no exception branch, and the property value should be related to the entry after the initialization is completed. Compare whether the naming under different branches corresponds to each other.
-     * @auto   true
-     */
+    /// UT test cases for BlockPoolSpawner::spawn()
+    ///
+    /// # Brief
+    /// 1. shared.shutdown == true, return directly.
+    /// 2. shared.shutdown == false, shared.idle_thread_num != 0
+    /// 3. shared.shutdown == false, shared.idle_thread_num == 0,
+    ///    shared.total_thread_num == self.inner.max_pool_size
+    /// 4. shared.shutdown == false, shared.idle_thread_num == 0,
+    ///    shared.total_thread_num != self.inner.max_pool_size,
+    ///    self.inner.worker_name.clone() != None
+    /// 5. shared.shutdown == false, shared.idle_thread_num == 0,
+    ///    shared.total_thread_num != self.inner.max_pool_size,
+    ///    self.inner.worker_name.clone() == None
+
     #[test]
     fn ut_blocking_pool_spawner_spawn() {
+        use std::thread::sleep;
+
         use crate::executor::blocking_pool::BlockingTask;
         use crate::task::TaskBuilder;
-        use std::thread::sleep;
 
         let thread_pool_builder = RuntimeBuilder::new_multi_thread();
         let blocking_pool = BlockPoolSpawner::new(&thread_pool_builder.common);

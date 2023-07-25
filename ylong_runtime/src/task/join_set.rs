@@ -11,10 +11,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::spawn::spawn_async;
-use crate::task::join_handle::CancelHandle;
-use crate::task::PriorityLevel;
-use crate::{JoinHandle, ScheduleError, TaskBuilder};
 use std::cell::{RefCell, UnsafeCell};
 use std::collections::{HashSet, LinkedList};
 use std::future::Future;
@@ -25,12 +21,17 @@ use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 
+use crate::spawn::spawn_async;
+use crate::task::join_handle::CancelHandle;
+use crate::task::PriorityLevel;
+use crate::{JoinHandle, ScheduleError, TaskBuilder};
+
 /// A collection of tasks get spawned on a Ylong runtime
 ///
-/// A `JoinSet` will take over the `JoinHandle`s of the tasks when spawning, and it can
-/// asynchronously wait for the completion of some or all of the tasks inside the set.
-/// However, `JoinSet` is unordered, which means that tasks' results will be returned
-/// in the order of their completion.
+/// A `JoinSet` will take over the `JoinHandle`s of the tasks when spawning, and
+/// it can asynchronously wait for the completion of some or all of the tasks
+/// inside the set. However, `JoinSet` is unordered, which means that tasks'
+/// results will be returned in the order of their completion.
 ///
 /// All the tasks spawned via a `JoinSet` must have the same return type.
 ///
@@ -41,9 +42,7 @@ use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 ///
 /// async fn join_set_spawn() {
 ///     let mut set = JoinSet::new();
-///     set.spawn(async move {
-///         0
-///     });
+///     set.spawn(async move { 0 });
 ///     let ret = set.join_next().await.unwrap().unwrap();
 ///     assert_eq!(ret, 0)
 /// }
@@ -114,14 +113,16 @@ impl<R> Hash for JoinEntry<R> {
 }
 
 impl<R> JoinEntry<R> {
-    // When waking a JoinEntry, the entry will get popped out of the wait list and pushed into
-    // the ready list. The corresponding in_done flag will also be changed.
-    // Safety: it will take the list's lock before moving the entry, so it's concurrently safe.
+    // When waking a JoinEntry, the entry will get popped out of the wait list and
+    // pushed into the ready list. The corresponding in_done flag will also be
+    // changed. Safety: it will take the list's lock before moving the entry, so
+    // it's concurrently safe.
     fn wake_by_ref(entry: &Arc<JoinEntry<R>>) {
         let mut list = entry.list.lock().unwrap();
         if !entry.in_done.replace(true) {
-            // We couldn't find the entry, meaning that the JoinSet has been dropped already.
-            // In this case, there is no need to push the entry back to the done list.
+            // We couldn't find the entry, meaning that the JoinSet has been dropped
+            // already. In this case, there is no need to push the entry back to
+            // the done list.
             if !list.wait_list.remove(entry) {
                 return;
             }
@@ -136,8 +137,8 @@ impl<R> JoinEntry<R> {
 }
 
 impl<R> JoinSet<R> {
-    /// Spawns a task via a `JoinSet` onto a Ylong runtime. The task will start immediately
-    /// when `spawn` is called.
+    /// Spawns a task via a `JoinSet` onto a Ylong runtime. The task will start
+    /// immediately when `spawn` is called.
     ///
     /// # Panics
     /// This method panics when calling outside of Ylong runtime.
@@ -148,7 +149,7 @@ impl<R> JoinSet<R> {
     /// use ylong_runtime::task::JoinSet;
     /// ylong_runtime::block_on(async move {
     ///     let mut set = JoinSet::new();
-    ///     let cancel_handle = set.spawn(async move {1});
+    ///     let cancel_handle = set.spawn(async move { 1 });
     ///     cancel_handle.cancel();
     /// });
     /// ```
@@ -186,7 +187,8 @@ impl<R> JoinSet<R> {
         cancel
     }
 
-    /// Waits until one task inside the `JoinSet` completes and returns its output.
+    /// Waits until one task inside the `JoinSet` completes and returns its
+    /// output.
     ///
     /// Returns `None` if there is no task inside the set.
     ///
@@ -196,7 +198,7 @@ impl<R> JoinSet<R> {
     /// use ylong_runtime::task::JoinSet;
     /// ylong_runtime::block_on(async move {
     ///     let mut set = JoinSet::new();
-    ///     set.spawn(async move {1});
+    ///     set.spawn(async move { 1 });
     ///     let ret = set.join_next().await.unwrap().unwrap();
     ///     assert_eq!(ret, 1);
     ///     // no more task, so this `join_next` will return none
@@ -225,15 +227,15 @@ impl<R> JoinSet<R> {
 
     /// Cancels every tasks inside the JoinSet.
     ///
-    /// If [`JoinSet::join_next`] is called after calling `cancel_all`, then it would return
-    /// `TaskCanceled` error.
+    /// If [`JoinSet::join_next`] is called after calling `cancel_all`, then it
+    /// would return `TaskCanceled` error.
     ///
     /// # Examples
     /// ```
     /// use ylong_runtime::task::JoinSet;
     /// ylong_runtime::block_on(async move {
     ///     let mut set = JoinSet::new();
-    ///     set.spawn(async move {1});
+    ///     set.spawn(async move { 1 });
     ///     set.cancel_all();
     /// });
     /// ```
@@ -254,7 +256,7 @@ impl<R> JoinSet<R> {
     /// use ylong_runtime::task::JoinSet;
     /// ylong_runtime::block_on(async move {
     ///     let mut set = JoinSet::new();
-    ///     set.spawn(async move {1});
+    ///     set.spawn(async move { 1 });
     ///     set.shutdown();
     /// });
     /// ```
@@ -263,8 +265,8 @@ impl<R> JoinSet<R> {
         while self.join_next().await.is_some() {}
     }
 
-    /// Creates a builder that configures task attributes. This builder could spawn tasks
-    /// with its attributes onto the JoinSet.
+    /// Creates a builder that configures task attributes. This builder could
+    /// spawn tasks with its attributes onto the JoinSet.
     ///
     /// # Examples
     /// ```
@@ -272,7 +274,7 @@ impl<R> JoinSet<R> {
     /// ylong_runtime::block_on(async move {
     ///     let mut set = JoinSet::new();
     ///     let mut builder = set.build_task().name("hello".into());
-    ///     builder.spawn(async move {1});
+    ///     builder.spawn(async move { 1 });
     /// });
     /// ```
     pub fn build_task(&mut self) -> Builder<'_, R> {
@@ -302,10 +304,11 @@ impl<R> JoinSet<R> {
             drop(list);
             let waker = entry_into_waker(&entry);
             let mut ctx = Context::from_waker(&waker);
-            // We have to dereference the JoinHandle from the UnsafeCell in order to poll it.
-            // The lifetime of the handle is valid here since it's wrapped by a ManuallyDrop.
-            // It will only get dropped when the task returns ready, and by the time, the entry
-            // is also dropped, and could never be popped from the done list once again.
+            // We have to dereference the JoinHandle from the UnsafeCell in order to poll
+            // it. The lifetime of the handle is valid here since it's wrapped
+            // by a ManuallyDrop. It will only get dropped when the task returns
+            // ready, and by the time, the entry is also dropped, and could
+            // never be popped from the done list once again.
             unsafe {
                 match Pin::new(&mut **(entry.handle.get())).poll(&mut ctx) {
                     Poll::Ready(res) => {
@@ -353,7 +356,8 @@ impl<'a, R> Builder<'a, R> {
         }
     }
 
-    /// Sets the name for the tasks that are going to get spawned by this JoinSet Builder
+    /// Sets the name for the tasks that are going to get spawned by this
+    /// JoinSet Builder
     ///
     /// # Examples
     /// ```
@@ -361,7 +365,7 @@ impl<'a, R> Builder<'a, R> {
     /// ylong_runtime::block_on(async move {
     ///     let mut set = JoinSet::new();
     ///     let mut builder = set.build_task().name("hello".into());
-    ///     builder.spawn(async move {1});
+    ///     builder.spawn(async move { 1 });
     /// });
     /// ```
     pub fn name(self, name: String) -> Self {
@@ -372,7 +376,8 @@ impl<'a, R> Builder<'a, R> {
         }
     }
 
-    /// Sets the priority for the tasks that are going to get spawned by this JoinSet Builder
+    /// Sets the priority for the tasks that are going to get spawned by this
+    /// JoinSet Builder
     ///
     /// # Examples
     /// ```
@@ -380,7 +385,7 @@ impl<'a, R> Builder<'a, R> {
     /// ylong_runtime::block_on(async move {
     ///     let mut set = JoinSet::new();
     ///     let mut builder = set.build_task().priority(PriorityLevel::AbsHigh);
-    ///     builder.spawn(async move {1});
+    ///     builder.spawn(async move { 1 });
     /// });
     /// ```
     pub fn priority(self, pri_level: PriorityLevel) -> Self {
@@ -391,8 +396,8 @@ impl<'a, R> Builder<'a, R> {
         }
     }
 
-    /// Spawns a task via a `JoinSet` onto a Ylong runtime. The task will start immediately
-    /// when `spawn` is called.
+    /// Spawns a task via a `JoinSet` onto a Ylong runtime. The task will start
+    /// immediately when `spawn` is called.
     ///
     /// # Panics
     /// This method panics when calling outside of Ylong runtime.
@@ -402,7 +407,7 @@ impl<'a, R> Builder<'a, R> {
     /// ylong_runtime::block_on(async move {
     ///     let mut set = JoinSet::new();
     ///     let mut builder = set.build_task();
-    ///     builder.spawn(async move {1});
+    ///     builder.spawn(async move { 1 });
     /// });
     /// ```
     pub fn spawn<T>(&mut self, task: T) -> CancelHandle

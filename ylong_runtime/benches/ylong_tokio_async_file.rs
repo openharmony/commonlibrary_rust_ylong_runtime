@@ -103,13 +103,13 @@ macro_rules! async_write {
 #[cfg(test)]
 mod ylong_async_file {
     extern crate test;
-    use crate::task_helpers::*;
-    use test::Bencher;
-
     use std::hint::black_box;
 
+    use test::Bencher;
     use ylong_runtime::fs::File;
     use ylong_runtime::io::{AsyncReadExt, AsyncWriteExt};
+
+    use crate::task_helpers::*;
 
     async_read!(ylong_runtime);
     async_write!(ylong_runtime);
@@ -122,16 +122,18 @@ mod tokio_async_file {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     extern crate test;
+    use std::hint::black_box;
+
     use test::Bencher;
 
     use crate::task_helpers::*;
-    use std::hint::black_box;
 
     async_read!(tokio_runtime);
     async_write!(tokio_runtime);
 
-    // For codec benchmarks, tokio has `async_read_codec` in `fs.rs`. That's the correct
-    // ways to use tokio's codec features. However, here, use the same benchmark to apply
-    // the same method to test ylong, tokio, swift, and avoid new packages imported.
+    // For codec benchmarks, tokio has `async_read_codec` in `fs.rs`. That's the
+    // correct ways to use tokio's codec features. However, here, use the same
+    // benchmark to apply the same method to test ylong, tokio, swift, and avoid
+    // new packages imported.
     async_read_by_chars!(tokio_runtime);
 }

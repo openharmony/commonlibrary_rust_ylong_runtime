@@ -24,7 +24,8 @@ fn main() {
     // tuple's length = number of `x`'s round brackets - 2
     // tuple's default element = `A`
     // tuple's except element = `B`
-    // tuple's except element's index = `y`'s TokenTree count, in addition to the parentheses
+    // tuple's except element's index = `y`'s TokenTree count, in addition to the
+    // parentheses
     let tuple = ylong_runtime_macros::tuple_form!(( (((0)+1)+1) ) with Out::Fail except Out::Finish at ( ) );
     assert_eq!(tuple, (Out::Finish, Out::Fail));
 

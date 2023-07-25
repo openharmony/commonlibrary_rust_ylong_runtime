@@ -75,7 +75,8 @@ impl<T> LinkedList<T> {
     }
 
     pub(crate) fn remove_node(&mut self, mut node: NonNull<Node<T>>) {
-        let node = unsafe { node.as_mut() }; // this one is ours now, we can create an &mut.
+        // this one is ours now, we can create an &mut.
+        let node = unsafe { node.as_mut() };
 
         match node.prev {
             Some(prev) => unsafe { (*prev.as_ptr()).next = node.next },

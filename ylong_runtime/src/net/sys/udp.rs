@@ -11,24 +11,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::io::ReadBuf;
-use crate::net::AsyncSource;
 use std::fmt::{Debug, Formatter};
 use std::io;
 use std::mem::MaybeUninit;
 use std::net::SocketAddr;
 use std::task::{Context, Poll};
+
 use ylong_io::Interest;
+
+use crate::io::ReadBuf;
+use crate::net::AsyncSource;
 
 /// Asynchronous UdpSocket.
 ///
 /// # Examples
 ///
 /// ```rust
-/// use ylong_runtime::net::UdpSocket;
 /// use std::io;
 ///
-/// async fn io_func() -> io::Result<()>{
+/// use ylong_runtime::net::UdpSocket;
+///
+/// async fn io_func() -> io::Result<()> {
 ///     let sender_addr = "127.0.0.1:8081".parse().unwrap();
 ///     let receiver_addr = "127.0.0.1:8082".parse().unwrap();
 ///     let mut sender = UdpSocket::bind(sender_addr).await?;
@@ -84,13 +87,15 @@ impl Debug for ConnectedUdpSocket {
 }
 
 impl UdpSocket {
-    /// Creates a new UDP socket and attempts to bind it to the address provided,
+    /// Creates a new UDP socket and attempts to bind it to the address
+    /// provided,
     ///
     /// # Examples
     ///
     /// ```rust
-    /// use ylong_runtime::net::UdpSocket;
     /// use std::io;
+    ///
+    /// use ylong_runtime::net::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
     ///     let addr = "127.0.0.1:8080".parse().unwrap();
@@ -103,7 +108,8 @@ impl UdpSocket {
     }
 
     /// Internal interfaces.
-    /// Creates new ylong_runtime::net::UdpSocket according to the incoming ylong_io::UdpSocket.
+    /// Creates new ylong_runtime::net::UdpSocket according to the incoming
+    /// ylong_io::UdpSocket.
     pub(crate) fn new(socket: ylong_io::UdpSocket) -> io::Result<Self> {
         let source = AsyncSource::new(socket, None)?;
         Ok(UdpSocket { source })
@@ -116,8 +122,9 @@ impl UdpSocket {
     /// # Examples
     ///
     /// ```rust
-    /// use ylong_runtime::net::UdpSocket;
     /// use std::io;
+    ///
+    /// use ylong_runtime::net::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
     ///     let local_addr = "127.0.0.1:8080".parse().unwrap();
@@ -148,8 +155,9 @@ impl UdpSocket {
     /// # Examples
     ///
     /// ```rust
-    /// use ylong_runtime::net::UdpSocket;
     /// use std::io;
+    ///
+    /// use ylong_runtime::net::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
     ///     let addr = "127.0.0.1:8080".parse().unwrap();
@@ -162,8 +170,10 @@ impl UdpSocket {
         self.source.local_addr()
     }
 
-    /// Sends data on the socket to the given address. On success, returns the number of bytes written.
-    /// This will return an error when the IP version of the local socket does not match that returned from SocketAddr.
+    /// Sends data on the socket to the given address. On success, returns the
+    /// number of bytes written. This will return an error when the IP
+    /// version of the local socket does not match that returned from
+    /// SocketAddr.
     ///
     /// # Return value
     /// The function returns:
@@ -173,8 +183,9 @@ impl UdpSocket {
     /// # Examples
     ///
     /// ```rust
-    /// use ylong_runtime::net::UdpSocket;
     /// use std::io;
+    ///
+    /// use ylong_runtime::net::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
     ///     let local_addr = "127.0.0.1:8080".parse().unwrap();
@@ -199,15 +210,16 @@ impl UdpSocket {
     /// The function returns:
     /// * `Ok(n)` n is the number of bytes sent.
     /// * `Err(e)` if an error is encountered.
-    /// When the remote cannot receive the message, an [`ErrorKind::WouldBlock`] will be returned.
-    /// This will return an error If the IP version of the local socket does not match
-    /// that returned from SocketAddr.
+    /// When the remote cannot receive the message, an [`ErrorKind::WouldBlock`]
+    /// will be returned. This will return an error If the IP version of the
+    /// local socket does not match that returned from SocketAddr.
     ///
     /// # Examples
     ///
     /// ```rust
-    /// use ylong_runtime::net::UdpSocket;
     /// use std::io;
+    ///
+    /// use ylong_runtime::net::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
     ///     let local_addr = "127.0.0.1:8080".parse().unwrap();
@@ -224,7 +236,8 @@ impl UdpSocket {
 
     /// Attempts to send data on the socket to a given address.
     /// Note that on multiple calls to a poll_* method in the send direction,
-    /// only the Waker from the Context passed to the most recent call will be scheduled to receive a wakeup
+    /// only the Waker from the Context passed to the most recent call will be
+    /// scheduled to receive a wakeup
     ///
     /// # Return value
     /// The function returns:
@@ -235,9 +248,10 @@ impl UdpSocket {
     /// # Examples
     ///
     /// ```rust
-    /// use ylong_runtime::net::UdpSocket;
-    /// use ylong_runtime::futures::poll_fn;
     /// use std::io;
+    ///
+    /// use ylong_runtime::futures::poll_fn;
+    /// use ylong_runtime::net::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
     ///     let local_addr = "127.0.0.1:8080".parse().unwrap();
@@ -258,21 +272,24 @@ impl UdpSocket {
             .poll_write_io(cx, || self.source.send_to(buf, target))
     }
 
-    /// Receives a single datagram message on the socket. On success, returns the number of bytes
-    /// read and the origin. The function must be called with valid byte array buf of sufficient
-    /// size to hold the message bytes. If a message is too long to fit in the supplied buffer,
+    /// Receives a single datagram message on the socket. On success, returns
+    /// the number of bytes read and the origin. The function must be called
+    /// with valid byte array buf of sufficient size to hold the message
+    /// bytes. If a message is too long to fit in the supplied buffer,
     /// excess bytes may be discarded.
     ///
     /// # Return value
     /// The function returns:
-    /// * `Ok((n, addr))` n is the number of bytes received, addr is the address of sender.
+    /// * `Ok((n, addr))` n is the number of bytes received, addr is the address
+    ///   of sender.
     /// * `Err(e)` if an error is encountered.
     ///
     /// # Examples
     ///
     /// ```rust
-    /// use ylong_runtime::net::UdpSocket;
     /// use std::io;
+    ///
+    /// use ylong_runtime::net::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
     ///     let local_addr = "127.0.0.1:8080".parse().unwrap();
@@ -291,21 +308,25 @@ impl UdpSocket {
 
     /// Attempts to receive a single datagram message on the socket.
     ///
-    /// The function is usually paired with `readable` and must be called with valid byte array
-    /// buf of sufficient size to hold the message bytes. If a message is too long to fit in the
-    /// supplied buffer, excess bytes may be discarded.
+    /// The function is usually paired with `readable` and must be called with
+    /// valid byte array buf of sufficient size to hold the message bytes.
+    /// If a message is too long to fit in the supplied buffer, excess bytes
+    /// may be discarded.
     ///
     /// # Return value
     /// The function returns:
-    /// * `Ok(n, addr)` n is the number of bytes received, addr is the address of the remote.
+    /// * `Ok(n, addr)` n is the number of bytes received, addr is the address
+    ///   of the remote.
     /// * `Err(e)` if an error is encountered.
-    /// If there is no pending data, an [`ErrorKind::WouldBlock`] will be returned.
+    /// If there is no pending data, an [`ErrorKind::WouldBlock`] will be
+    /// returned.
     ///
     /// # Examples
     ///
     /// ```rust
-    /// use ylong_runtime::net::UdpSocket;
     /// use std::io;
+    ///
+    /// use ylong_runtime::net::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
     ///     let local_addr = "127.0.0.1:8080".parse().unwrap();
@@ -327,8 +348,9 @@ impl UdpSocket {
     /// # Examples
     ///
     /// ```
-    /// use ylong_runtime::net::UdpSocket;
     /// use std::io;
+    ///
+    /// use ylong_runtime::net::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
     ///     let local_addr = "127.0.0.1:8080".parse().unwrap();
@@ -350,8 +372,9 @@ impl UdpSocket {
     ///
     /// # Examples
     /// ```
-    /// use ylong_runtime::net::UdpSocket;
     /// use std::io;
+    ///
+    /// use ylong_runtime::net::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
     ///     let local_addr = "127.0.0.1:8080".parse().unwrap();
@@ -369,21 +392,24 @@ impl UdpSocket {
 
     /// Attempts to receive a single datagram on the socket.
     /// Note that on multiple calls to a poll_* method in the recv direction,
-    /// only the Waker from the Context passed to the most recent call will be scheduled to receive a wakeup.
+    /// only the Waker from the Context passed to the most recent call will be
+    /// scheduled to receive a wakeup.
     ///
     /// # Return value
     /// The function returns:
     /// * `Poll::Pending` if the socket is not ready to read
-    /// * `Poll::Ready(Ok(addr))` reads data from addr into ReadBuf if the socket is ready
+    /// * `Poll::Ready(Ok(addr))` reads data from addr into ReadBuf if the
+    ///   socket is ready
     /// * `Poll::Ready(Err(e))` if an error is encountered.
     ///
     /// # Examples
     ///
     /// ```rust
-    /// use ylong_runtime::net::UdpSocket;
     /// use std::io;
+    ///
     /// use ylong_runtime::futures::poll_fn;
     /// use ylong_runtime::io::ReadBuf;
+    /// use ylong_runtime::net::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
     ///     let local_addr = "127.0.0.1:8080".parse().unwrap();
@@ -416,12 +442,14 @@ impl UdpSocket {
     }
 
     /// Sets the value of the `SO_BROADCAST` option for this socket.
-    /// When enabled, this socket is allowed to send packets to a broadcast address.
+    /// When enabled, this socket is allowed to send packets to a broadcast
+    /// address.
     ///
     /// # Examples
     ///
     /// ```rust
     /// use std::io;
+    ///
     /// use ylong_runtime::net::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
@@ -444,6 +472,7 @@ impl UdpSocket {
     ///
     /// ```rust
     /// use std::io;
+    ///
     /// use ylong_runtime::net::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
@@ -460,7 +489,8 @@ impl UdpSocket {
 
 impl ConnectedUdpSocket {
     /// Internal interfaces.
-    /// Creates new ylong_runtime::net::ConnectedUdpSocket according to the incoming ylong_io::UdpSocket.
+    /// Creates new ylong_runtime::net::ConnectedUdpSocket according to the
+    /// incoming ylong_io::UdpSocket.
     pub(crate) fn new(socket: ylong_io::ConnectedUdpSocket) -> io::Result<Self> {
         let source = AsyncSource::new(socket, None)?;
         Ok(ConnectedUdpSocket { source })
@@ -471,8 +501,9 @@ impl ConnectedUdpSocket {
     /// # Examples
     ///
     /// ```rust
-    /// use ylong_runtime::net::UdpSocket;
     /// use std::io;
+    ///
+    /// use ylong_runtime::net::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
     ///     let addr = "127.0.0.1:8080".parse().unwrap();
@@ -492,13 +523,15 @@ impl ConnectedUdpSocket {
         self.source.local_addr()
     }
 
-    /// Returns the socket address of the remote peer this socket was connected to.
+    /// Returns the socket address of the remote peer this socket was connected
+    /// to.
     ///
     /// # Examples
     ///
     /// ```rust
-    /// use ylong_runtime::net::UdpSocket;
     /// use std::io;
+    ///
+    /// use ylong_runtime::net::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
     ///     let addr = "127.0.0.1:8080".parse().unwrap();
@@ -518,18 +551,21 @@ impl ConnectedUdpSocket {
         self.source.peer_addr()
     }
 
-    /// Sends data on the socket to the remote address that the socket is connected to.
-    /// The connect method will connect this socket to a remote address.
-    /// This method will fail if the socket is not connected.
+    /// Sends data on the socket to the remote address that the socket is
+    /// connected to. The connect method will connect this socket to a
+    /// remote address. This method will fail if the socket is not
+    /// connected.
     ///
     /// # Return value
-    /// On success, the number of bytes sent is returned, otherwise, the encountered error is returned.
+    /// On success, the number of bytes sent is returned, otherwise, the
+    /// encountered error is returned.
     ///
     /// # Examples
     ///
     /// ```rust
-    /// use ylong_runtime::net::UdpSocket;
     /// use std::io;
+    ///
+    /// use ylong_runtime::net::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
     ///     let local_addr = "127.0.0.1:8080".parse().unwrap();
@@ -551,8 +587,9 @@ impl ConnectedUdpSocket {
             .await
     }
 
-    /// Attempts to send data on the socket to the remote address that the socket is connected to.
-    /// This method will fail if the socket is not connected.
+    /// Attempts to send data on the socket to the remote address that the
+    /// socket is connected to. This method will fail if the socket is not
+    /// connected.
     ///
     /// The function is usually paired with `writable`.
     ///
@@ -560,13 +597,15 @@ impl ConnectedUdpSocket {
     /// The function returns:
     /// * `Ok(n)` n is the number of bytes sent.
     /// * `Err(e)` if an error is encountered.
-    /// When the remote cannot receive the message, an [`ErrorKind::WouldBlock`] will be returned.
+    /// When the remote cannot receive the message, an [`ErrorKind::WouldBlock`]
+    /// will be returned.
     ///
     /// # Examples
     ///
     /// ```rust
-    /// use ylong_runtime::net::UdpSocket;
     /// use std::io;
+    ///
+    /// use ylong_runtime::net::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
     ///     let local_addr = "127.0.0.1:8080".parse().unwrap();
@@ -587,11 +626,12 @@ impl ConnectedUdpSocket {
             .try_io(Interest::WRITABLE, || self.source.send(buf))
     }
 
-    /// Attempts to send data on the socket to the remote address to which it was previously connected.
-    /// The connect method will connect this socket to a remote address.
-    /// This method will fail if the socket is not connected.
-    /// Note that on multiple calls to a poll_* method in the send direction,
-    /// only the Waker from the Context passed to the most recent call will be scheduled to receive a wakeup.
+    /// Attempts to send data on the socket to the remote address to which it
+    /// was previously connected. The connect method will connect this
+    /// socket to a remote address. This method will fail if the socket is
+    /// not connected. Note that on multiple calls to a poll_* method in the
+    /// send direction, only the Waker from the Context passed to the most
+    /// recent call will be scheduled to receive a wakeup.
     ///
     /// # Return value
     /// The function returns:
@@ -602,9 +642,10 @@ impl ConnectedUdpSocket {
     /// # Examples
     ///
     /// ```rust
-    /// use ylong_runtime::net::UdpSocket;
     /// use std::io;
+    ///
     /// use ylong_runtime::futures::poll_fn;
+    /// use ylong_runtime::net::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
     ///     let local_addr = "127.0.0.1:8080".parse().unwrap();
@@ -624,10 +665,11 @@ impl ConnectedUdpSocket {
         self.source.poll_write_io(cx, || self.source.send(buf))
     }
 
-    /// Receives a single datagram message on the socket from the remote address to which it is connected.
-    /// On success, returns the number of bytes read.
-    /// The function must be called with valid byte array buf of sufficient size to hold the message bytes.
-    /// If a message is too long to fit in the supplied buffer, excess bytes may be discarded.
+    /// Receives a single datagram message on the socket from the remote address
+    /// to which it is connected. On success, returns the number of bytes
+    /// read. The function must be called with valid byte array buf of
+    /// sufficient size to hold the message bytes. If a message is too long
+    /// to fit in the supplied buffer, excess bytes may be discarded.
     /// The connect method will connect this socket to a remote address.
     /// This method will fail if the socket is not connected.
     ///
@@ -639,8 +681,9 @@ impl ConnectedUdpSocket {
     /// # Examples
     ///
     /// ```rust
-    /// use ylong_runtime::net::UdpSocket;
     /// use std::io;
+    ///
+    /// use ylong_runtime::net::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
     ///     let local_addr = "127.0.0.1:8080".parse().unwrap();
@@ -664,24 +707,28 @@ impl ConnectedUdpSocket {
             .await
     }
 
-    /// Attempts to receive a single datagram message on the socket from the remote address
-    /// to which it is connected.
-    /// On success, returns the number of bytes read. The function must be called with valid byte
-    /// array buf of sufficient size to hold the message bytes. If a message is too long to fit in
-    /// the supplied buffer, excess bytes may be discarded.
-    /// This method will fail if the socket is not connected.
+    /// Attempts to receive a single datagram message on the socket from the
+    /// remote address to which it is connected.
+    /// On success, returns the number of bytes read. The function must be
+    /// called with valid byte array buf of sufficient size to hold the
+    /// message bytes. If a message is too long to fit in the supplied
+    /// buffer, excess bytes may be discarded. This method will fail if the
+    /// socket is not connected.
     ///
     /// # Return value
     /// The function returns:
-    /// * `Ok(n, addr)` n is the number of bytes received, addr is the address of the remote.
+    /// * `Ok(n, addr)` n is the number of bytes received, addr is the address
+    ///   of the remote.
     /// * `Err(e)` if an error is encountered.
-    /// If there is no pending data, an [`ErrorKind::WouldBlock`] will be returned.
+    /// If there is no pending data, an [`ErrorKind::WouldBlock`] will be
+    /// returned.
     ///
     /// # Examples
     ///
     /// ```rust
-    /// use ylong_runtime::net::UdpSocket;
     /// use std::io;
+    ///
+    /// use ylong_runtime::net::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
     ///     let local_addr = "127.0.0.1:8080".parse().unwrap();
@@ -704,11 +751,13 @@ impl ConnectedUdpSocket {
             .try_io(Interest::READABLE, || self.source.recv(buf))
     }
 
-    /// Attempts to receive a single datagram message on the socket from the remote address to which it is connected.
-    /// The connect method will connect this socket to a remote address.
-    /// This method resolves to an error if the socket is not connected.
-    /// Note that on multiple calls to a poll_* method in the recv direction,
-    /// only the Waker from the Context passed to the most recent call will be scheduled to receive a wakeup.
+    /// Attempts to receive a single datagram message on the socket from the
+    /// remote address to which it is connected. The connect method will
+    /// connect this socket to a remote address. This method resolves to an
+    /// error if the socket is not connected. Note that on multiple calls to
+    /// a poll_* method in the recv direction, only the Waker from the
+    /// Context passed to the most recent call will be scheduled to receive a
+    /// wakeup.
     ///
     /// # Return value
     /// The function returns:
@@ -720,10 +769,11 @@ impl ConnectedUdpSocket {
     /// # Examples
     ///
     /// ```rust
-    /// use ylong_runtime::net::UdpSocket;
     /// use std::io;
+    ///
     /// use ylong_runtime::futures::poll_fn;
     /// use ylong_runtime::io::ReadBuf;
+    /// use ylong_runtime::net::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
     ///     let local_addr = "127.0.0.1:8080".parse().unwrap();
@@ -765,8 +815,9 @@ impl ConnectedUdpSocket {
     /// # Examples
     ///
     /// ```
-    /// use ylong_runtime::net::{UdpSocket, ConnectedUdpSocket};
     /// use std::io;
+    ///
+    /// use ylong_runtime::net::{ConnectedUdpSocket, UdpSocket};
     ///
     /// async fn io_func() -> io::Result<()> {
     ///     let local_addr = "127.0.0.1:8080".parse().unwrap();
@@ -796,8 +847,9 @@ impl ConnectedUdpSocket {
     /// # Examples
     ///
     /// ```
-    /// use ylong_runtime::net::{UdpSocket, ConnectedUdpSocket};
     /// use std::io;
+    ///
+    /// use ylong_runtime::net::{ConnectedUdpSocket, UdpSocket};
     ///
     /// async fn io_func() -> io::Result<()> {
     ///     let local_addr = "127.0.0.1:8080".parse().unwrap();
@@ -828,16 +880,13 @@ mod tests {
     use crate::net::UdpSocket;
     use crate::{block_on, spawn};
 
-    /// UT test for `poll_send()` and `poll_recv()`.
-    ///
-    /// # Title
-    /// test_send_recv_poll
+    /// UT test cases for `poll_send()` and `poll_recv()`.
     ///
     /// # Brief
-    /// 1.Create UdpSocket and connect to the remote address.
-    /// 2.Sender calls poll_fn() to send message first.
-    /// 3.Receiver calls poll_fn() to receive message.
-    /// 4.Check if the test results are correct.
+    /// 1. Create UdpSocket and connect to the remote address.
+    /// 2. Sender calls poll_fn() to send message first.
+    /// 3. Receiver calls poll_fn() to receive message.
+    /// 4. Check if the test results are correct.
     #[test]
     fn test_send_recv_poll() {
         let sender_addr = "127.0.0.1:8083".parse().unwrap();
@@ -890,16 +939,14 @@ mod tests {
         block_on(handle).expect("block_on failed");
     }
 
-    /// UT test for `poll_send_to()` and `poll_recv_from()`.
-    ///
-    /// # Title
-    /// test_send_to_recv_from_poll
-    ///
+    /// UT test cases for `poll_send_to()` and `poll_recv_from()`.
+
     /// # Brief
-    /// 1.Create UdpSocket.
-    /// 2.Sender calls poll_fn() to send message to the specified address.
-    /// 3.Receiver calls poll_fn() to receive message and return the address the message from.
-    /// 4.Check if the test results are correct.
+    /// 1. Create UdpSocket.
+    /// 2. Sender calls poll_fn() to send message to the specified address.
+    /// 3. Receiver calls poll_fn() to receive message and return the address
+    ///    the message from.
+    /// 4. Check if the test results are correct.
     #[test]
     fn test_send_to_recv_from_poll() {
         let sender_addr = "127.0.0.1:8087".parse().unwrap();
@@ -939,16 +986,13 @@ mod tests {
         block_on(handle).expect("block_on failed");
     }
 
-    /// UT test for `broadcast()` and `set_broadcast()`.
-    ///
-    /// # Title
-    /// ut_set_get_broadcast
+    /// UT test cases for `broadcast()` and `set_broadcast()`.
     ///
     /// # Brief
-    /// 1.Create UdpSocket.
-    /// 2.Sender calls set_broadcast() to set broadcast.
-    /// 3.Sender calls broadcast() to get broadcast.
-    /// 4.Check if the test results are correct.
+    /// 1. Create UdpSocket.
+    /// 2. Sender calls set_broadcast() to set broadcast.
+    /// 3. Sender calls broadcast() to get broadcast.
+    /// 4. Check if the test results are correct.
     #[test]
     fn ut_set_get_broadcast() {
         let local_addr = "127.0.0.1:8091".parse().unwrap();
@@ -969,15 +1013,12 @@ mod tests {
         block_on(handle).expect("block_on failed");
     }
 
-    /// UT test for `local_addr()`.
-    ///
-    /// # Title
-    /// ut_get_local_addr
+    /// UT test cases for `local_addr()`.
     ///
     /// # Brief
-    /// 1.Create UdpSocket.
-    /// 2.Sender calls local_addr() to get local address.
-    /// 3.Check if the test results are correct.
+    /// 1. Create UdpSocket.
+    /// 2. Sender calls local_addr() to get local address.
+    /// 3. Check if the test results are correct.
     #[test]
     fn ut_get_local_addr() {
         let local_addr = "127.0.0.1:8092".parse().unwrap();
@@ -1002,15 +1043,13 @@ mod tests {
         block_on(handle).expect("block_on failed");
     }
 
-    /// UT test for `peer_addr()`.
-    ///
-    /// # Title
-    /// ut_get_peer_addr
+    /// UT test cases for `peer_addr()`.
     ///
     /// # Brief
-    /// 1.Create UdpSocket.
-    /// 2.Sender calls peer_addr() to get the socket address of the remote peer.
-    /// 3.Check if the test results are correct.
+    /// 1. Create UdpSocket.
+    /// 2. Sender calls peer_addr() to get the socket address of the remote
+    ///    peer.
+    /// 3. Check if the test results are correct.
     #[test]
     fn ut_get_peer_addr() {
         let local_addr = "127.0.0.1:8094".parse().unwrap();

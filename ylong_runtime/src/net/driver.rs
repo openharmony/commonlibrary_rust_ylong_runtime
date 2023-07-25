@@ -11,14 +11,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::io;
+use std::ops::Deref;
+use std::sync::{Arc, Mutex};
+
+use ylong_io::{Interest, Source, Token};
+
 use crate::macros::{cfg_ffrt, cfg_not_ffrt};
 use crate::net::{Ready, ScheduleIO, Tick};
 use crate::util::bit::{Bit, Mask};
 use crate::util::slab::{Address, Ref, Slab};
-use std::io;
-use std::ops::Deref;
-use std::sync::{Arc, Mutex};
-use ylong_io::{Interest, Source, Token};
 
 cfg_ffrt! {
     use libc::{c_void, c_int, c_uint};
@@ -34,12 +36,11 @@ cfg_not_ffrt! {
 
 const DRIVER_TICK_INIT: u8 = 0;
 
-
 // Token structure
 // | reserved | generation | address |
 // |----------|------------|---------|
 // |   1 bit  |   7 bits   | 24 bits |
-//const RESERVED: Mask = Mask::new(1, 31);
+// const RESERVED: Mask = Mask::new(1, 31);
 const GENERATION: Mask = Mask::new(7, 24);
 const ADDRESS: Mask = Mask::new(24, 0);
 
@@ -108,9 +109,10 @@ impl Deref for Handle {
 /// 1）IO registration
 /// 2）Resource management
 pub(crate) struct Inner {
-    /// When the driver gets dropped, the resources in the driver will be transmitted to here.
-    /// Then all the slabs inside will get dropped when Inner's ref count clears to zero, so
-    /// there is no concurrent problem when new slabs gets inserted
+    /// When the driver gets dropped, the resources in the driver will be
+    /// transmitted to here. Then all the slabs inside will get dropped when
+    /// Inner's ref count clears to zero, so there is no concurrent problem
+    /// when new slabs gets inserted
     resources: Mutex<Option<Slab<ScheduleIO>>>,
 
     /// Used to register scheduleIO into the slab
@@ -122,7 +124,8 @@ pub(crate) struct Inner {
 }
 
 impl Driver {
-    /// IO dispatch function. Wakes the task through the token getting from the epoll events.
+    /// IO dispatch function. Wakes the task through the token getting from the
+    /// epoll events.
     fn dispatch(&mut self, token: Token, ready: Ready) {
         let addr_bit = Bit::from_usize(token.0);
         let addr = addr_bit.get_by_mask(ADDRESS);
@@ -178,8 +181,8 @@ impl Driver {
         )
     }
 
-    /// Runs the driver. This method will blocking wait for fd events to come in and then
-    /// wakes the corresponding tasks through the events.
+    /// Runs the driver. This method will blocking wait for fd events to come in
+    /// and then wakes the corresponding tasks through the events.
     ///
     /// In linux environment, the driver uses epoll.
     pub(crate) fn drive(&mut self, time_out: Option<Duration>) -> io::Result<bool> {
@@ -250,9 +253,7 @@ impl Driver {
     /// Initializes the single instance IO driver.
     pub(crate) fn get_mut_ref() -> &'static mut Driver {
         Driver::initialize();
-        unsafe {
-            &mut *DRIVER.as_mut_ptr()
-        }
+        unsafe { &mut *DRIVER.as_mut_ptr() }
     }
 }
 
@@ -281,7 +282,8 @@ impl Inner {
         io: &mut impl Source,
         interest: Interest,
     ) -> io::Result<Ref<ScheduleIO>> {
-        // Allocates space for the slab. If reaches maximum capacity, error will be returned
+        // Allocates space for the slab. If reaches maximum capacity, error will be
+        // returned
         let (schedule_io, token) = self.allocate_schedule_io_pair()?;
 
         self.registry
@@ -311,7 +313,8 @@ impl Inner {
         io: &mut impl Source,
         interest: Interest,
     ) -> io::Result<Ref<ScheduleIO>> {
-        // Allocates space for the slab. If reaches maximum capacity, error will be returned
+        // Allocates space for the slab. If reaches maximum capacity, error will be
+        // returned
         let (schedule_io, token) = self.allocate_schedule_io_pair()?;
 
         fn interests_to_io_event(interests: Interest) -> c_uint {

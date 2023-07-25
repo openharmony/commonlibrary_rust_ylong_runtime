@@ -52,8 +52,9 @@ pub(crate) fn tuple_parser(input: TokenStream) -> TupleParser {
             }
             TokenTree::Group(group) => {
                 if !flag_with && !flag_except && !flag_at {
-                    // The tuple length is obtained by calculating the number of parenthesis layers of ((0 + 1) + 1).
-                    // Actually the '0' also has a parenthesis wrapped around it, So here have to -1.
+                    // The tuple length is obtained by calculating the number of parenthesis layers
+                    // of ((0 + 1) + 1). Actually the '0' also has a parenthesis wrapped around it,
+                    // So here have to -1.
                     len = group_num(group.stream()) - 1;
                     idx += 1;
                     continue;

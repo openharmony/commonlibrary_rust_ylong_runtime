@@ -14,6 +14,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
+
 use ylong_runtime::time::sleep;
 
 type AppId = usize;
@@ -90,14 +91,11 @@ async fn simulate() {
     }
 }
 
-/// SDV test for multi time create.
-///
-/// # Title
-/// test_multi_timer
+/// SDV test cases for multi time create.
 ///
 /// # Brief
-/// 1.Creates multi threads and multi timers.
-/// 2.Checks if the test results are correct.
+/// 1. Creates multi threads and multi timers.
+/// 2. Checks if the test results are correct.
 #[test]
 fn test_multi_timer() {
     ylong_runtime::block_on(simulate());

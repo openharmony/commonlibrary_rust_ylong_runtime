@@ -11,12 +11,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::sys::windows::selector::{SelectorInner, SockState};
-use crate::{Interest, Selector, Token};
 use std::os::windows::io::RawSocket;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex, Once};
 use std::{io, net};
+
+use crate::sys::windows::selector::{SelectorInner, SockState};
+use crate::{Interest, Selector, Token};
 
 /// Initialise the network stack for Windows.
 pub(crate) fn init() {
@@ -89,8 +90,8 @@ impl NetState {
         }
     }
 
-    /// The IO operation does not really report an error when Err(WouldBlock) occurs.
-    /// We need to re-register the current IO operation.
+    /// The IO operation does not really report an error when Err(WouldBlock)
+    /// occurs. We need to re-register the current IO operation.
     pub(crate) fn try_io<T, F, R>(&self, task: F, io: &T) -> io::Result<R>
     where
         F: FnOnce(&T) -> io::Result<R>,

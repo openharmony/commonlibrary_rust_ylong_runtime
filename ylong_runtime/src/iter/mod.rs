@@ -11,10 +11,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! ParIter module, providing asynchronous iter lambda function implementations such as
-//! `for_each`, `zip`, `map`, `filter`.
-//!
-//!
+//! ParIter module, providing asynchronous iter lambda function implementations
+//! such as `for_each`, `zip`, `map`, `filter`.
 mod core;
 
 /// Parallel type and implementation

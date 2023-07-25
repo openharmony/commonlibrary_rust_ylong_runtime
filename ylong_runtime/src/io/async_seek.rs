@@ -11,29 +11,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::io::seek_task::SeekTask;
 use std::io;
 use std::io::SeekFrom;
 use std::ops::DerefMut;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
+use crate::io::seek_task::SeekTask;
+
 /// An asynchronous version of [`std::io::Seek`].
 ///
-/// The `AsyncSeek` trait provides a cursor which can be moved within a stream of
-/// bytes asynchronously.
+/// The `AsyncSeek` trait provides a cursor which can be moved within a stream
+/// of bytes asynchronously.
 ///
-/// The stream typically has a fixed size, allowing seeking relative to either end
-/// or the current offset.
+/// The stream typically has a fixed size, allowing seeking relative to either
+/// end or the current offset.
 pub trait AsyncSeek {
     /// Attempts to seek to a position in an I/O source.
     ///
-    /// If succeeds, this method will return `Poll::Ready(Ok(n))` where `n` indicates the current
-    /// position in the I/O source.
+    /// If succeeds, this method will return `Poll::Ready(Ok(n))` where `n`
+    /// indicates the current position in the I/O source.
     ///
-    /// If `Poll::Pending` is returned, it means that the input source is currently not ready
-    /// for seeking. In this case, this task will be put to sleep until the underlying stream
-    /// becomes readable or closed.
+    /// If `Poll::Pending` is returned, it means that the input source is
+    /// currently not ready for seeking. In this case, this task will be put
+    /// to sleep until the underlying stream becomes readable or closed.
     fn poll_seek(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -76,10 +77,11 @@ impl<T: AsyncSeek + Unpin + ?Sized> AsyncSeek for &mut T {
 
 impl<T: AsyncSeek + ?Sized> AsyncSeekExt for T {}
 
-/// An external trait that is automatically implemented for any object that has the AsyncSeek trait.
-/// Provides std-like `seek` method.
-/// `Seek` method in this trait returns a future object. Awaits on the future will complete the
-/// task, but it doesn't guarantee whether the task will finished immediately or asynchronously.
+/// An external trait that is automatically implemented for any object that has
+/// the AsyncSeek trait. Provides std-like `seek` method.
+/// `Seek` method in this trait returns a future object. Awaits on the future
+/// will complete the task, but it doesn't guarantee whether the task will
+/// finished immediately or asynchronously.
 pub trait AsyncSeekExt: AsyncSeek {
     /// Asynchronously seek to an offset, in bytes, in a stream.
     ///
@@ -91,7 +93,8 @@ pub trait AsyncSeekExt: AsyncSeek {
     ///
     /// # Errors
     ///
-    /// Seeking can fail, for example because it might involve flushing a buffer.
+    /// Seeking can fail, for example because it might involve flushing a
+    /// buffer.
     ///
     /// Seeking to a negative offset is considered an error.
     fn seek(&mut self, pos: SeekFrom) -> SeekTask<Self>

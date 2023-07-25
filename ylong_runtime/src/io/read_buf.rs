@@ -13,12 +13,13 @@
 
 use std::mem::MaybeUninit;
 
-/// This buf comes from std::io::ReadBuf, an unstable std lib. This buffer is a wrapper around byte
-/// buffer and it allows users to read data into an uninitialized memory. It tracks three regions in
-/// the buffer: a region at the beginning of the buffer that has been logically filled with data,
-/// a region that has been initialized at some point but not yet logically filled, and a region at
-/// the end that is fully uninitialized. The filled region is guaranteed to be a subset of the
-/// initialized region.
+/// This buf comes from std::io::ReadBuf, an unstable std lib. This buffer is a
+/// wrapper around byte buffer and it allows users to read data into an
+/// uninitialized memory. It tracks three regions in the buffer: a region at the
+/// beginning of the buffer that has been logically filled with data,
+/// a region that has been initialized at some point but not yet logically
+/// filled, and a region at the end that is fully uninitialized. The filled
+/// region is guaranteed to be a subset of the initialized region.
 ///
 /// In summary, the contents of the buffer can be visualized as:
 /// ```not_rust
@@ -85,7 +86,8 @@ impl<'a> ReadBuf<'a> {
         self.initialized
     }
 
-    /// Returns a new ReadBuf that uses the first `n` unfilled bytes of the buffer.
+    /// Returns a new ReadBuf that uses the first `n` unfilled bytes of the
+    /// buffer.
     #[inline]
     pub fn take(&mut self, n: usize) -> ReadBuf<'_> {
         let rsize = std::cmp::min(n, self.remaining());
@@ -122,8 +124,9 @@ impl<'a> ReadBuf<'a> {
         unsafe { &mut *(&mut self.buf[..self.initialized] as *mut [MaybeUninit<u8>] as *mut [u8]) }
     }
 
-    /// Returns a mutable reference to the entire buffer, including the initialized and uninitialized
-    /// portion. If the buffer is partially initialized, the caller must call [`ReadBuf::assume_init`] with
+    /// Returns a mutable reference to the entire buffer, including the
+    /// initialized and uninitialized portion. If the buffer is partially
+    /// initialized, the caller must call [`ReadBuf::assume_init`] with
     /// the number of bytes initialized.
     #[inline]
     pub fn inner_mut(&mut self) -> &mut [MaybeUninit<u8>] {
@@ -136,8 +139,9 @@ impl<'a> ReadBuf<'a> {
         self.buf.len() - self.filled
     }
 
-    /// Returns a mutable reference to the first n bytes of the unfilled portion of the `ReadBuf`.
-    /// This method guarantees the returned buffer is fully initialized.
+    /// Returns a mutable reference to the first n bytes of the unfilled portion
+    /// of the `ReadBuf`. This method guarantees the returned buffer is
+    /// fully initialized.
     ///
     /// # Panics
     /// Panics if n is bigger than the remaining capacity of the buf.
@@ -159,14 +163,15 @@ impl<'a> ReadBuf<'a> {
         unsafe { &mut *(&mut self.buf[self.filled..end] as *mut [MaybeUninit<u8>] as *mut [u8]) }
     }
 
-    /// Returns a mutable reference to the unfilled portion of the `ReadBuf`. This method guarantees
-    /// the the buffer is fully initialized.
+    /// Returns a mutable reference to the unfilled portion of the `ReadBuf`.
+    /// This method guarantees the the buffer is fully initialized.
     #[inline]
     pub fn initialize_unfilled(&mut self) -> &mut [u8] {
         self.initialize_unfilled_to(self.remaining())
     }
 
-    /// Clears the `ReadBuf`. The filled size turns to zero while the initialized size is unchanged.
+    /// Clears the `ReadBuf`. The filled size turns to zero while the
+    /// initialized size is unchanged.
     #[inline]
     pub fn clear(&mut self) {
         self.filled = 0;
@@ -175,7 +180,8 @@ impl<'a> ReadBuf<'a> {
     /// Sets the filled size of the buffer.
     ///
     /// # Panics
-    /// Panics if the filled portion is bigger than the initialized portion of the buffer.
+    /// Panics if the filled portion is bigger than the initialized portion of
+    /// the buffer.
     #[inline]
     pub fn set_filled(&mut self, n: usize) {
         if n > self.initialized {
@@ -187,8 +193,10 @@ impl<'a> ReadBuf<'a> {
     /// Advances the filled portion of the buffer by n bytes.
     ///
     /// # Panics
-    /// 1. Panics if the filled size is overflowed after adding the advance size.
-    /// 2. Panics if the filled portion becomes larger than the initialized portion of the buffer.
+    /// 1. Panics if the filled size is overflowed after adding the advance
+    ///    size.
+    /// 2. Panics if the filled portion becomes larger than the initialized
+    ///    portion of the buffer.
     #[inline]
     pub fn advance(&mut self, n: usize) {
         let filled = self
@@ -198,8 +206,9 @@ impl<'a> ReadBuf<'a> {
         self.set_filled(filled);
     }
 
-    /// Makes the n bytes after the filled portion of the buffer become initialized. If adding
-    /// n bytes exceeds the capacity, the initialized size will be set to the capacity.
+    /// Makes the n bytes after the filled portion of the buffer become
+    /// initialized. If adding n bytes exceeds the capacity, the initialized
+    /// size will be set to the capacity.
     #[inline]
     pub fn assume_init(&mut self, n: usize) {
         let end = std::cmp::min(self.filled + n, self.capacity());
@@ -208,11 +217,12 @@ impl<'a> ReadBuf<'a> {
         }
     }
 
-    /// Appends the input data into the `BufRead`. Advances the filled size and initialized size
-    /// accordingly.
+    /// Appends the input data into the `BufRead`. Advances the filled size and
+    /// initialized size accordingly.
     ///
     /// # Panics
-    /// Panics if the size of the appending buffer is greater than the remaining size of the `ReadBuf`
+    /// Panics if the size of the appending buffer is greater than the remaining
+    /// size of the `ReadBuf`
     #[inline]
     pub fn append(&mut self, buf: &[u8]) {
         if buf.len() > self.remaining() {

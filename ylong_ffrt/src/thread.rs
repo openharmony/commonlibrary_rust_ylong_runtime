@@ -11,9 +11,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::FfrtResult;
-use libc::{c_int, c_void};
 use std::ptr::null_mut;
+
+use libc::{c_int, c_void};
+
+use super::FfrtResult;
 
 /// A handle for thread.
 pub struct ThreadHandle(FfrtThrd);

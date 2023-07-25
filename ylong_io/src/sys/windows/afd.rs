@@ -11,7 +11,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::sys::windows::iocp::CompletionPort;
 use std::ffi::c_void;
 use std::fs::File;
 use std::mem::{size_of, zeroed};
@@ -20,6 +19,7 @@ use std::ptr::null_mut;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::{fmt, io};
+
 use windows_sys::Win32::Foundation::{
     RtlNtStatusToDosError, HANDLE, INVALID_HANDLE_VALUE, NTSTATUS, STATUS_NOT_FOUND,
     STATUS_PENDING, STATUS_SUCCESS, UNICODE_STRING,
@@ -32,6 +32,8 @@ use windows_sys::Win32::System::WindowsProgramming::{
     NtDeviceIoControlFile, FILE_SKIP_SET_EVENT_ON_HANDLE, IO_STATUS_BLOCK, IO_STATUS_BLOCK_0,
     OBJECT_ATTRIBUTES,
 };
+
+use crate::sys::windows::iocp::CompletionPort;
 
 pub const POLL_RECEIVE: u32 = 0x0001;
 pub const POLL_RECEIVE_EXPEDITED: u32 = 0x0002;
@@ -82,7 +84,8 @@ extern "system" {
 }
 
 /// Asynchronous file descriptor
-/// Implementing a single file handle to monitor multiple Io operations using the IO multiplexing model.
+/// Implementing a single file handle to monitor multiple Io operations using
+/// the IO multiplexing model.
 #[derive(Debug)]
 pub struct Afd {
     fd: File,

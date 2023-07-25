@@ -11,7 +11,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-///worker struct info and method
+use std::cell::{Cell, RefCell};
+use std::ptr;
+use std::sync::Arc;
+use std::task::Waker;
+
+/// worker struct info and method
 use crate::executor::async_pool::MultiThreadScheduler;
 use crate::executor::parker::Parker;
 use crate::executor::queue::LocalQueue;
@@ -19,10 +24,6 @@ use crate::executor::queue::LocalQueue;
 use crate::net::Handle;
 use crate::task::yield_now::wake_yielded_tasks;
 use crate::task::Task;
-use std::cell::{Cell, RefCell};
-use std::ptr;
-use std::sync::Arc;
-use std::task::Waker;
 
 thread_local! {
     pub(crate) static CURRENT_WORKER : Cell<* const ()> = Cell::new(ptr::null());

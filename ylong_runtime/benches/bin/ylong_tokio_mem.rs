@@ -11,7 +11,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Benchmarks for memory usage, computed by difference between virtual rss printed.
+//! Benchmarks for memory usage, computed by difference between virtual rss
+//! printed.
 #[cfg(unix)]
 fn get_memory_info() {
     use std::process;

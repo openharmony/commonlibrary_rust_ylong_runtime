@@ -62,11 +62,15 @@ pub fn tuple_form(input: TokenStream) -> TokenStream {
 
 /// Mark the async fn to execute with the selected runtime.
 ///
-/// You can set the runtime by adding attributes after the main ident in a parentheses. Attributes that can be set include runtime flavor , ....
+/// You can set the runtime by adding attributes after the main ident in a
+/// parentheses. Attributes that can be set include runtime flavor , ....
 ///
-/// Note: This procedural macro is just to simplify the setup of ylong runtime. If you need more complex and specific settings. You should directly invoke the runtime builder function.
+/// Note: This procedural macro is just to simplify the setup of ylong runtime.
+/// If you need more complex and specific settings. You should directly invoke
+/// the runtime builder function.
 ///
-/// Note: Please make sure that the corresponding feature is enabled, otherwise it will show that the corresponding function cannot be found.
+/// Note: Please make sure that the corresponding feature is enabled, otherwise
+/// it will show that the corresponding function cannot be found.
 ///
 /// ## Usage
 ///

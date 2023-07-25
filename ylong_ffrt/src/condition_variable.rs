@@ -11,11 +11,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::mutex::MutexGuard;
-use libc::{c_int, c_void, timespec};
 use std::cell::UnsafeCell;
 use std::ffi::c_long;
 use std::time::Duration;
+
+use libc::{c_int, c_void, timespec};
+
+use crate::mutex::MutexGuard;
 
 #[repr(C)]
 struct FfrtCondvar {
@@ -32,7 +34,8 @@ impl Condvar {
     pub fn new() -> Condvar {
         let mut inner = FfrtCondvar { storage: [0; 512] };
         unsafe {
-            let _ = ffrt_cnd_init(&mut inner as _); // how to handle return value?
+            // how to handle return value?
+            let _ = ffrt_cnd_init(&mut inner as _);
         }
         Condvar {
             inner: UnsafeCell::new(inner),
@@ -42,14 +45,16 @@ impl Condvar {
     /// Notifies all tasks that wait on this condvar.
     pub fn notify_all(&self) {
         unsafe {
-            let _ = ffrt_cnd_broadcast(self.inner.get()); // ignore return result
+            // ignore return result
+            let _ = ffrt_cnd_broadcast(self.inner.get());
         }
     }
 
     /// Notifies one task that waits on this condvar.
     pub fn notify_one(&self) {
         unsafe {
-            let _ = ffrt_cnd_signal(self.inner.get()); // ignore return result
+            // ignore return result
+            let _ = ffrt_cnd_signal(self.inner.get());
         }
     }
 

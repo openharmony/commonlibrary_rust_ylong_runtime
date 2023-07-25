@@ -13,12 +13,11 @@
 
 use ylong_runtime::util::slots::Slots;
 
-/// SDV test for Slots
-/// # Title
-/// sdv_huge_data_push_back
+/// SDV test cases for Slots
+///
 /// # Brief
-/// 1.Push a large amount of data into the initialized container.
-/// 2.Check the correctness of inserted data iteratively.
+/// 1. Push a large amount of data into the initialized container.
+/// 2. Check the correctness of inserted data iteratively.
 #[test]
 fn sdv_slots_huge_data_push_back() {
     let mut slots = Slots::new();
@@ -34,14 +33,13 @@ fn sdv_slots_huge_data_push_back() {
     }
 }
 
-/// SDV test for Slots
-/// # Title
-/// sdv_huge_data_remove
+/// SDV test cases for Slots
+///
 /// # Brief
-/// 1.Push a large amount of data into the initialized container.
-/// 2.Remove the first half of the container.
-/// 3.Push new data into the container again.
-/// 4.Check the correctness of data sequence and values.
+/// 1. Push a large amount of data into the initialized container.
+/// 2. Remove the first half of the container.
+/// 3. Push new data into the container again.
+/// 4. Check the correctness of data sequence and values.
 #[test]
 fn sdv_slots_huge_data_remove() {
     let mut slots = Slots::new();
@@ -68,14 +66,13 @@ fn sdv_slots_huge_data_remove() {
     }
 }
 
-/// SDV test for Slots
-/// # Title
-/// sdv_remove_and_pop
+/// SDV test cases for Slots
+///
 /// # Brief
-/// 1.Push data into the initialized container.
-/// 2.Remove slots that have been popped.
-/// 3.Remove slots at wrong index.
-/// 4.Pop the remaining data.
+/// 1. Push data into the initialized container.
+/// 2. Remove slots that have been popped.
+/// 3. Remove slots at wrong index.
+/// 4. Pop the remaining data.
 #[test]
 fn sdv_slots_remove_and_pop() {
     let mut slots = Slots::new();
@@ -106,12 +103,11 @@ fn sdv_slots_remove_and_pop() {
     assert!(slots.pop_front().is_none());
 }
 
-/// SDV test for Slots
-/// # Title
-/// sdv_huge_data_find
+/// SDV test cases for Slots
+///
 /// # Brief
-/// 1.Push a large amount of data into the initialized container.
-/// 2.Find data through key-value pairs.
+/// 1. Push a large amount of data into the initialized container.
+/// 2. Find data through key-value pairs.
 #[test]
 fn sdv_slots_huge_data_find() {
     let mut slots = Slots::new();
@@ -127,14 +123,13 @@ fn sdv_slots_huge_data_find() {
     }
 }
 
-/// SDV test for Slots
-/// # Title
-/// sdv_huge_data_pop_front
+/// SDV test cases for Slots
+///
 /// # Brief
-/// 1.Push a large amount of data into the initialized container.
-/// 2.Pop the first half of the container.
-/// 3.Push new data into the container again.
-/// 4.Pop all of the data and check correctness of data sequence and values.
+/// 1. Push a large amount of data into the initialized container.
+/// 2. Pop the first half of the container.
+/// 3. Push new data into the container again.
+/// 4. Pop all of the data and check correctness of data sequence and values.
 #[test]
 fn sdv_slots_huge_data_pop_front() {
     let mut slots = Slots::new();

@@ -11,9 +11,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::*;
-use libc::{c_char, c_void};
 use std::ffi::{CStr, CString};
+
+use libc::{c_char, c_void};
+
+use super::*;
 
 type FfrtHook = extern "C" fn(*mut c_void);
 
@@ -167,12 +169,18 @@ extern "C" {
 
     /// Submits a task.
     pub fn ffrt_submit_h_coroutine(
-        data: *mut c_void,         // void* callable,
-        fp: FfrtExecHook,          // ffrt_function_t exec,
-        destroy_fp: FfrtHook,      // ffrt_function_t destroy,
-        in_deps: *const FfrtDeps,  //const ffrt_deps_t* in_deps,
-        out_deps: *const FfrtDeps, //const ffrt_deps_t* out_deps,
-        attr: *const FfrtTaskAttr, //const ffrt_task_attr_t* attr
+        // void* callable
+        data: *mut c_void,
+        // ffrt_function_tdd exec
+        fp: FfrtExecHook,
+        // ffrt_function_t destroy
+        destroy_fp: FfrtHook,
+        // const ffrt_deps_t* out_deps,
+        in_deps: *const FfrtDeps,
+        // const ffrt_deps_t* out_deps,
+        out_deps: *const FfrtDeps,
+        // const ffrt_task_attr_t* att
+        attr: *const FfrtTaskAttr,
     ) -> RawTaskHandle;
 
     // release handle

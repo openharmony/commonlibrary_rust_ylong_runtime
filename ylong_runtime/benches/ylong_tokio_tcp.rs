@@ -128,16 +128,16 @@ macro_rules! ylong_tcp_task {
 mod tcp_bench {
     extern crate test;
 
-    pub use crate::task_helpers::tokio_runtime;
     use std::hint::black_box;
     use std::net::SocketAddr;
+
     use test::Bencher;
-    use tokio::io::AsyncReadExt as tokioAsyncReadExt;
-    use tokio::io::AsyncWriteExt as tokioAsyncWriteExt;
-    use tokio::net::TcpListener as tokioTcpListener;
-    use tokio::net::TcpStream as tokioTcpStream;
+    use tokio::io::{AsyncReadExt as tokioAsyncReadExt, AsyncWriteExt as tokioAsyncWriteExt};
+    use tokio::net::{TcpListener as tokioTcpListener, TcpStream as tokioTcpStream};
     use ylong_runtime::io::{AsyncReadExt, AsyncWriteExt};
     use ylong_runtime::net::{TcpListener, TcpStream};
+
+    pub use crate::task_helpers::tokio_runtime;
 
     ylong_tcp_task!(
         ylong_tcp_10_1000_10000,

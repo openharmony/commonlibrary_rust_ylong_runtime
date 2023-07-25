@@ -11,11 +11,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::par_vec_impl;
 use std::collections::VecDeque;
 
-use crate::iter::parallel::IntoParIter;
-use crate::iter::parallel::ParIter;
+use super::par_vec_impl;
+use crate::iter::parallel::{IntoParIter, ParIter};
 par_vec_impl!(VecDeque<T>, Vec<T>, into_iter, impl <T>);
 
 par_vec_impl!(&'a VecDeque<T>, Vec<&'a T>, iter, impl <'a, T>);

@@ -11,11 +11,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{Events, Interest, Token};
 use std::io;
 use std::os::raw::{c_int, c_uint};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
+
+use crate::{Events, Interest, Token};
 
 static NEXT_ID: AtomicUsize = AtomicUsize::new(1);
 
@@ -23,8 +24,10 @@ static NEXT_ID: AtomicUsize = AtomicUsize::new(1);
 /// Linux: epoll
 /// Windows: iocp
 pub struct Selector {
-    id: usize, //selector id
-    ep: i32,   //epoll fd
+    // selector id
+    id: usize,
+    // epoll fd
+    ep: i32,
 }
 
 impl Selector {
@@ -48,7 +51,8 @@ impl Selector {
 
     /// Waits for io events to come within a time limit.
     pub fn select(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
-        // Convert to milliseconds, if input time is none, it means the timeout is -1 and wait permanently.
+        // Convert to milliseconds, if input time is none, it means the timeout is -1
+        // and wait permanently.
         let timeout = timeout.map(|time| time.as_millis() as c_int).unwrap_or(-1);
 
         events.clear();

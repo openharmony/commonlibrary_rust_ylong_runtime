@@ -12,7 +12,6 @@
 // limitations under the License.
 
 //! num_cpu windows wrapping
-//!
 use std::os::raw::c_long;
 
 // Get the current number of available cpu cores on Windows platform

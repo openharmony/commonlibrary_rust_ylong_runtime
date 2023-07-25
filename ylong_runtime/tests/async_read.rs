@@ -19,11 +19,11 @@ use ylong_runtime::net::{TcpListener, TcpStream};
 /// SDV for &[u8]::poll_read.
 ///
 /// # Brief
-/// 1. use global runtime to spawn a task
-/// 2. construct a buf and a slice, buf's length is greater than the slice
-/// 3. call AsyncReadExt::read on them, check the returns are correct
-/// 4. construct another buf and slice, buf's length is smaller than the slice
-/// 5. call AsyncReadExt::read on them, check the returns are correct
+/// 1. use global runtime to spawn a task.
+/// 2. construct a buf and a slice, buf's length is greater than the slice.
+/// 3. call AsyncReadExt::read on them, check the returns are correct.
+/// 4. construct another buf and slice, buf's length is smaller than the slice.
+/// 5. call AsyncReadExt::read on them, check the returns are correct.
 #[test]
 fn sdv_async_read_slice() {
     ylong_runtime::block_on(async move {

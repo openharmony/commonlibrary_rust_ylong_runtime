@@ -15,17 +15,35 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::thread::sleep;
+
 use ylong_runtime::builder::RuntimeBuilder;
 
-//pidstat -p `pidof block_on-0fd2269f774d8981` -t 1
-//cargo test --release  test_test_schedule(fuzzy matching test name) --  --nocapture
-//cargo test --color=always Run all use cases (with comments) under the current workspace
-//cargo test --color=always --package ylong_runtime  Run all test cases of a crate/package
-//cargo test --color=always --package ylong_runtime --test block_on Run all use cases in block_on.rs
-//cargo test --color=always --package ylong_runtime --test block_on single2_block_on Run a single use case for block_on.rs
-//cargo test --color=always --package ylong_runtime --test block_on single2_block_on  --nocapture --no-fail-fast Print and ignore failures
-//cargo test --color=always --package ylong_runtime --test block_on single2_block_on -- --exact Run accurately and solve scenarios of the same name
-//cargo test -p ylong_runtime Select the module you want to test, the test case you want to test and the sample of how to write the cargo doc
+// pidstat -p `pidof block_on-0fd2269f774d8981` -t 1
+//
+// cargo test --release  test_test_schedule(fuzzy matching test name) --
+// --nocapture
+//
+// cargo test --color=always Run all use cases (with comments) under the
+// current workspace
+//
+// cargo test --color=always --package ylong_runtime  Run all test cases of a
+// crate/package
+//
+// cargo test --color=always --package ylong_runtime --test block_on Run all
+// use cases in block_on.rs
+//
+// cargo test --color=always --package ylong_runtime --test block_on
+// single2_block_on Run a single use case for block_on.rs
+//
+// cargo test --color=always --package ylong_runtime --test block_on
+// single2_block_on  --nocapture --no-fail-fast Print and ignore failures
+//
+// cargo test --color=always --package ylong_runtime --test block_on
+// single2_block_on -- --exact Run accurately and solve scenarios of the same
+// name
+//
+// cargo test -p ylong_runtime Select the module you want to test, the test
+// case you want to test and the sample of how to write the cargo doc
 
 #[test]
 fn sdv_single1_block_on() {
@@ -240,8 +258,12 @@ fn sdv_block_on_nest_await_spawn() {
     assert_eq!(res, 100 * 1000);
 }
 
-// Problem 1: When all the above use cases run concurrently with the following use cases, there is a segment error. The simple analysis is that someone pops at the same time when stealing, which causes the fetching task to be empty, resulting in a segment error.
-// Problem 2: When there are many concurrent use cases, such as more than 1000, it is impossible to wake up the thread where block_on is located.
+// Problem 1: When all the above use cases run concurrently with the following
+// use cases, there is a segment error. The simple analysis is that someone pops
+// at the same time when stealing, which causes the fetching task to be empty,
+// resulting in a segment error. Problem 2: When there are many concurrent use
+// cases, such as more than 1000, it is impossible to wake up the thread where
+// block_on is located.
 #[test]
 fn sdv_block_on_nest_await_spawn_bug_test() {
     async fn task() -> usize {

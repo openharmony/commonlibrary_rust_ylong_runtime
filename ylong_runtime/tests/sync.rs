@@ -11,20 +11,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::sync::{Arc, Mutex};
-use ylong_runtime::sync::Mutex as YlongMutex;
-
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{Acquire, Release};
+use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
 use std::thread;
 use std::thread::sleep;
 use std::time::Duration;
-use ylong_runtime::sync::Waiter;
 
-use ylong_runtime::sync::RwLock;
+use ylong_runtime::sync::{Mutex as YlongMutex, RwLock, Waiter};
 
 const NUM: usize = 200;
 
@@ -54,16 +51,13 @@ async fn test_future() -> usize {
     create_new(1000).await
 }
 
-/// SDV test for `Mutex`.
-///
-/// # Title
-/// sdv_concurrency_with_mutex1
+/// SDV test cases for `Mutex`.
 ///
 /// # Brief
-/// 1.Create Runtime.
-/// 2.Create a variable of Mutex.
-/// 3.Executing an async task and change the variable.
-/// 4.Check if the test results are correct.
+/// 1. Create Runtime.
+/// 2. Create a variable of Mutex.
+/// 3. Executing an async task and change the variable.
+/// 4. Check if the test results are correct.
 #[test]
 fn sdv_concurrency_with_mutex1() {
     ylong_runtime::block_on(async {
@@ -115,16 +109,13 @@ fn sdv_concurrency_with_mutex1() {
     });
 }
 
-/// SDV test for `Mutex`.
-///
-/// # Title
-/// sdv_concurrency_with_mutex2
+/// SDV test cases for `Mutex`.
 ///
 /// # Brief
-/// 1.Create Runtime.
-/// 2.Create a variable of Mutex.
-/// 3.Executing an async task and change the variable for 100 times.
-/// 4.Check if the test results are correct.
+/// 1. Create Runtime.
+/// 2. Create a variable of Mutex.
+/// 3. Executing an async task and change the variable for 100 times.
+/// 4. Check if the test results are correct.
 #[test]
 fn sdv_concurrency_with_mutex2() {
     ylong_runtime::block_on(async {
@@ -144,15 +135,12 @@ fn sdv_concurrency_with_mutex2() {
     });
 }
 
-/// SDV test for `Mutex`.
-///
-/// # Title
-/// sdv_concurrency_with_mutex3
+/// SDV test cases for `Mutex`.
 ///
 /// # Brief
-/// 1.Create Runtime.
-/// 2.Executing async tasks and Change the variable for 5 times
-/// 3.Check if the test results are correct.
+/// 1. Create Runtime.
+/// 2. Executing async tasks and Change the variable for 5 times
+/// 3. Check if the test results are correct.
 #[test]
 fn sdv_concurrency_with_mutex3() {
     ylong_runtime::block_on(async {
@@ -178,27 +166,24 @@ fn sdv_concurrency_with_mutex3() {
     });
 }
 
-/// SDV test for `Mutex`.
-///
-/// # Title
-/// sdv_concurrency_with_mutex4
+/// SDV test cases for `Mutex`.
 ///
 /// # Brief
-/// 1.Create Runtime.
-/// 2.Executing an async task which contains an async task and locking
-/// 3.Check if the test results are correct.
+/// 1. Create Runtime.
+/// 2. Executing an async task which contains an async task and locking
+/// 3. Check if the test results are correct.
 #[test]
 fn sdv_concurrency_with_mutex4() {
     let mutex1 = Arc::new(YlongMutex::new(0));
-    // If test_future().await and the lock operation are put together to form a future,
-    // there is a sequential relationship between the two futures,
+    // If test_future().await and the lock operation are put together to form a
+    // future, there is a sequential relationship between the two futures,
     let mut handlers1 = Vec::with_capacity(NUM);
     let mut handlers2 = Vec::with_capacity(NUM);
 
     for _ in 0..200 {
         let mutex = mutex1.clone();
         handlers1.push(ylong_runtime::spawn(async move {
-            //test_future() and locking do not exist concurrently.
+            // test_future() and locking do not exist concurrently.
             test_future().await;
             let mut n = mutex.lock().await;
             *n += 1;
@@ -207,7 +192,7 @@ fn sdv_concurrency_with_mutex4() {
 
     for _ in 0..200 {
         handlers2.push(ylong_runtime::spawn(
-            //test_future() and locking exist concurrently.
+            // test_future() and locking exist concurrently.
             test_future(),
         ));
     }
@@ -226,16 +211,13 @@ fn sdv_concurrency_with_mutex4() {
     });
 }
 
-/// SDV test for RwLock.
-///
-/// # Title
-/// sdv_rwlock_multi_threads
+/// SDV test cases for RwLock.
 ///
 /// # Brief
-/// 1.Create producer_lock.
-/// 2.Write for 100000 times.
-/// 3.Two read thread to read for 100000 times.
-/// 4.Check if the test results are correct.
+/// 1. Create producer_lock.
+/// 2. Write for 100000 times.
+/// 3. Two read thread to read for 100000 times.
+/// 4. Check if the test results are correct.
 #[test]
 fn sdv_rwlock_multi_threads() {
     // Put the counter initial value into a read/write lock encapsulated
@@ -283,16 +265,13 @@ fn sdv_rwlock_multi_threads() {
     assert_eq!(*mutex.lock().unwrap(), 110000);
 }
 
-/// SDV test for RwLock read.
-///
-/// # Title
-/// sdv_rwlock_with_read1
+/// SDV test cases for RwLock read.
 ///
 /// # Brief
-/// 1.Create a variable of Rwlock.
-/// 2.Create Runtime.
-/// 3.Executing an async task for 200 times.
-/// 4.Check if the test results are correct.
+/// 1. Create a variable of Rwlock.
+/// 2. Create Runtime.
+/// 3. Executing an async task for 200 times.
+/// 4. Check if the test results are correct.
 #[test]
 fn sdv_rwlock_with_read1() {
     let rwlock = Arc::new(RwLock::new(5));
@@ -317,16 +296,13 @@ fn sdv_rwlock_with_read1() {
     }
 }
 
-/// SDV test for read lock.
-///
-/// # Title
-/// sdv_rwlock_with_read2
+/// SDV test cases for read lock.
 ///
 /// # Brief
-/// 1.Create a variable of Rwlock.
-/// 2.Create Runtime.
-/// 3.Read for 200 times.
-/// 4.Check if the test results are correct.
+/// 1. Create a variable of Rwlock.
+/// 2. Create Runtime.
+/// 3. Read for 200 times.
+/// 4. Check if the test results are correct.
 #[test]
 fn sdv_rwlock_with_read2() {
     let rwlock = Arc::new(RwLock::new(5));
@@ -344,17 +320,14 @@ fn sdv_rwlock_with_read2() {
     }
 }
 
-/// SDV test for read-write lock.
-///
-/// # Title
-/// sdv_rwlock_read_and_write
+/// SDV test cases for read-write lock.
 ///
 /// # Brief
-/// 1.Create a variable of Rwlock.
-/// 2.Create Runtime.
-/// 3.Executing an async task.
-/// 3.Read and write for 200 times.
-/// 4.Check if the test results are correct.
+/// 1. Create a variable of Rwlock.
+/// 2. Create Runtime.
+/// 3. Executing an async task.
+/// 4. Read and write for 200 times.
+/// 5. Check if the test results are correct.
 #[test]
 fn sdv_rwlock_read_and_write() {
     let rwlock = Arc::new(RwLock::new(5));
@@ -389,16 +362,13 @@ fn sdv_rwlock_read_and_write() {
     });
 }
 
-/// SDV test for Rwlock.
-///
-/// # Title
-/// sdv_rwlock_with_write1
+/// SDV test cases for Rwlock.
 ///
 /// # Brief
-/// 1.Create a variable of Rwlock.
-/// 2.Create Runtime.
-/// 3.Write and execute another task for 200 times.
-/// 4.Check if the test results are correct.
+/// 1. Create a variable of Rwlock.
+/// 2. Create Runtime.
+/// 3. Write and execute another task for 200 times.
+/// 4. Check if the test results are correct.
 #[test]
 fn sdv_rwlock_with_write1() {
     let rwlock = Arc::new(RwLock::new(5));
@@ -428,16 +398,13 @@ fn sdv_rwlock_with_write1() {
     });
 }
 
-/// SDV test for Rwlock.
-///
-/// # Title
-/// sdv_rwlock_with_write2
+/// SDV test cases for Rwlock.
 ///
 /// # Brief
-/// 1.Create a variable of Rwlock.
-/// 2.Create Runtime.
-/// 3.Write for 200 times.
-/// 4.Check if the test results are correct.
+/// 1. Create a variable of Rwlock.
+/// 2. Create Runtime.
+/// 3. Write for 200 times.
+/// 4. Check if the test results are correct.
 #[test]
 fn sdv_rwlock_with_write2() {
     let rwlock = Arc::new(RwLock::new(5));
@@ -460,14 +427,11 @@ fn sdv_rwlock_with_write2() {
     });
 }
 
-/// SDV test for `Waiter::wake_one()`.
-///
-/// # Title
-/// sdv_waiter_with_wake_one
+/// SDV test cases for `Waiter::wake_one()`.
 ///
 /// # Brief
-/// 1.Call `wake_one` before a task calling `wait`.
-/// 2.Call `wake_one` after a task calling `wait`.
+/// 1. Call `wake_one` before a task calling `wait`.
+/// 2. Call `wake_one` after a task calling `wait`.
 #[test]
 fn sdv_waiter_with_wake_one() {
     let waiter = Arc::new(Waiter::new());
@@ -494,13 +458,10 @@ fn sdv_waiter_with_wake_one() {
     let _ = ylong_runtime::block_on(handle3);
 }
 
-/// SDV test for `Waiter::wake_all()`.
-///
-/// # Title
-/// sdv_waiter_with_wake_all
+/// SDV test cases for `Waiter::wake_all()`.
 ///
 /// # Brief
-/// 1.Call `wake_all` after some tasks calling `wait`.
+/// 1. Call `wake_all` after some tasks calling `wait`.
 #[test]
 fn sdv_waiter_with_wake_all() {
     let waiter = Arc::new(Waiter::new());

@@ -11,13 +11,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::task::raw::Header;
 use std::future::Future;
 use std::marker::PhantomData;
 use std::mem::ManuallyDrop;
 use std::ops::Deref;
 use std::ptr::NonNull;
 use std::task::{RawWaker, RawWakerVTable, Waker};
+
+use crate::task::raw::Header;
 
 unsafe fn get_header_by_raw_ptr(ptr: *const ()) -> NonNull<Header> {
     let header = ptr as *mut Header;
@@ -65,7 +66,8 @@ where
     RawWaker::new(ptr, raw_waker_ref)
 }
 
-/// Warps std::task::{RawWaker, RawWakerVTable, Waker} info, implements task notify and schedule
+/// Warps std::task::{RawWaker, RawWakerVTable, Waker} info, implements task
+/// notify and schedule
 pub(crate) struct WakerRefHeader<'a> {
     waker: ManuallyDrop<Waker>,
     _field: PhantomData<&'a Header>,

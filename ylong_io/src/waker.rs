@@ -11,9 +11,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::io;
+
 use crate::sys::WakerInner;
 use crate::{Poll, Token};
-use std::io;
 
 /// Waker allows cross-thread waking of Poll.
 #[derive(Debug)]

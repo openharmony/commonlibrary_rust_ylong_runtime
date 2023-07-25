@@ -11,9 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::IntoParIter;
-use super::ParIter;
-use super::ParSplit;
+use super::{IntoParIter, ParIter, ParSplit};
 
 impl<T> ParSplit for Vec<T> {
     fn len(&self) -> usize {

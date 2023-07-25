@@ -11,32 +11,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::io::read_task::{LinesTask, ReadLineTask, ReadUtilTask, SplitTask};
-use crate::io::AsyncRead;
 use std::io;
 use std::ops::DerefMut;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
+use crate::io::read_task::{LinesTask, ReadLineTask, ReadUtilTask, SplitTask};
+use crate::io::AsyncRead;
+
 /// It is an asynchronous version of [`std::io::BufRead`].
 ///
-/// A `AsyncBufRead` is a type of `AsyncRead`er which has an internal buffer, allowing it
-/// to perform extra ways of reading, such as `read_line`.
+/// A `AsyncBufRead` is a type of `AsyncRead`er which has an internal buffer,
+/// allowing it to perform extra ways of reading, such as `read_line`.
 pub trait AsyncBufRead: AsyncRead {
-    /// Returns the contents of the internal buffer, trying to fill it with more data
-    /// from the inner reader if it is empty.
+    /// Returns the contents of the internal buffer, trying to fill it with more
+    /// data from the inner reader if it is empty.
     ///
-    /// This method is non-blocking. If the underlying reader is unable to perform
-    /// a read at the time, this method would return a `Poll::Pending`. If there is data inside
-    /// the buffer or the read is successfully performed, then it would return a
-    /// `Poll::Ready(&[u8])`.
+    /// This method is non-blocking. If the underlying reader is unable to
+    /// perform a read at the time, this method would return a
+    /// `Poll::Pending`. If there is data inside the buffer or the read is
+    /// successfully performed, then it would return a `Poll::Ready(&[u8])`.
     ///
     /// This method is a low-level call. It needs to be paired up with calls to
     /// [`Self::consume`] method to function properly.
     fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>>;
 
-    /// Tells this buffer that `amt` bytes have been consumed from the buffer, so they should
-    /// no longer be returned in calls to `read`.
+    /// Tells this buffer that `amt` bytes have been consumed from the buffer,
+    /// so they should no longer be returned in calls to `read`.
     ///
     /// This method is a low-level call. It has to be called after a call to
     /// [`Self::poll_fill_buf`] in order to function properly.
@@ -83,13 +84,15 @@ where
     }
 }
 
-/// An external trait that is automatically implemented for any object that has the AsyncBufRead trait.
-/// Provides std-like reading methods such as `read_until`, `read_line`, `split`, `lines`.
-/// Every method in this trait returns a future object. Awaits on the future will complete the
-/// task, but it doesn't guarantee whether the task will finished immediately or asynchronously.
+/// An external trait that is automatically implemented for any object that has
+/// the AsyncBufRead trait. Provides std-like reading methods such as
+/// `read_until`, `read_line`, `split`, `lines`. Every method in this trait
+/// returns a future object. Awaits on the future will complete the task, but it
+/// doesn't guarantee whether the task will finished immediately or
+/// asynchronously.
 pub trait AsyncBufReadExt: AsyncBufRead {
-    /// Asynchronously reads data from the underlying stream into the `buf` until the
-    /// desired delimiter appears or EOF is reached.
+    /// Asynchronously reads data from the underlying stream into the `buf`
+    /// until the desired delimiter appears or EOF is reached.
     ///
     /// If successful, this function will return the total number of bytes read.
     ///
@@ -107,8 +110,8 @@ pub trait AsyncBufReadExt: AsyncBufRead {
         ReadUtilTask::new(self, byte, buf)
     }
 
-    /// Asynchronously reads data from the underlying stream into the `buf` until the
-    /// delimiter '\n' appears or EOF is reached.
+    /// Asynchronously reads data from the underlying stream into the `buf`
+    /// until the delimiter '\n' appears or EOF is reached.
     ///
     /// If successful, this function will return the total number of bytes read.
     ///
@@ -126,8 +129,8 @@ pub trait AsyncBufReadExt: AsyncBufRead {
         ReadLineTask::new(self, buf)
     }
 
-    /// Asynchronously reads data from the underlying stream until EOF is reached
-    /// and splits it on a delimiter.
+    /// Asynchronously reads data from the underlying stream until EOF is
+    /// reached and splits it on a delimiter.
     ///
     /// # Examples
     /// ```no run
@@ -143,8 +146,8 @@ pub trait AsyncBufReadExt: AsyncBufRead {
         SplitTask::new(self, byte)
     }
 
-    /// Asynchronously reads data from the underlying stream until EOF is reached
-    /// and splits it on a delimiter.
+    /// Asynchronously reads data from the underlying stream until EOF is
+    /// reached and splits it on a delimiter.
     ///
     /// # Examples
     /// ```no run

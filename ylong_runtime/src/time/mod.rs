@@ -20,16 +20,17 @@ mod timeout;
 mod timer;
 mod wheel;
 
+use std::ptr::{addr_of_mut, NonNull};
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering::Relaxed;
+use std::task::Waker;
+
 pub(crate) use driver::Driver;
 pub use sleep::{sleep, sleep_until};
 pub use timeout::timeout;
 pub use timer::{periodic_schedule, timer, timer_at, Timer};
 
 use crate::util::link_list::{Link, Node};
-use std::ptr::{addr_of_mut, NonNull};
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering::Relaxed;
-use std::task::Waker;
 
 // Struct for timing and waking up corresponding tasks on the timing wheel.
 pub(crate) struct Clock {

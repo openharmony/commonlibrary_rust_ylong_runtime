@@ -11,15 +11,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::sys::windows::tcp::TcpSocket;
-use crate::sys::NetState;
-use crate::{Interest, Selector, Source, Token};
-use crate::source::Fd;
 use std::fmt::Formatter;
 use std::io::{IoSlice, IoSliceMut, Read, Write};
 use std::net::{Shutdown, SocketAddr};
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
 use std::{fmt, io, net};
+
+use crate::source::Fd;
+use crate::sys::windows::tcp::TcpSocket;
+use crate::sys::NetState;
+use crate::{Interest, Selector, Source, Token};
 
 /// A non-blocking TCP Stream between a local socket and a remote socket.
 pub struct TcpStream {
@@ -68,13 +69,15 @@ impl TcpStream {
     ///
     /// ```no_run
     /// use std::net::{IpAddr, Ipv4Addr};
+    ///
     /// use ylong_io::TcpStream;
     ///
     /// let addr = "127.0.0.1:1234".parse().unwrap();
-    /// let stream = TcpStream::connect(addr)
-    ///                        .expect("Couldn't connect to the server...");
-    /// assert_eq!(stream.local_addr().unwrap().ip(),
-    ///            IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)));
+    /// let stream = TcpStream::connect(addr).expect("Couldn't connect to the server...");
+    /// assert_eq!(
+    ///     stream.local_addr().unwrap().ip(),
+    ///     IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))
+    /// );
     /// ```
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
         self.inner.local_addr()
@@ -86,13 +89,15 @@ impl TcpStream {
     ///
     /// ```no_run
     /// use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+    ///
     /// use ylong_io::TcpStream;
     ///
     /// let addr = "127.0.0.1:1234".parse().unwrap();
-    /// let stream = TcpStream::connect(addr)
-    ///                        .expect("Couldn't connect to the server...");
-    /// assert_eq!(stream.peer_addr().unwrap(),
-    ///            SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 1234)));
+    /// let stream = TcpStream::connect(addr).expect("Couldn't connect to the server...");
+    /// assert_eq!(
+    ///     stream.peer_addr().unwrap(),
+    ///     SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 1234))
+    /// );
     /// ```
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
         self.inner.peer_addr()
@@ -103,13 +108,15 @@ impl TcpStream {
     /// # Examples
     ///
     /// ```no_run
-    /// use std::net::{Shutdown};
+    /// use std::net::Shutdown;
+    ///
     /// use ylong_io::TcpStream;
     ///
     /// let addr = "127.0.0.1:1234".parse().unwrap();
-    /// let stream = TcpStream::connect(addr)
-    ///                        .expect("Couldn't connect to the server...");
-    /// stream.shutdown(Shutdown::Both).expect("shutdown call failed");
+    /// let stream = TcpStream::connect(addr).expect("Couldn't connect to the server...");
+    /// stream
+    ///     .shutdown(Shutdown::Both)
+    ///     .expect("shutdown call failed");
     /// ```
     pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
         self.inner.shutdown(how)
@@ -123,8 +130,7 @@ impl TcpStream {
     /// use ylong_io::TcpStream;
     ///
     /// let addr = "127.0.0.1:1234".parse().unwrap();
-    /// let stream = TcpStream::connect(addr)
-    ///                        .expect("Couldn't connect to the server...");
+    /// let stream = TcpStream::connect(addr).expect("Couldn't connect to the server...");
     /// stream.set_nodelay(true).expect("set_nodelay call failed");
     /// ```
     pub fn set_nodelay(&self, nodelay: bool) -> io::Result<()> {
@@ -139,8 +145,7 @@ impl TcpStream {
     /// use ylong_io::TcpStream;
     ///
     /// let addr = "127.0.0.1:1234".parse().unwrap();
-    /// let stream = TcpStream::connect(addr)
-    ///                        .expect("Couldn't connect to the server...");
+    /// let stream = TcpStream::connect(addr).expect("Couldn't connect to the server...");
     /// stream.set_nodelay(true).expect("set_nodelay call failed");
     /// assert_eq!(stream.nodelay().unwrap_or(false), true);
     /// ```
@@ -156,8 +161,7 @@ impl TcpStream {
     /// use ylong_io::TcpStream;
     ///
     /// let addr = "127.0.0.1:1234".parse().unwrap();
-    /// let stream = TcpStream::connect(addr)
-    ///                        .expect("Couldn't connect to the server...");
+    /// let stream = TcpStream::connect(addr).expect("Couldn't connect to the server...");
     /// stream.set_ttl(100).expect("set_ttl call failed");
     /// ```
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
@@ -172,8 +176,7 @@ impl TcpStream {
     /// use ylong_io::TcpStream;
     ///
     /// let addr = "127.0.0.1:1234".parse().unwrap();
-    /// let stream = TcpStream::connect(addr)
-    ///                        .expect("Couldn't connect to the server...");
+    /// let stream = TcpStream::connect(addr).expect("Couldn't connect to the server...");
     /// stream.set_ttl(100).expect("set_ttl call failed");
     /// assert_eq!(stream.ttl().unwrap_or(0), 100);
     /// ```
@@ -189,8 +192,7 @@ impl TcpStream {
     /// use ylong_io::TcpStream;
     ///
     /// let addr = "127.0.0.1:1234".parse().unwrap();
-    /// let stream = TcpStream::connect(addr)
-    ///                        .expect("Couldn't connect to the server...");
+    /// let stream = TcpStream::connect(addr).expect("Couldn't connect to the server...");
     /// stream.take_error().expect("No error was expected...");
     /// ```
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
@@ -209,8 +211,7 @@ impl TcpStream {
     /// use ylong_io::TcpStream;
     ///
     /// let addr = "127.0.0.1:1234".parse().unwrap();
-    /// let stream = TcpStream::connect(addr)
-    ///                        .expect("Couldn't connect to the server...");
+    /// let stream = TcpStream::connect(addr).expect("Couldn't connect to the server...");
     /// let mut buf = [0; 10];
     /// let len = stream.peek(&mut buf).expect("peek failed");
     /// ```

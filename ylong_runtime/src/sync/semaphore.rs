@@ -15,64 +15,67 @@
 
 use crate::sync::semaphore_inner::{SemaphoreError, SemaphoreInner};
 
-/// Asynchronous counting semaphore. It allows more than one caller to access the shared resource.
-/// Semaphore contains a set of permits. Call `acquire` method and get a permit to access the shared
-/// resource. When permits are used up, new requests to acquire permit will wait until `release` method
-/// is called. When no request is waiting, calling `release` method will add a permit to semaphore.
+/// Asynchronous counting semaphore. It allows more than one caller to access
+/// the shared resource. Semaphore contains a set of permits. Call `acquire`
+/// method and get a permit to access the shared resource. When permits are used
+/// up, new requests to acquire permit will wait until `release` method
+/// is called. When no request is waiting, calling `release` method will add a
+/// permit to semaphore.
 ///
-/// The difference between [`AutoRelSemaphore`] and [`Semaphore`] is that permit acquired from
-/// [`Semaphore`] will be consumed. When permit from [`AutoRelSemaphore`] is dropped, it will be
-/// assigned to another acquiring request or returned to the semaphore.
+/// The difference between [`AutoRelSemaphore`] and [`Semaphore`] is that permit
+/// acquired from [`Semaphore`] will be consumed. When permit from
+/// [`AutoRelSemaphore`] is dropped, it will be assigned to another acquiring
+/// request or returned to the semaphore.
 ///
 /// # Examples
 ///
 /// ```
-///
 /// use std::sync::Arc;
+///
 /// use ylong_runtime::sync::semaphore::Semaphore;
 ///
-///  async fn io_func() {
+/// async fn io_func() {
 ///     let sem = Arc::new(Semaphore::new(2).unwrap());
 ///     let sem2 = sem.clone();
 ///     let _permit1 = sem.try_acquire();
 ///     ylong_runtime::spawn(async move {
 ///         let _permit2 = sem2.acquire().await.unwrap();
 ///     });
-///  }
-///
+/// }
 /// ```
 pub struct Semaphore {
     inner: SemaphoreInner,
 }
 
-/// Asynchronous counting semaphore. It allows more than one caller to access the shared resource.
-/// semaphore contains a set of permits. Call `acquire` method and get a permit to access the shared
-/// resource. The total number of permits is fixed. When no permits are available, new request to
-/// acquire permit will wait until another permit is dropped. When no request is waiting and one permit
-/// is **dropped**, the permit will be return to semaphore so that the number of permits in semaphore will
-/// increase.
+/// Asynchronous counting semaphore. It allows more than one caller to access
+/// the shared resource. semaphore contains a set of permits. Call `acquire`
+/// method and get a permit to access the shared resource. The total number of
+/// permits is fixed. When no permits are available, new request to
+/// acquire permit will wait until another permit is dropped. When no request is
+/// waiting and one permit is **dropped**, the permit will be return to
+/// semaphore so that the number of permits in semaphore will increase.
 ///
-/// The difference between [`AutoRelSemaphore`] and [`Semaphore`] is that permit acquired from
-/// [`Semaphore`] will be consumed. When permit from [`AutoRelSemaphore`] is dropped, it will be
-/// assigned to another acquiring request or returned to the semaphore, in other words, permit will
+/// The difference between [`AutoRelSemaphore`] and [`Semaphore`] is that permit
+/// acquired from [`Semaphore`] will be consumed. When permit from
+/// [`AutoRelSemaphore`] is dropped, it will be assigned to another acquiring
+/// request or returned to the semaphore, in other words, permit will
 /// be automatically released when it is dropped.
 ///
 /// # Examples
 ///
 /// ```
-///
 /// use std::sync::Arc;
+///
 /// use ylong_runtime::sync::semaphore::AutoRelSemaphore;
 ///
-///  async fn io_func() {
+/// async fn io_func() {
 ///     let sem = Arc::new(AutoRelSemaphore::new(2).unwrap());
 ///     let sem2 = sem.clone();
 ///     let _permit1 = sem.try_acquire();
 ///     ylong_runtime::spawn(async move {
 ///         let _permit2 = sem2.acquire().await.unwrap();
 ///     });
-///  }
-///
+/// }
 /// ```
 pub struct AutoRelSemaphore {
     inner: SemaphoreInner,
@@ -94,11 +97,9 @@ impl Semaphore {
     /// # Examples
     ///
     /// ```
-    ///
     /// use ylong_runtime::sync::Semaphore;
     ///
     /// let sem = Semaphore::new(4).unwrap();
-    ///
     /// ```
     pub fn new(permits: usize) -> Result<Semaphore, SemaphoreError> {
         match SemaphoreInner::new(permits) {
@@ -112,11 +113,9 @@ impl Semaphore {
     /// # Examples
     ///
     /// ```
-    ///
     /// use ylong_runtime::sync::Semaphore;
     /// let sem = Semaphore::new(4).unwrap();
     /// assert_eq!(sem.current_permits(), 4);
-    ///
     /// ```
     pub fn current_permits(&self) -> usize {
         self.inner.current_permits()
@@ -127,14 +126,12 @@ impl Semaphore {
     /// # Examples
     ///
     /// ```
-    ///
     /// use ylong_runtime::sync::Semaphore;
     ///
     /// let sem = Semaphore::new(4).unwrap();
     /// assert_eq!(sem.current_permits(), 4);
     /// sem.release();
     /// assert_eq!(sem.current_permits(), 5);
-    ///
     /// ```
     pub fn release(&self) {
         self.inner.release();
@@ -151,7 +148,6 @@ impl Semaphore {
     /// # Examples
     ///
     /// ```
-    ///
     /// use ylong_runtime::sync::Semaphore;
     ///
     /// let sem = Semaphore::new(4).unwrap();
@@ -160,7 +156,6 @@ impl Semaphore {
     /// assert_eq!(sem.current_permits(), 3);
     /// drop(permit);
     /// assert_eq!(sem.current_permits(), 3);
-    ///
     /// ```
     pub fn try_acquire(&self) -> Result<SemaphorePermit, SemaphoreError> {
         match self.inner.try_acquire() {
@@ -185,27 +180,25 @@ impl Semaphore {
     ///     ylong_runtime::spawn(async move {
     ///         let _permit2 = sem.acquire().await.unwrap();
     ///     });
-    ///  }
-    ///
+    /// }
     /// ```
     pub async fn acquire(&self) -> Result<SemaphorePermit, SemaphoreError> {
         self.inner.acquire().await?;
         Ok(SemaphorePermit)
     }
 
-    /// Checks whether semaphore is closed. If so, the semaphore could not be acquired anymore.
+    /// Checks whether semaphore is closed. If so, the semaphore could not be
+    /// acquired anymore.
     ///
     /// # Examples
     ///
     /// ```
-    ///
     /// use ylong_runtime::sync::semaphore::Semaphore;
     ///
     /// let sem = Semaphore::new(4).unwrap();
     /// assert!(!sem.is_closed());
     /// sem.close();
     /// assert!(sem.is_closed());
-    ///
     /// ```
     pub fn is_closed(&self) -> bool {
         self.inner.is_closed()
@@ -217,14 +210,12 @@ impl Semaphore {
     /// # Examples
     ///
     /// ```
-    ///
     /// use ylong_runtime::sync::Semaphore;
     ///
     /// let sem = Semaphore::new(4).unwrap();
     /// assert!(!sem.is_closed());
     /// sem.close();
     /// assert!(sem.is_closed());
-    ///
     /// ```
     pub fn close(&self) {
         self.inner.close();
@@ -237,11 +228,9 @@ impl AutoRelSemaphore {
     /// # Examples
     ///
     /// ```
-    ///
     /// use ylong_runtime::sync::AutoRelSemaphore;
     ///
     /// let sem = AutoRelSemaphore::new(4).unwrap();
-    ///
     /// ```
     pub fn new(number: usize) -> Result<AutoRelSemaphore, SemaphoreError> {
         match SemaphoreInner::new(number) {
@@ -255,11 +244,9 @@ impl AutoRelSemaphore {
     /// # Examples
     ///
     /// ```
-    ///
     /// use ylong_runtime::sync::AutoRelSemaphore;
     /// let sem = AutoRelSemaphore::new(4).unwrap();
     /// assert_eq!(sem.current_permits(), 4);
-    ///
     /// ```
     pub fn current_permits(&self) -> usize {
         self.inner.current_permits()
@@ -276,7 +263,6 @@ impl AutoRelSemaphore {
     /// # Examples
     ///
     /// ```
-    ///
     /// use ylong_runtime::sync::AutoRelSemaphore;
     ///
     /// let sem = AutoRelSemaphore::new(4).unwrap();
@@ -285,7 +271,6 @@ impl AutoRelSemaphore {
     /// assert_eq!(sem.current_permits(), 3);
     /// drop(permit);
     /// assert_eq!(sem.current_permits(), 4);
-    ///
     /// ```
     pub fn try_acquire(&self) -> Result<AutoRelSemaphorePermit<'_>, SemaphoreError> {
         match self.inner.try_acquire() {
@@ -304,7 +289,6 @@ impl AutoRelSemaphore {
     /// # Examples
     ///
     /// ```
-    ///
     /// use ylong_runtime::sync::AutoRelSemaphore;
     ///
     /// async fn io_func() {
@@ -312,47 +296,42 @@ impl AutoRelSemaphore {
     ///     ylong_runtime::spawn(async move {
     ///         let _permit2 = sem.acquire().await.unwrap();
     ///     });
-    ///  }
-    ///
+    /// }
     /// ```
     pub async fn acquire(&self) -> Result<AutoRelSemaphorePermit<'_>, SemaphoreError> {
         self.inner.acquire().await?;
         Ok(AutoRelSemaphorePermit { sem: self })
     }
 
-    /// Checks whether the state of semaphore is closed, if so, the semaphore could not acquire
-    /// permits anymore.
+    /// Checks whether the state of semaphore is closed, if so, the semaphore
+    /// could not acquire permits anymore.
     ///
     /// # Examples
     ///
     /// ```
-    ///
     /// use ylong_runtime::sync::AutoRelSemaphore;
     ///
     /// let sem = AutoRelSemaphore::new(4).unwrap();
     /// assert!(!sem.is_closed());
     /// sem.close();
     /// assert!(sem.is_closed());
-    ///
     /// ```
     pub fn is_closed(&self) -> bool {
         self.inner.is_closed()
     }
 
-    /// Turns the state of semaphore to be closed so that semaphore could not acquire
-    /// permits anymore, and notify all request in the waiting list.
+    /// Turns the state of semaphore to be closed so that semaphore could not
+    /// acquire permits anymore, and notify all request in the waiting list.
     ///
     /// # Examples
     ///
     /// ```
-    ///
     /// use ylong_runtime::sync::AutoRelSemaphore;
     ///
     /// let sem = AutoRelSemaphore::new(4).unwrap();
     /// assert!(!sem.is_closed());
     /// sem.close();
     /// assert!(sem.is_closed());
-    ///
     /// ```
     pub fn close(&self) {
         self.inner.close();

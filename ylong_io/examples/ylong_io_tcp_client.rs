@@ -11,12 +11,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! cargo build --example ylong_io_tcp_client --no-default-features --features="ylong_tcp"
-//! Uses with ylong_io_tcp_server, start ylong_io_tcp_server first, then start ylong_io_tcp_client
+//! cargo build --example ylong_io_tcp_client --no-default-features
+//! --features="ylong_tcp" Uses with ylong_io_tcp_server, start
+//! ylong_io_tcp_server first, then start ylong_io_tcp_client
 
 use std::io::{Read, Write};
 use std::thread::sleep;
 use std::time::Duration;
+
 use ylong_io::TcpStream;
 
 fn main() {

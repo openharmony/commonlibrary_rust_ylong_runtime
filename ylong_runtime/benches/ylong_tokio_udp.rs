@@ -23,21 +23,17 @@ pub mod task_helpers;
 mod udp_bench {
     extern crate test;
 
-    use crate::task_helpers::tokio_runtime;
     use test::Bencher;
-
+    use tokio::net::UdpSocket as tokioUdpSocket;
     use ylong_runtime::net::UdpSocket;
 
-    use tokio::net::UdpSocket as tokioUdpSocket;
+    use crate::task_helpers::tokio_runtime;
 
-    /// benchmark test for ylong udp connect.
-    ///
-    /// # Title
-    /// ylong_udp_connect
+    /// Benchmark test for ylong udp connect.
     ///
     /// # Brief
-    /// 1.Create sender.
-    /// 2.Bind and Connect.
+    /// 1. Create sender.
+    /// 2. Bind and Connect.
     #[bench]
     fn ylong_udp_connect(b: &mut Bencher) {
         let sender_addr = "127.0.0.1:8093".parse().unwrap();
@@ -52,14 +48,11 @@ mod udp_bench {
         });
     }
 
-    /// benchmark test for tokio udp connect.
-    ///
-    /// # Title
-    /// tokio_udp_connect
+    /// Benchmark test for tokio udp connect.
     ///
     /// # Brief
-    /// 1.Create sender.
-    /// 2.Bind and Connect.
+    /// 1. Create sender.
+    /// 2. Bind and Connect.
     #[bench]
     fn tokio_udp_connect(b: &mut Bencher) {
         let sender_addr = "127.0.0.1:8095";
@@ -75,16 +68,14 @@ mod udp_bench {
         });
     }
 
-    /// benchmark test for ylong udp function send() and recv().
-    ///
-    /// # Title
-    /// ylong_udp_send_recv
+    /// Benchmark test for ylong udp function send() and recv().
     ///
     /// # Brief
-    /// 1.Create sender and receiver, bind their new UdpSockets and connect to each other.
-    /// 2.Sender use send() to send message.
-    /// 3.Receiver use recv() to receives message.
-    /// 4.Check if the test results are correct.
+    /// 1. Create sender and receiver, bind their new UdpSockets and connect to
+    ///    each other.
+    /// 2. Sender use send() to send message.
+    /// 3. Receiver use recv() to receives message.
+    /// 4. Check if the test results are correct.
     #[bench]
     fn ylong_udp_send_recv(b: &mut Bencher) {
         let basic_addr = "127.0.0.1:";
@@ -121,16 +112,14 @@ mod udp_bench {
         });
     }
 
-    /// benchmark test for tokio udp function send() and recv().
-    ///
-    /// # Title
-    /// tokio_udp_send_recv
+    /// Benchmark test for tokio udp function send() and recv().
     ///
     /// # Brief
-    /// 1.Create sender and receiver, bind their new UdpSockets and connect to each other.
-    /// 2.Sender use send() to send message.
-    /// 3.Receiver use recv() to receives message.
-    /// 4.Check if the test results are correct.
+    /// 1. Create sender and receiver, bind their new UdpSockets and connect to
+    ///    each other.
+    /// 2. Sender use send() to send message.
+    /// 3. Receiver use recv() to receives message.
+    /// 4. Check if the test results are correct.
     #[bench]
     fn tokio_udp_send_recv(b: &mut Bencher) {
         let basic_addr = "127.0.0.1:";
@@ -164,16 +153,13 @@ mod udp_bench {
         });
     }
 
-    /// benchmark test for ylong udp function send_to() and recv_from().
-    ///
-    /// # Title
-    /// ylong_udp_send_to_recv_from
+    /// Benchmark test for ylong udp function send_to() and recv_from().
     ///
     /// # Brief
-    /// 1.Create sender and receiver.
-    /// 2.Sender use send_to() to send message.
-    /// 3.Receiver use recv_from() to receives message.
-    /// 4.Check if the test results are correct.
+    /// 1. Create sender and receiver.
+    /// 2. Sender use send_to() to send message.
+    /// 3. Receiver use recv_from() to receives message.
+    /// 4. Check if the test results are correct.
     #[bench]
     fn ylong_udp_send_to_recv_from(b: &mut Bencher) {
         let basic_addr = "127.0.0.1:";
@@ -207,16 +193,13 @@ mod udp_bench {
         });
     }
 
-    /// benchmark test for tokio udp function send_to() and recv_from().
-    ///
-    /// # Title
-    /// tokio_udp_send_to_recv_from
+    /// Benchmark test for tokio udp function send_to() and recv_from().
     ///
     /// # Brief
-    /// 1.Create sender and receiver.
-    /// 2.Sender use send_to() to send message.
-    /// 3.Receiver use recv_from() to receives message.
-    /// 4.Check if the test results are correct.
+    /// 1. Create sender and receiver.
+    /// 2. Sender use send_to() to send message.
+    /// 3. Receiver use recv_from() to receives message.
+    /// 4. Check if the test results are correct.
     #[bench]
     fn tokio_udp_send_to_recv_from(b: &mut Bencher) {
         let basic_addr = "127.0.0.1:";

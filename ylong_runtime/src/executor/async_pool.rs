@@ -11,30 +11,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::builder::CallbackHook;
-use crate::executor::sleeper::Sleepers;
-use crate::executor::worker::{get_current_ctx, run_worker, Worker, WorkerContext};
-use crate::executor::{worker, Schedule};
-use crate::task::{Task, TaskBuilder, VirtualTableType};
-use crate::util::num_cpus::get_cpu_num;
 use std::cell::RefCell;
 use std::collections::LinkedList;
+use std::future::Future;
 use std::sync::atomic::Ordering::{Acquire, SeqCst};
 use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::{Arc, Condvar, Mutex, RwLock};
 use std::time::Duration;
 use std::{cmp, thread};
 
-use crate::util::core_affinity::set_current_affinity;
-
 use crate::builder::multi_thread_builder::MultiThreadBuilder;
+use crate::builder::CallbackHook;
 use crate::executor::parker::Parker;
 use crate::executor::queue::{GlobalQueue, LocalQueue, LOCAL_QUEUE_CAP};
+use crate::executor::sleeper::Sleepers;
+use crate::executor::worker::{get_current_ctx, run_worker, Worker, WorkerContext};
+use crate::executor::{worker, Schedule};
 #[cfg(feature = "net")]
 use crate::net::{Driver, Handle};
+use crate::task::{Task, TaskBuilder, VirtualTableType};
+use crate::util::core_affinity::set_current_affinity;
 use crate::util::fastrand::fast_random;
+use crate::util::num_cpus::get_cpu_num;
 use crate::JoinHandle;
-use std::future::Future;
 
 const ASYNC_THREAD_QUIT_WAIT_TIME: Duration = Duration::from_secs(3);
 pub(crate) const GLOBAL_POLL_INTERVAL: u8 = 61;
@@ -48,7 +47,8 @@ pub(crate) struct MultiThreadScheduler {
     pub(crate) num_workers: usize,
     /// Join Handles for all threads in the executor
     handles: RwLock<Vec<Parker>>,
-    /// records the number of stealing workers and the number of working workers.
+    /// records the number of stealing workers and the number of working
+    /// workers.
     pub(crate) record: Record,
     /// The global queue of the executor
     global: GlobalQueue,
@@ -71,7 +71,7 @@ impl Record {
         Self(AtomicUsize::new(num_unpark << ACTIVE_WORKER_SHIFT))
     }
 
-    //Return true if it is the last searching thread
+    // Return true if it is the last searching thread
     pub(crate) fn dec_searching_num(&self) -> bool {
         let ret = self.0.fetch_sub(1, SeqCst);
         (ret & SEARCHING_MASK) == 1
@@ -253,7 +253,8 @@ impl MultiThreadScheduler {
             return true;
         }
 
-        // If the local queue of the current worker is full, push the task into the global queue
+        // If the local queue of the current worker is full, push the task into the
+        // global queue
         self.global.push_back(task);
         true
     }
@@ -293,7 +294,8 @@ impl MultiThreadScheduler {
 
         // There is no task in the local queue or the global queue, so we try to steal
         // tasks from another worker's local queue.
-        // The number of stealing worker should be less than half of the total worker number.
+        // The number of stealing worker should be less than half of the total worker
+        // number.
         if !worker_inner.is_searching {
             let (_, num_searching) = self.record.load_state();
             if num_searching * 2 < self.num_workers {
@@ -513,17 +515,19 @@ impl AsyncPoolSpawner {
     }
 
     /// # Safety
-    /// Users need to guarantee that the future will remember lifetime and thus compiler will capture
-    /// lifetime issues, or the future will complete when its context remains valid. If not, currently
+    /// Users need to guarantee that the future will remember lifetime and thus
+    /// compiler will capture lifetime issues, or the future will complete
+    /// when its context remains valid. If not, currently
     /// runtime initialization will cause memory error.
     ///
     /// ## Memory issue example
-    /// No matter using which type (current / multi thread) of runtime, the following code can compile.
-    /// When the variable `slice` gets released when the function ends, any handles returned from
-    /// this function rely on a dangled pointer.
+    /// No matter using which type (current / multi thread) of runtime, the
+    /// following code can compile. When the variable `slice` gets released
+    /// when the function ends, any handles returned from this function rely
+    /// on a dangled pointer.
     ///
     /// ```no run
-    ///  fn err_example(runtime: &Runtime) -> JoinHandle<()> {
+    /// fn err_example(runtime: &Runtime) -> JoinHandle<()> {
     ///     let builder = TaskBuilder::default();
     ///     let mut slice = [1, 2, 3, 4, 5];
     ///     let borrow = &mut slice;
@@ -566,7 +570,8 @@ impl AsyncPoolSpawner {
     }
 
     /// Waits 3 seconds for threads to finish before releasing the async pool.
-    /// If threads could not finish before releasing, there could be possible memory leak.
+    /// If threads could not finish before releasing, there could be possible
+    /// memory leak.
     fn release_wait(&self) -> Result<(), ()> {
         self.exe_mng_info.cancel();
         let pair = self.inner.shutdown_handle.clone();
@@ -599,15 +604,8 @@ impl AsyncPoolSpawner {
     }
 }
 
-#[cfg(all(test))]
+#[cfg(test)]
 mod test {
-    use crate::builder::RuntimeBuilder;
-    use crate::executor::async_pool::{get_cpu_core, AsyncPoolSpawner, MultiThreadScheduler};
-
-    use crate::executor::parker::Parker;
-    #[cfg(feature = "net")]
-    use crate::net::Driver;
-    use crate::task::{Task, TaskBuilder, VirtualTableType};
     use std::future::Future;
     use std::pin::Pin;
     use std::sync::atomic::Ordering::{Acquire, Release};
@@ -615,6 +613,13 @@ mod test {
     use std::sync::{Arc, Mutex};
     use std::task::{Context, Poll};
     use std::thread::spawn;
+
+    use crate::builder::RuntimeBuilder;
+    use crate::executor::async_pool::{get_cpu_core, AsyncPoolSpawner, MultiThreadScheduler};
+    use crate::executor::parker::Parker;
+    #[cfg(feature = "net")]
+    use crate::net::Driver;
+    use crate::task::{Task, TaskBuilder, VirtualTableType};
 
     pub struct TestFuture {
         value: usize,
@@ -645,14 +650,11 @@ mod test {
         create_new().await
     }
 
-    /*
-     * @title  ExecutorMngInfo::new()
-     * @brief  描述测试用例执行
-     *         1、Creates a ExecutorMsgInfo with thread number 1
-     *         2、Creates a ExecutorMsgInfo with thread number 2
-     * @expect 对比创建完成后的参数，应当与所期待值相同
-     * @auto   true
-     */
+    /// UT test cases for ExecutorMngInfo::new()
+    ///
+    /// # Brief
+    /// 1. Creates a ExecutorMsgInfo with thread number 1
+    /// 2. Creates a ExecutorMsgInfo with thread number 2
     #[test]
     fn ut_executor_mng_info_new_001() {
         #[cfg(feature = "net")]
@@ -674,16 +676,11 @@ mod test {
         assert_eq!(executor_mng_info.handles.read().unwrap().capacity(), 0);
     }
 
-    /*
-     * @title  ExecutorMngInfo::create_local_queues() UT test
-     * @design No invalid value in the input, no exception branch, direct check function, return value
-     * @precon Use ExecutorMngInfo::new(), get its creation object
-     * @brief  Describe test case execution
-     *         1、index set to 0, check the return value
-     *         2、index set to ExecutorMngInfo.inner.total, check the return value
-     * @expect Compare the parameters after creation, they should be the same as the expected value
-     * @auto   true
-     */
+    /// UT test cases for ExecutorMngInfo::create_local_queues()
+    ///
+    /// # Brief
+    /// 1. index set to 0, check the return value
+    /// 2. index set to ExecutorMngInfo.inner.total, check the return value
     #[test]
     fn ut_executor_mng_info_create_local_queues() {
         #[cfg(feature = "net")]
@@ -705,16 +702,11 @@ mod test {
         assert!(local_run_queue_info.is_empty());
     }
 
-    /*
-     * @title  ExecutorMngInfo::enqueue() UT test
-     * @design No invalid value in the input, no exception branch, direct check function, return value
-     * @precon Use ExecutorMngInfo::new(), get its creation object
-     * @brief  Describe test case execution
-     *         1、index set to 0, check the return value
-     *         2、index set to ExecutorMngInfo.inner.total, check the return value
-     * @expect Compare the parameters after creation, they should be the same as the expected value
-     * @auto   true
-     */
+    /// UT test cases for ExecutorMngInfo::enqueue()
+    ///
+    /// # Brief
+    /// 1. index set to 0, check the return value
+    /// 2. index set to ExecutorMngInfo.inner.total, check the return value
     #[test]
     fn ut_executor_mng_info_enqueue() {
         #[cfg(feature = "net")]
@@ -742,16 +734,11 @@ mod test {
         assert!(!executor_mng_info.has_no_work());
     }
 
-    /*
-     * @title  ExecutorMngInfo::is_cancel() UT test
-     * @design No invalid value in the input, no exception branch, direct check function, return value
-     * @precon Use ExecutorMngInfo::new(), get its creation object
-     * @brief  Describe test case execution
-     *         1、The is_cancel value is set to true to check the return value
-     *         2、The is_cancel value is set to false to check the return value
-     * @expect Compare the parameters after creation, they should be the same as the expected value
-     * @auto   true
-     */
+    /// UT test cases for ExecutorMngInfo::is_cancel()
+    ///
+    /// # Brief
+    /// 1. The is_cancel value is set to true to check the return value
+    /// 2. The is_cancel value is set to false to check the return value
     #[test]
     fn ut_executor_mng_info_is_cancel() {
         #[cfg(feature = "net")]
@@ -767,15 +754,10 @@ mod test {
         assert!(executor_mng_info.is_cancel());
     }
 
-    /*
-     * @title  ExecutorMngInfo::set_cancel() UT test
-     * @design No invalid value in the input, no exception branch, direct check function, return value
-     * @precon Use ExecutorMngInfo::new(), get its creation object
-     * @brief  Describe test case execution
-     *         1、Check if the is_cancel parameter becomes true after set_cancel
-     * @expect Compare the parameters after creation, they should be the same as the expected value
-     * @auto   true
-     */
+    /// UT test cases for ExecutorMngInfo::set_cancel()
+    ///
+    /// # Brief
+    /// 1. Check if the is_cancel parameter becomes true after set_cancel
     #[test]
     fn ut_executor_mng_info_set_cancel() {
         #[cfg(feature = "net")]
@@ -790,15 +772,10 @@ mod test {
         assert!(executor_mng_info.is_cancel.load(Acquire));
     }
 
-    /*
-     * @title  ExecutorMngInfo::cancel() UT test
-     * @design No invalid values in the input, the existence of exception branches, direct check function, return value
-     * @precon Use ExecutorMngInfo::new(), get its creation object
-     * @brief  Describe test case execution
-     *         1、Check if the is_cancel parameter becomes true after set_cancel
-     * @expect Compare the parameters after creation, they should be the same as the expected value
-     * @auto   true
-     */
+    /// UT test cases for ExecutorMngInfo::cancel()
+    ///
+    /// # Brief
+    /// 1. Check if the is_cancel parameter becomes true after set_cancel
     #[test]
     fn ut_executor_mng_info_cancel() {
         #[cfg(feature = "net")]
@@ -831,15 +808,11 @@ mod test {
         assert_eq!(*flag.lock().unwrap(), 1);
     }
 
-    /*
-     * @title  ExecutorMngInfo::wake_up_all() UT test
-     * @design No invalid value in the input, no exception branch, direct check function, return value
-     * @precon Use ExecutorMngInfo::new(), get its creation object
-     * @brief  Describe test case execution
-     *         1、Constructs an environment to check if all threads are woken up and executed via thread hooks
-     * @expect Here, if the function is not correct, the thread will stay parked, if the function is correct, it will execute normally
-     * @auto   true
-     */
+    /// UT test cases for ExecutorMngInfo::wake_up_all()
+    ///
+    /// # Brief
+    /// 1. Constructs an environment to check if all threads are woken up and
+    ///    executed via thread hooks.
     #[test]
     fn ut_executor_mng_info_wake_up_all() {
         #[cfg(feature = "net")]
@@ -874,15 +847,11 @@ mod test {
         assert_eq!(*flag.lock().unwrap(), 1);
     }
 
-    /*
-     * @title  ExecutorMngInfo::wake_up_rand_one() UT test
-     * @design No invalid values in the input, the existence of exception branches, direct check function, return value
-     * @precon Use ExecutorMngInfo::new(), get its creation object
-     * @brief  Describe test case execution
-     *         1、Constructs an environment to check if a thread is woken up and executed by a thread hook
-     * @expect Here, if the function is not correct, the thread will stay parked, if the function is correct, it will execute normally
-     * @auto   true
-     */
+    /// UT test cases for ExecutorMngInfo::wake_up_rand_one()
+    ///
+    /// # Brief
+    /// 1. Constructs an environment to check if a thread is woken up and
+    ///    executed by a thread hook.
     #[test]
     fn ut_executor_mng_info_wake_up_rand_one() {
         #[cfg(feature = "net")]
@@ -918,15 +887,11 @@ mod test {
         assert_eq!(*flag.lock().unwrap(), 1);
     }
 
-    /*
-     * @title  ExecutorMngInfo::wake_up_if_one_task_left() UT test
-     * @design No invalid values in the input, the existence of exception branches, direct check function, return value
-     * @precon Use ExecutorMngInfo::new(), get its creation object
-     * @brief  Describe test case execution
-     *         1、Constructs the environment, checks if there are still tasks, and if so, wakes up a thread to continue working
-     * @expect Here, if the function is not correct, the thread will stay parked, if the function is correct, it will execute normally
-     * @auto   true
-     */
+    /// UT test cases for ExecutorMngInfo::wake_up_if_one_task_left()
+    ///
+    /// # Brief
+    /// 1. Constructs the environment, checks if there are still tasks, and if
+    ///    so, wakes up a thread to continue working.
     #[test]
     fn ut_executor_mng_info_wake_up_if_one_task_left() {
         #[cfg(feature = "net")]
@@ -978,15 +943,12 @@ mod test {
         assert_eq!(*flag.lock().unwrap(), 1);
     }
 
-    /*
-     * @title  ExecutorMngInfo::from_woken_to_sleep() UT test
-     * @design No invalid values in the input, the existence of exception branches, direct check function, return value
-     * @precon Use ExecutorMngInfo::new(), get its creation object
-     * @brief  Describe test case execution
-     *         1、Construct the environment and set the state of the specified thread to park state. If the last thread is in park state, check whether there is a task, and if so, wake up this thread.
-     * @expect Here, if the function is not correct, the thread will stay parked, if the function is correct, it will execute normally
-     * @auto   true
-     */
+    /// UT test cases for ExecutorMngInfo::from_woken_to_sleep()
+    ///
+    /// # Brief
+    ///  1. Construct the environment and set the state of the specified thread
+    ///     to park state. If the last thread is in park state, check whether
+    ///     there is a task, and if so, wake up this thread.
     #[test]
     fn ut_from_woken_to_sleep() {
         #[cfg(feature = "net")]
@@ -1035,15 +997,10 @@ mod test {
         assert_eq!(*flag.lock().unwrap(), 1);
     }
 
-    /*
-     * @title  AsyncPoolSpawner::new() UT test
-     * @design No invalid values in the input, the existence of exception branches, direct check function, return value
-     * @precon Use AsyncPoolSpawner::new(), get its creation object
-     * @brief  Describe test case execution
-     *         1、Verify the parameters of the initialization completion
-     * @expect Here, if the function is not correct, the thread will stay parked, if the function is correct, it will execute normally
-     * @auto   true
-     */
+    /// UT test cases for AsyncPoolSpawner::new()
+    ///
+    /// # Brief
+    /// 1. Verify the parameters of the initialization completion
     #[test]
     fn ut_async_pool_spawner_new() {
         let thread_pool_builder = RuntimeBuilder::new_multi_thread();
@@ -1065,7 +1022,7 @@ mod test {
         assert!(!async_pool_spawner.exe_mng_info.is_cancel.load(Acquire));
     }
 
-    /// UT test for `create_async_thread_pool`.
+    /// UT test cases for `create_async_thread_pool`.
     ///
     /// # Brief
     /// 1. Create an async_pool_spawner with `is_affinity` setting to false
@@ -1077,7 +1034,7 @@ mod test {
         let _ = AsyncPoolSpawner::new(&thread_pool_builder.is_affinity(false));
     }
 
-    /// UT test for `UnboundedSender`.
+    /// UT test cases for `UnboundedSender`.
     ///
     /// # Brief
     /// 1. Create an async_pool_spawner with `is_affinity` setting to true

@@ -32,7 +32,8 @@ pub trait ParSplit: Sized + IntoIterator {
     /// Reduces the number of elements in the data
     fn reduce(self, len: usize) -> Self;
 
-    /// Splits data into two parts, if it can no longer be divided, returns None.
+    /// Splits data into two parts, if it can no longer be divided, returns
+    /// None.
     fn split(self) -> (Self, Option<Self>);
 
     /// Returns true if the parsplit has a length of 0

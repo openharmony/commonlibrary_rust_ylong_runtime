@@ -17,24 +17,21 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use ylong_runtime::task::{JoinSet, PriorityLevel};
-
 #[cfg(feature = "time")]
 use std::time::Duration;
+
 #[cfg(feature = "time")]
 use ylong_runtime::error::ErrorKind;
+use ylong_runtime::task::{JoinSet, PriorityLevel};
 #[cfg(feature = "time")]
 use ylong_runtime::time::sleep;
 
-/// SDV test for spawning and waiting for a simple future.
-///
-/// # Title
-/// join_set_spawn_simple
+/// SDV test cases for spawning and waiting for a simple future.
 ///
 /// # Brief
-/// 1. Create a JoinSet
-/// 2. Spawn a simple future that returns 1 immediately
-/// 3. Asynchronously wait the task to finish using `join_next`
+/// 1. Create a JoinSet.
+/// 2. Spawn a simple future that returns 1 immediately.
+/// 3. Asynchronously wait the task to finish using `join_next`.
 /// 4. Check the return value.
 #[test]
 fn sdv_join_set_spawn_simple() {
@@ -64,15 +61,14 @@ impl Future for TestFuture {
     }
 }
 
-/// SDV test for spawning and waiting for a future that returns pending once.
-///
-/// # Title
-/// join_set_spawn_pending
+/// SDV test cases for spawning and waiting for a future that returns pending
+/// once.
 ///
 /// # Brief
-/// 1. Create a JoinSet
-/// 2. Spawn a future that returns pending during first poll and ready for second poll
-/// 3. Asynchronously wait the task to finish using `join_next`
+/// 1. Create a JoinSet.
+/// 2. Spawn a future that returns pending during first poll and ready for
+///    second poll.
+/// 3. Asynchronously wait the task to finish using `join_next`.
 /// 4. Check the return value.
 #[test]
 fn sdv_join_set_spawn_pending() {
@@ -82,14 +78,14 @@ fn sdv_join_set_spawn_pending() {
     assert_eq!(ret, 1);
 }
 
-/// SDV test for spawning and waiting for two io tasks
+/// SDV test cases for spawning and waiting for two io tasks
 ///
 /// # Brief
-/// 1. Create a JoinSet
-/// 2. Spawn a task as a tcp client
-/// 3. Spawn a task as a tcp server
-/// 3. Asynchronously wait the tasks to finish using `join_next`
-/// 4. Check the return value.
+/// 1. Create a JoinSet.
+/// 2. Spawn a task as a tcp client.
+/// 3. Spawn a task as a tcp server.
+/// 4. Asynchronously wait the tasks to finish using `join_next`.
+/// 5. Check the return value.
 #[cfg(feature = "net")]
 #[test]
 fn sdv_join_set_spawn_io() {
@@ -129,12 +125,12 @@ fn sdv_join_set_spawn_io() {
     ylong_runtime::block_on(handle).unwrap();
 }
 
-/// SDV test for spawning and waiting for multiple tasks
+/// SDV test cases for spawning and waiting for multiple tasks
 ///
 /// # Brief
-/// 1. Create a JoinSet
-/// 2. Spawn 100 task that returns pending once
-/// 3. Asynchronously wait all the tasks to finish using `join_next`
+/// 1. Create a JoinSet.
+/// 2. Spawn 100 task that returns pending once.
+/// 3. Asynchronously wait all the tasks to finish using `join_next`.
 /// 4. Check the return value.
 #[test]
 fn sdv_join_set_spawn_multiple() {
@@ -151,12 +147,12 @@ fn sdv_join_set_spawn_multiple() {
     ylong_runtime::block_on(handle).unwrap();
 }
 
-/// SDV test for join_all
+/// SDV test cases for join_all
 ///
 /// # Brief
-/// 1. Create a JoinSet
-/// 2. Spawn 100 tasks that fetch_add an atomic value for 10 times
-/// 3. Call join_all()
+/// 1. Create a JoinSet.
+/// 2. Spawn 100 tasks that fetch_add an atomic value for 10 times.
+/// 3. Call join_all().
 /// 4. Check the atomic value.
 #[test]
 fn sdv_join_set_join_all() {
@@ -180,14 +176,14 @@ fn sdv_join_set_join_all() {
     });
 }
 
-/// SDV test for CancelHandle
+/// SDV test cases for CancelHandle
 ///
 /// # Brief
-/// 1. Create a JoinSet
-/// 2. Spawn a task that sleeps a very long time
-/// 4. Cancel the task via its CancelHandle
-/// 5. Call join_next
-/// 6. Check the return error
+/// 1. Create a JoinSet.
+/// 2. Spawn a task that sleeps a very long time.
+/// 3. Cancel the task via its CancelHandle.
+/// 4. Call join_next.
+/// 5. Check the return error.
 #[cfg(feature = "time")]
 #[test]
 fn sdv_join_set_cancel_one() {
@@ -207,14 +203,14 @@ fn sdv_join_set_cancel_one() {
     }
 }
 
-/// SDV test for CancelHandle
+/// SDV test cases for CancelHandle
 ///
 /// # Brief
-/// 1. Create a JoinSet
-/// 2. Spawn 100 tasks that sleep a very long time
-/// 4. Cancel every task using cancel_all()
-/// 5. Call join_next()
-/// 6. Check the return error
+/// 1. Create a JoinSet.
+/// 2. Spawn 100 tasks that sleep a very long time.
+/// 3. Cancel every task using cancel_all().
+/// 4. Call join_next().
+/// 5. Check the return error.
 #[test]
 #[cfg(feature = "time")]
 fn sdv_join_set_cancel_all() {
@@ -235,13 +231,13 @@ fn sdv_join_set_cancel_all() {
     });
 }
 
-/// SDV test for CancelHandle
+/// SDV test cases for CancelHandle
 ///
 /// # Brief
-/// 1. Create a JoinSet
-/// 2. Create a Builder
-/// 3. Spawn 10 tasks via the Builder
-/// 4. check return value
+/// 1. Create a JoinSet.
+/// 2. Create a Builder.
+/// 3. Spawn 10 tasks via the Builder.
+/// 4. check return value.
 #[test]
 fn sdv_join_set_builder() {
     let mut set = JoinSet::<u8>::new();
@@ -260,14 +256,14 @@ fn sdv_join_set_builder() {
     });
 }
 
-/// SDV test for CancelHandle
+/// SDV test cases for CancelHandle
 ///
 /// # Brief
-/// 1. Create a JoinSet
-/// 2. Spawn 100 tasks that sleep a very long time
-/// 4. Shutdown the JoinSet
-/// 5. Call join_next()
-/// 6. Check the return error
+/// 1. Create a JoinSet.
+/// 2. Spawn 100 tasks that sleep a very long time.
+/// 3. Shutdown the JoinSet.
+/// 4. Call join_next().
+/// 5. Check the return error.
 #[cfg(feature = "time")]
 #[test]
 fn sdv_join_set_shutdown() {
@@ -284,12 +280,12 @@ fn sdv_join_set_shutdown() {
     })
 }
 
-/// SDV test for JoinSet Drop to check memory leak
+/// SDV test cases for JoinSet Drop to check memory leak
 ///
 /// # Brief
-/// 1. Create a JoinSet
-/// 2. Spawn 100 tasks that sleep a very long time
-/// 3. Drop the set before tasks complete
+/// 1. Create a JoinSet.
+/// 2. Spawn 100 tasks that sleep a very long time.
+/// 3. Drop the set before tasks complete.
 /// 4. Check asan for memory leak
 #[cfg(feature = "time")]
 #[test]

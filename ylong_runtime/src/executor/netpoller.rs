@@ -11,11 +11,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(feature = "time")]
-use crate::time::Driver as TimerDriver;
 use std::cell::RefCell;
 use std::sync::Arc;
 use std::thread;
+
+#[cfg(feature = "time")]
+use crate::time::Driver as TimerDriver;
 
 #[cfg(any(not(feature = "ffrt"), all(feature = "net", feature = "ffrt")))]
 const NET_POLL_INTERVAL_TIME: std::time::Duration = std::time::Duration::from_millis(10);

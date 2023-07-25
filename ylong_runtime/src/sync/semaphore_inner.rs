@@ -11,7 +11,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::sync::wake_list::WakerList;
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
 use std::future::Future;
@@ -20,6 +19,8 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
 use std::task::Poll::{Pending, Ready};
 use std::task::{Context, Poll};
+
+use crate::sync::wake_list::WakerList;
 
 /// Maximum capacity of `Semaphore`.
 const MAX_PERMITS: usize = usize::MAX >> 1;
@@ -234,7 +235,7 @@ impl Future for Permit<'_> {
 impl Drop for Permit<'_> {
     fn drop(&mut self) {
         if self.enqueue {
-            //if `enqueue` is true, `waker_index` must be `Some(_)`.
+            // if `enqueue` is true, `waker_index` must be `Some(_)`.
             let _ = self.semaphore.waker_list.remove(self.waker_index.unwrap());
         }
     }

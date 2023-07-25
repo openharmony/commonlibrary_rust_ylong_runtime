@@ -84,7 +84,8 @@ pub struct BoundedReceiver<T> {
     channel: Rx<Array<T>>,
 }
 
-/// Creates a new mpsc channel, and returns the `Sender` and `Receiver` handle pair.
+/// Creates a new mpsc channel, and returns the `Sender` and `Receiver` handle
+/// pair.
 ///
 /// The channel is bounded with the passed in capacity.
 ///
@@ -121,8 +122,8 @@ impl<T> BoundedSender<T> {
 
     /// Attempts to send a value to the associated [`BoundedReceiver`].
     ///
-    /// If the receiver has been closed or the channel is full, this method will return an error
-    /// containing sent value.
+    /// If the receiver has been closed or the channel is full, this method will
+    /// return an error containing sent value.
     ///
     /// # Return value
     /// * `Ok(T)` if receiving a value successfully.
@@ -151,8 +152,8 @@ impl<T> BoundedSender<T> {
 
     /// Sends a value to the associated receiver
     ///
-    /// If the receiver has been closed, this method will return an error containing the sent
-    /// value.
+    /// If the receiver has been closed, this method will return an error
+    /// containing the sent value.
     ///
     /// # Return value
     /// * `Ok()` if sending a value successfully.
@@ -178,7 +179,8 @@ impl<T> BoundedSender<T> {
         self.channel.send(value).await
     }
 
-    /// Attempts to send a value to the associated receiver in a limited amount of time.
+    /// Attempts to send a value to the associated receiver in a limited amount
+    /// of time.
     ///
     /// If the receiver has been closed or the time limit has been passed, this
     /// method will return an error containing the sent value.
@@ -192,6 +194,7 @@ impl<T> BoundedSender<T> {
     ///
     /// ```
     /// use std::time::Duration;
+    ///
     /// use ylong_runtime::sync::mpsc::bounded::bounded_channel;
     /// async fn io_func() {
     ///     let (tx, mut rx) = bounded_channel(1);
@@ -221,8 +224,8 @@ impl<T> BoundedSender<T> {
     }
 
     /// Checks whether the channel is closed. If so, the sender could not
-    /// send values anymore. It returns true after the [`BoundedReceiver`] is dropped
-    /// or the [`close`] method gets called.
+    /// send values anymore. It returns true after the [`BoundedReceiver`] is
+    /// dropped or the [`close`] method gets called.
     ///
     /// [`close`]: BoundedReceiver::close
     ///
@@ -372,7 +375,8 @@ impl<T> BoundedReceiver<T> {
 
     /// Receives a value from the associated [`BoundedSender`].
     ///
-    /// The `receiver` can still receive all sent messages in the channel after the channel is closed.
+    /// The `receiver` can still receive all sent messages in the channel after
+    /// the channel is closed.
     ///
     /// # Return value
     /// * `Ok(T)` if receiving a value successfully.
@@ -395,9 +399,11 @@ impl<T> BoundedReceiver<T> {
         self.channel.recv().await
     }
 
-    /// Attempts to receive a value from the associated [`BoundedSender`] in a limited amount of time.
+    /// Attempts to receive a value from the associated [`BoundedSender`] in a
+    /// limited amount of time.
     ///
-    /// The `receiver` can still receive all sent messages in the channel after the channel is closed.
+    /// The `receiver` can still receive all sent messages in the channel after
+    /// the channel is closed.
     ///
     /// # Return value
     /// * `Ok(T)` if receiving a value successfully.
@@ -408,6 +414,7 @@ impl<T> BoundedReceiver<T> {
     ///
     /// ```
     /// use std::time::Duration;
+    ///
     /// use ylong_runtime::sync::mpsc::bounded::bounded_channel;
     /// async fn io_func() {
     ///     let (tx, mut rx) = bounded_channel(1);
@@ -428,8 +435,9 @@ impl<T> BoundedReceiver<T> {
 
     /// Closes the channel, prevents the `Sender` from sending more values.
     ///
-    /// The `Sender` will fail to call [`send`] or [`try_send`] after the `Receiver` called
-    /// `close`. It will do nothing if the channel is already closed.
+    /// The `Sender` will fail to call [`send`] or [`try_send`] after the
+    /// `Receiver` called `close`. It will do nothing if the channel is
+    /// already closed.
     ///
     /// [`send`]: BoundedSender::send
     /// [`try_send`]: BoundedSender::try_send

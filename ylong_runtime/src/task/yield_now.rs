@@ -12,11 +12,12 @@
 // limitations under the License.
 
 //! Yields the current task and wakes it for a reschedule.
-#[cfg(not(feature = "ffrt"))]
-use crate::executor::worker;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+
+#[cfg(not(feature = "ffrt"))]
+use crate::executor::worker;
 
 /// Yields the current task and wakes it for a reschedule.
 /// # Examples
@@ -24,9 +25,10 @@ use std::task::{Context, Poll};
 /// ```
 /// use ylong_runtime::task::*;
 ///
-/// let res = ylong_runtime::block_on(
-///    ylong_runtime::spawn(async { yield_now().await; })
-/// ).unwrap();
+/// let res = ylong_runtime::block_on(ylong_runtime::spawn(async {
+///     yield_now().await;
+/// }))
+/// .unwrap();
 /// assert_eq!(res, ());
 /// ```
 pub async fn yield_now() {
@@ -44,9 +46,10 @@ impl Future for YieldTask {
             self.0 = true;
             let ctx = worker::get_current_ctx();
 
-            // Under worker context, we push the waker into the yielded list owned by the worker
-            // to avoid waking the waker immediately. This is because waking the waker in a worker
-            // context will put the task in the lifo slot, we don't want that.
+            // Under worker context, we push the waker into the yielded list owned by the
+            // worker to avoid waking the waker immediately. This is because
+            // waking the waker in a worker context will put the task in the
+            // lifo slot, we don't want that.
             if let Some(ctx) = ctx {
                 match ctx {
                     worker::WorkerContext::Multi(ctx) => {
@@ -94,7 +97,7 @@ pub(crate) fn wake_yielded_tasks() {
 mod test {
     use crate::task::yield_now;
 
-    /// ut for yield.
+    /// UT test cases for yield.
     ///
     /// # Brief
     /// 1. Create two tasks that adds a number to 1000

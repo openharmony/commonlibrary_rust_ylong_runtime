@@ -13,21 +13,17 @@
 
 use std::fs;
 use std::io::SeekFrom;
+
 use ylong_runtime::builder::RuntimeBuilder;
 use ylong_runtime::fs::{File, OpenOptions};
 use ylong_runtime::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 
-/*
-* @title  Asynchronous file writing sdv test
-* @design Statement Override
-* @precon None
-* @brief  Describe test case execution
-*         1. Generate an asynchronous file IO with create
-*         2. Write to an array of length 5
-*         3. Start another task to read and write the same data as you read
-* @expect Write success, read success
-* @auto   true
-*/
+/// SDV test cases for asynchronous file writing
+///
+/// # Brief
+/// 1. Generate an asynchronous file IO with create.
+/// 2. Write to an array of length 5.
+/// 3. Start another task to read and write the same data as you read.
 #[test]
 fn sdv_async_fs_write() {
     let runtime = RuntimeBuilder::new_multi_thread()
@@ -55,17 +51,12 @@ fn sdv_async_fs_write() {
     fs::remove_file("./tests/tmp_file").unwrap();
 }
 
-/*
-* @title  Asynchronous file reading sdv test
-* @design Statement Override
-* @precon None
-* @brief  Describe test case execution
-*         1. Generate an asynchronous file IO with create
-*         2. Write to an array of length 5
-*         3. Start two tasks to read, write and read the same data
-* @expect Read and write data successfully
-* @auto   true
-*/
+/// SDV test cases for asynchronous file reading
+///
+/// # Brief
+/// 1. Generate an asynchronous file IO with create.
+/// 2. Write to an array of length 5.
+/// 3. Start two tasks to read, write and read the same data.
 #[test]
 fn sdv_async_fs_read() {
     let runtime = RuntimeBuilder::new_multi_thread()
@@ -99,17 +90,12 @@ fn sdv_async_fs_read() {
     fs::remove_file("./tests/tmp_file2").unwrap();
 }
 
-/*
-* @title  Asynchronous file multi-threaded read and write sdv test
-* @design Statement Override
-* @precon None
-* @brief  Describe test case execution
-*         1. Generate an asynchronous file IO with create
-*         2. Start a task to perform a write operation
-*         3. Start another task to perform a read operation
-* @expect Read and write data successfully
-* @auto   true
-*/
+/// SDV test cases for asynchronous file multi-threaded read and write
+///
+/// # Brief
+/// 1. Generate an asynchronous file IO with create.
+/// 2. Start a task to perform a write operation.
+/// 3. Start another task to perform a read operation.
 #[test]
 fn sdv_async_fs_rw() {
     let runtime = RuntimeBuilder::new_multi_thread()
@@ -177,17 +163,12 @@ fn sdv_async_fs_rw() {
     fs::remove_file("./tests/tmp_file3").unwrap();
 }
 
-/*
-* @title  Asynchronous file multi-threaded read and write sdv test
-* @design Statement Override
-* @precon None
-* @brief  Describe test case execution
-*         1. Generate an asynchronous file IO with create
-*         2. Start a task to write a large amount of data
-*         3. Start another task for reading large amounts of data
-* @expect Read and write data successfully
-* @auto   true
-*/
+/// SDV test cases for Asynchronous file multi-threaded read and write
+///
+/// # Brief
+/// 1. Generate an asynchronous file IO with create.
+/// 2. Start a task to write a large amount of data.
+/// 3. Start another task for reading large amounts of data.
 #[test]
 fn sdv_async_fs_read_to_end() {
     let runtime = RuntimeBuilder::new_multi_thread().build().unwrap();
@@ -208,17 +189,12 @@ fn sdv_async_fs_read_to_end() {
     fs::remove_file("./tests/tmp_file7").unwrap();
 }
 
-/*
-* @title  Asynchronous file Seek sdv test
-* @design Statement Override
-* @precon None
-* @brief  Describe test case execution
-*         1. Generate an asynchronous file IO with create
-*         2. Start a task to perform a write operation
-*         3. Start another task for seek and read operations
-* @expect Seek read successfully
-* @auto   true
-*/
+/// SDV test cases for asynchronous file Seek
+///
+/// # Brief
+/// 1. Generate an asynchronous file IO with create.
+/// 2. Start a task to perform a write operation.
+/// 3. Start another task for seek and read operations.
 #[test]
 fn sdv_async_fs_seek() {
     let runtime = RuntimeBuilder::new_multi_thread()
@@ -280,17 +256,12 @@ fn sdv_async_fs_seek() {
     fs::remove_file("./tests/tmp_file4").unwrap();
 }
 
-/*
-* @title  Asynchronous file set permission sdv test
-* @design Statement Override
-* @precon None
-* @brief  Describe test case execution
-*         1. Generate an asynchronous file IO with create
-*         2. Asynchronously get the permissions of the file
-*         3. Change the permission to read only, set it to this file
-* @expect Set up successfully
-* @auto   true
-*/
+/// SDV test cases for Asynchronous file set permission
+///
+/// # Brief
+/// 1. Generate an asynchronous file IO with create.
+/// 2. Asynchronously get the permissions of the file.
+/// 3. Change the permission to read only, set it to this file.
 #[test]
 fn sdv_async_fs_set_permission() {
     let runtime = RuntimeBuilder::new_multi_thread()
@@ -314,16 +285,11 @@ fn sdv_async_fs_set_permission() {
     fs::remove_file("./tests/tmp_file5").unwrap();
 }
 
-/*
-* @title  Asynchronous file sync sdv test
-* @design Statement Override
-* @precon None
-* @brief  Describe test case execution
-*         1. Generate an asynchronous file IO with create
-*         2. Call sync_all and sync_data after asynchronous write
-* @expect Sync successfully
-* @auto   true
-*/
+/// SDV test cases for asynchronous file sync
+///
+/// # Brief
+/// 1. Generate an asynchronous file IO with create.
+/// 2. Call sync_all and sync_data after asynchronous write.
 #[test]
 fn sdv_async_fs_sync_all() {
     let runtime = RuntimeBuilder::new_multi_thread()

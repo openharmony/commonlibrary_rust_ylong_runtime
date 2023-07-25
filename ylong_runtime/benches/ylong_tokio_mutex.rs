@@ -14,9 +14,12 @@
 //! Benchmarks for mutex.
 //!
 //! Designs of ylong_runtime benchmarks:
-//! - Multiple threads are mutually exclusive to obtain the mutex and then rewrite the contents of the mutex for 10 times.
-//! - Multiple threads are mutually exclusive to obtain the mutex and then rewrite the contents of the mutex for 100 times.
-//! - Multiple threads are mutually exclusive to obtain the mutex and then rewrite the contents of the mutex for 1000 times.
+//! - Multiple threads are mutually exclusive to obtain the mutex and then
+//!   rewrite the contents of the mutex for 10 times.
+//! - Multiple threads are mutually exclusive to obtain the mutex and then
+//!   rewrite the contents of the mutex for 100 times.
+//! - Multiple threads are mutually exclusive to obtain the mutex and then
+//!   rewrite the contents of the mutex for 1000 times.
 
 #![feature(test)]
 
@@ -84,13 +87,14 @@ macro_rules! ylong_mutex_task {
 mod mutex_bench {
     extern crate test;
 
-    pub use crate::task_helpers::tokio_runtime;
     use std::hint::black_box;
     use std::sync::Arc;
-    use test::Bencher;
 
+    use test::Bencher;
     use tokio::sync::Mutex;
     use ylong_runtime::sync::Mutex as YlongMutex;
+
+    pub use crate::task_helpers::tokio_runtime;
 
     ylong_mutex_task!(ylong_mutex_10, YlongMutex, 10);
     ylong_mutex_task!(ylong_mutex_100, YlongMutex, 100);

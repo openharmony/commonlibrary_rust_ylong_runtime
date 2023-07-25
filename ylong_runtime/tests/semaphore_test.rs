@@ -13,19 +13,17 @@
 
 #![cfg(feature = "sync")]
 use std::sync::Arc;
+
 use ylong_runtime::sync::{AutoRelSemaphore, Semaphore};
 use ylong_runtime::task::JoinHandle;
 
-/// SDV test for `AutoRelSemaphore::acquire()`.
-///
-/// # Title
-/// auto_release_sem_acquire_test
+/// SDV test cases for `AutoRelSemaphore::acquire()`.
 ///
 /// # Brief
-/// 1.Create a counting auto-release-semaphore with an initial capacity.
-/// 2.Acquire an auto-release-permit.
-/// 3.Asynchronously acquires a permit.
-/// 4.Check the number of permits in every stage.
+/// 1. Create a counting auto-release-semaphore with an initial capacity.
+/// 2. Acquire an auto-release-permit.
+/// 3. Asynchronously acquires a permit.
+/// 4. Check the number of permits in every stage.
 #[test]
 fn auto_release_sem_acquire_test() {
     let sem = Arc::new(AutoRelSemaphore::new(1).unwrap());
@@ -38,16 +36,14 @@ fn auto_release_sem_acquire_test() {
     assert_eq!(sem.current_permits(), 1);
 }
 
-/// SDV test for `AutoRelSemaphore::try_acquire()`.
-///
-/// # Title
-/// auto_release_sem_try_acquire_test
+/// SDV test cases for `AutoRelSemaphore::try_acquire()`.
 ///
 /// # Brief
-/// 1.Create a counting auto-release-semaphore with an initial capacity.
-/// 2.Acquire an auto-release-permit.
-/// 3.Fail to acquire an auto-release-permit.
-/// 4.Acquire an auto-release-permit successfully after the last one is recycled.
+/// 1. Create a counting auto-release-semaphore with an initial capacity.
+/// 2. Acquire an auto-release-permit.
+/// 3. Fail to acquire an auto-release-permit.
+/// 4. Acquire an auto-release-permit successfully after the last one is
+///    recycled.
 #[test]
 fn auto_release_sem_try_acquire_test() {
     let sem = AutoRelSemaphore::new(1).unwrap();
@@ -60,15 +56,12 @@ fn auto_release_sem_try_acquire_test() {
     assert!(permit3.is_ok());
 }
 
-/// SDV test for `Semaphore::release()`.
-///
-/// # Title
-/// release_test
+/// SDV test cases for `Semaphore::release()`.
 ///
 /// # Brief
-/// 1.Create a counting semaphore with an initial capacity.
-/// 2.Call `Semaphore::release()` to add a permit to the semaphore.
-/// 3.Check the number of permits before and after releasing.
+/// 1. Create a counting semaphore with an initial capacity.
+/// 2. Call `Semaphore::release()` to add a permit to the semaphore.
+/// 3. Check the number of permits before and after releasing.
 #[test]
 fn release_test() {
     let sem = Semaphore::new(2).unwrap();
@@ -77,15 +70,12 @@ fn release_test() {
     assert_eq!(sem.current_permits(), 3);
 }
 
-/// SDV test for `AutoRelSemaphore::close()`.
-///
-/// # Title
-/// auto_release_sem_close_test
+/// SDV test cases for `AutoRelSemaphore::close()`.
 ///
 /// # Brief
-/// 1.Create a counting auto-release-semaphore with an initial capacity.
-/// 2.Close the semaphore.
-/// 3.Fail to acquire an auto-release-permit.
+/// 1. Create a counting auto-release-semaphore with an initial capacity.
+/// 2. Close the semaphore.
+/// 3. Fail to acquire an auto-release-permit.
 #[test]
 fn auto_release_sem_close_test() {
     let sem = Arc::new(AutoRelSemaphore::new(2).unwrap());
@@ -102,15 +92,12 @@ fn auto_release_sem_close_test() {
     ylong_runtime::block_on(handle).expect("block_on failed");
 }
 
-/// Stress test for `AutoRelSemaphore::acquire()`.
-///
-/// # Title
-/// auto_release_sem_stress_test
+/// Stress test cases for `AutoRelSemaphore::acquire()`.
 ///
 /// # Brief
-/// 1.Create a counting auto-release-semaphore with an initial capacity.
-/// 2.Repeating acquiring an auto-release-permit for a huge number of times.
-/// 3.Check the correctness of function of semaphore.
+/// 1. Create a counting auto-release-semaphore with an initial capacity.
+/// 2. Repeating acquiring an auto-release-permit for a huge number of times.
+/// 3. Check the correctness of function of semaphore.
 #[test]
 fn auto_release_sem_stress_test() {
     let sem = Arc::new(AutoRelSemaphore::new(5).unwrap());
@@ -138,15 +125,14 @@ fn auto_release_sem_stress_test() {
     assert!(sem.try_acquire().is_err());
 }
 
-/// Stress test for `AutoRelSemaphore::acquire()` and `AutoRelSemaphore::drop()`.
-///
-/// # Title
-/// async_stress_test
+/// Stress test cases for `AutoRelSemaphore::acquire()` and
+/// `AutoRelSemaphore::drop()`.
 ///
 /// # Brief
-/// 1.Create a counting auto-release-semaphore with an initial capacity.
-/// 2.Repeating acquiring a pair of auto-release-permit for a huge number of times.
-/// 3.Check the correctness of the future of `Permit`.
+/// 1. Create a counting auto-release-semaphore with an initial capacity.
+/// 2. Repeating acquiring a pair of auto-release-permit for a huge number of
+///    times.
+/// 3. Check the correctness of the future of `Permit`.
 #[test]
 fn async_stress_test() {
     let mut tasks: Vec<JoinHandle<()>> = Vec::new();
@@ -166,15 +152,12 @@ fn async_stress_test() {
     }
 }
 
-/// SDV test for `Semaphore::try_acquire()`.
-///
-/// # Title
-/// try_acquire_test
+/// SDV test cases for `Semaphore::try_acquire()`.
 ///
 /// # Brief
-/// 1.Create a counting semaphore with an initial capacity.
-/// 2.Acquire permits successfully.
-/// 3.Fail to acquire a permit when all permits are consumed.
+/// 1. Create a counting semaphore with an initial capacity.
+/// 2. Acquire permits successfully.
+/// 3. Fail to acquire a permit when all permits are consumed.
 #[test]
 fn try_acquire_test() {
     let sem = Semaphore::new(2).unwrap();
@@ -190,16 +173,13 @@ fn try_acquire_test() {
     assert!(permit3.is_err());
 }
 
-/// SDV test for `Semaphore::acquire()`.
-///
-/// # Title
-/// acquire_test
+/// SDV test cases for `Semaphore::acquire()`.
 ///
 /// # Brief
-/// 1.Create a counting semaphore with an initial capacity.
-/// 2.Acquire a permit.
-/// 3.Asynchronously acquires a permit.
-/// 4.Check the number of permits in every stage.
+/// 1. Create a counting semaphore with an initial capacity.
+/// 2. Acquire a permit.
+/// 3. Asynchronously acquires a permit.
+/// 4. Check the number of permits in every stage.
 #[test]
 fn acquire_test() {
     let sem = Arc::new(Semaphore::new(0).unwrap());

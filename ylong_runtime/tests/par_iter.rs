@@ -12,12 +12,12 @@
 // limitations under the License.
 
 use std::collections::{HashMap, HashSet};
-/// SDV test for par_iter
-/// # Title
-/// sdv_par_iter
+
+/// SDV test cases for par_iter
+///
 /// # Brief
-/// 1.Creates a parallel iterator and adds elements together..
-/// 2.Checks the correctness of the answer.
+/// 1. Creates a parallel iterator and adds elements together.
+/// 2. Checks the correctness of the answer.
 use ylong_runtime::iter::prelude::*;
 #[test]
 fn sdv_par_iter_test() {

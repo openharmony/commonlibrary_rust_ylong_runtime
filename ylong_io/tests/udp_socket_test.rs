@@ -13,16 +13,13 @@
 
 use ylong_io::UdpSocket;
 
-/// SDV test for `send()` and `recv()`.
-///
-/// # Title
-/// test_send_recv
+/// SDV test cases for `send()` and `recv()`.
 ///
 /// # Brief
-/// 1.Create UdpSocket and connect to the remote address.
-/// 2.Sender sends message first.
-/// 3.Receiver receives message.
-/// 4.Check if the test results are correct.
+/// 1. Create UdpSocket and connect to the remote address.
+/// 2. Sender sends message first.
+/// 3. Receiver receives message.
+/// 4. Check if the test results are correct.
 #[test]
 fn test_send_recv() {
     let sender_addr = "127.0.0.1:8081".parse().unwrap();
@@ -70,16 +67,13 @@ fn test_send_recv() {
     assert_eq!(&recv_buf[..len], b"Hello");
 }
 
-/// SDV test for `send_to()` and `recv_from()`.
-///
-/// # Title
-/// test_send_to_recv_from
+/// SDV test cases for `send_to()` and `recv_from()`.
 ///
 /// # Brief
-/// 1.Create UdpSocket.
-/// 2.Sender sends message to the specified address.
-/// 3.Receiver receives message and return the address the message from.
-/// 4.Check if the test results are correct.
+/// 1. Create UdpSocket.
+/// 2. Sender sends message to the specified address.
+/// 3. Receiver receives message and return the address the message from.
+/// 4. Check if the test results are correct.
 #[test]
 fn test_send_to_recv_from() {
     let sender_addr = "127.0.0.1:8085".parse().unwrap();

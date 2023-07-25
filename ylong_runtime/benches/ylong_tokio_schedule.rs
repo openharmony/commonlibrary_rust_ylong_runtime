@@ -12,7 +12,6 @@
 // limitations under the License.
 
 //! Benchmarks for task scheduling.
-//!
 
 #![feature(test)]
 
@@ -67,11 +66,12 @@ macro_rules! ylong_schedule_task {
 mod tokio_schedule_bench {
     extern crate test;
 
-    pub use crate::task_helpers::{fibbo, tokio_runtime};
     use std::hint::black_box;
-    use test::Bencher;
 
+    use test::Bencher;
     use ylong_runtime::task::yield_now;
+
+    pub use crate::task_helpers::{fibbo, tokio_runtime};
 
     tokio_schedule_task!(tokio_runtime(), tokio_task_10_15, 10, 15);
     tokio_schedule_task!(tokio_runtime(), tokio_task_120_15, 120, 15);
@@ -83,11 +83,12 @@ mod tokio_schedule_bench {
 mod ylong_schedule_bench {
     extern crate test;
 
-    pub use crate::task_helpers::{fibbo, tokio_runtime};
     use std::hint::black_box;
-    use test::Bencher;
 
+    use test::Bencher;
     use ylong_runtime::task::yield_now;
+
+    pub use crate::task_helpers::{fibbo, tokio_runtime};
 
     ylong_schedule_task!(ylong_task_10_15, 10, 15);
     ylong_schedule_task!(ylong_task_120_15, 120, 15);

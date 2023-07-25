@@ -14,10 +14,11 @@
 use proc_macro::TokenStream;
 use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::quote;
-use syn::{
-    parse::Parser, punctuated::Punctuated, spanned::Spanned, token::Comma, Error, ItemFn,
-    MetaNameValue, Result,
-};
+use syn::parse::Parser;
+use syn::punctuated::Punctuated;
+use syn::spanned::Spanned;
+use syn::token::Comma;
+use syn::{Error, ItemFn, MetaNameValue, Result};
 
 fn stream_with_error(mut stream: TokenStream2, errors: Option<Error>) -> TokenStream2 {
     if let Some(error) = errors {
@@ -218,11 +219,12 @@ fn build_stream(mut async_fn: ItemFn, mut config: Config) -> TokenStream2 {
 #[cfg(test)]
 mod test {
     use super::*;
-    /// UT test cases for `build_stream` in main procedural macro.
+    /// UT test cases for cases for `build_stream` in main procedural macro.
     ///
     /// # Brief
     /// 1. Creates an `async_fn` using `quote!`.
-    /// 2. Creates an `output` by calling `build_stream` with different `config`.
+    /// 2. Creates an `output` by calling `build_stream` with different
+    ///    `config`.
     /// 3. Checks if the result is correct.
     #[test]
     fn ut_build_stream_main() {
@@ -251,7 +253,7 @@ mod test {
         let res: ItemFn = syn::parse2(res).unwrap();
         assert_eq!(res, output);
 
-        //current
+        // current
         let args = quote! {
             flavor = "current"
         };
@@ -277,7 +279,8 @@ mod test {
     ///
     /// # Brief
     /// 1. Creates an `async_fn` using `quote!`.
-    /// 2. Creates an `output` by calling `build_stream` with different `config`.
+    /// 2. Creates an `output` by calling `build_stream` with different
+    ///    `config`.
     /// 3. Checks if the result is correct.
     #[test]
     fn ut_build_stream_test() {
@@ -288,7 +291,7 @@ mod test {
         };
         let async_fn: ItemFn = syn::parse2(item).unwrap();
 
-        //default config for test procedural macro, where the flavor is `current`.
+        // default config for test procedural macro, where the flavor is `current`.
         let args = quote! {};
         let config = build_config(args, true).unwrap();
 
@@ -309,7 +312,7 @@ mod test {
         let res: ItemFn = syn::parse2(res).unwrap();
         assert_eq!(res, output);
 
-        //current
+        // current
 
         let args = quote! {
             flavor = "current"

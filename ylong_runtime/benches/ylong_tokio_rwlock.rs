@@ -27,26 +27,24 @@ pub mod task_helpers;
 mod rwlock_bench {
     extern crate test;
 
+    use std::hint::black_box;
+    use std::sync::Arc;
+
+    use test::Bencher;
+    use tokio::sync::RwLock;
+    use ylong_runtime::sync::rwlock::RwLock as YlongRwlock;
+
     pub use crate::task_helpers::{
         tokio_runtime, tokio_rwlock_task, tokio_rwlock_write_task, ylong_rwlock_task,
         ylong_rwlock_write_task,
     };
-    use std::hint::black_box;
-    use std::sync::Arc;
-    use test::Bencher;
-
-    use tokio::sync::RwLock;
-    use ylong_runtime::sync::rwlock::RwLock as YlongRwlock;
 
     /// Benchmark test for tokio rwlock.
     ///
-    /// # Title
-    /// Tokio_rwlock_read_concurrent_uncontended_multi
-    ///
     /// # Brief
-    /// 1.Create a runtime with 6 threads.
-    /// 2.Create a rwLock variable.
-    /// 3.Concurrently read data for 6 times.
+    /// 1. Create a runtime with 6 threads.
+    /// 2. Create a rwLock variable.
+    /// 3. Concurrently read data for 6 times.
     #[bench]
     fn tokio_rwlock_read(b: &mut Bencher) {
         let rt = tokio_runtime();
@@ -67,13 +65,10 @@ mod rwlock_bench {
 
     /// Benchmark test for ylong rwlock.
     ///
-    /// # Title
-    /// Ylong_rwlock_read_concurrent_uncontended_multi
-    ///
     /// # Brief
-    /// 1.Create a runtime with 6 threads.
-    /// 2.Create a rwLock variable.
-    /// 3.Concurrently read data for 6 times.
+    /// 1. Create a runtime with 6 threads.
+    /// 2. Create a rwLock variable.
+    /// 3. Concurrently read data for 6 times.
     #[bench]
     fn ylong_rwlock_read(b: &mut Bencher) {
         let handle = ylong_runtime::spawn(async move {});
@@ -95,13 +90,10 @@ mod rwlock_bench {
 
     /// Benchmark test for tokio rwlock.
     ///
-    /// # Title
-    /// Tokio_rwlock_read_concurrent_uncontended_multi
-    ///
     /// # Brief
-    /// 1.Create a runtime with 6 threads.
-    /// 2.Create a rwLock variable.
-    /// 3.Concurrently read data for 6 times.
+    /// 1. Create a runtime with 6 threads.
+    /// 2. Create a rwLock variable.
+    /// 3. Concurrently read data for 6 times.
     #[bench]
     fn tokio_rwlock_write(b: &mut Bencher) {
         let rt = tokio_runtime();
@@ -122,13 +114,10 @@ mod rwlock_bench {
 
     /// Benchmark test for ylong rwlock.
     ///
-    /// # Title
-    /// Ylong_rwlock_read_concurrent_uncontended_multi
-    ///
     /// # Brief
-    /// 1.Create a runtime with 6 threads.
-    /// 2.Create a rwLock variable.
-    /// 3.Concurrently read data for 6 times.
+    /// 1. Create a runtime with 6 threads.
+    /// 2. Create a rwLock variable.
+    /// 3. Concurrently read data for 6 times.
     #[bench]
     fn ylong_rwlock_write(b: &mut Bencher) {
         let handle = ylong_runtime::spawn(async move {});
@@ -150,14 +139,11 @@ mod rwlock_bench {
 
     /// Benchmark test for tokio rwlock.
     ///
-    /// # Title
-    /// Tokio_rwlock_read_concurrent_contended_multi
-    ///
     /// # Brief
-    /// 1.Create a runtime with 6 threads.
-    /// 2.Create a rwLock variable.
-    /// 3.Write the rwlock
-    /// 4.Concurrently read data for 5 times.
+    /// 1. Create a runtime with 6 threads.
+    /// 2. Create a rwLock variable.
+    /// 3. Write the rwlock
+    /// 4. Concurrently read data for 5 times.
     #[bench]
     fn tokio_rwlock_write_read(b: &mut Bencher) {
         let rt = tokio_runtime();
@@ -184,14 +170,11 @@ mod rwlock_bench {
 
     /// Benchmark test for ylong rwlock.
     ///
-    /// # Title
-    /// Ylong_rwlock_read_concurrent_contended_multi
-    ///
     /// # Brief
-    /// 1.Create a runtime with 6 threads.
-    /// 2.Create a rwLock variable.
-    /// 3.Write the rwlock
-    /// 4.Concurrently read data for 5 times.
+    /// 1. Create a runtime with 6 threads.
+    /// 2. Create a rwLock variable.
+    /// 3. Write the rwlock
+    /// 4. Concurrently read data for 5 times.
     #[bench]
     fn ylong_rwlock_write_read(b: &mut Bencher) {
         let handle = ylong_runtime::spawn(async move {});

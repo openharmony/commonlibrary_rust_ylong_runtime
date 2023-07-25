@@ -11,22 +11,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::io::buffered::DEFAULT_BUF_SIZE;
-use crate::io::{poll_ready, AsyncBufRead, AsyncRead, AsyncSeek, AsyncWrite, ReadBuf};
 use std::io;
 use std::io::{IoSlice, SeekFrom};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
+use crate::io::buffered::DEFAULT_BUF_SIZE;
+use crate::io::{poll_ready, AsyncBufRead, AsyncRead, AsyncSeek, AsyncWrite, ReadBuf};
+
 /// This is an asynchronous version of [`std::io::BufWriter`]
 ///
-/// The `AsyncBufWriter<W>` struct adds buffering to any writer that implements AsyncWrite.
-/// It is suitable to perform large, infrequent writes on the underlying [`AsyncWrite`] object
-/// and maintains an in-memory buffer of the results.
+/// The `AsyncBufWriter<W>` struct adds buffering to any writer that implements
+/// AsyncWrite. It is suitable to perform large, infrequent writes on the
+/// underlying [`AsyncWrite`] object and maintains an in-memory buffer of the
+/// results.
 ///
-/// When the `AsyncBufWriter<W>` is dropped, the contents inside its buffer will be discarded.
-/// Creating multiple instances of `AsyncBufWriter<W>` on the same [`AsyncWrite`] stream may cause
-/// data loss.
+/// When the `AsyncBufWriter<W>` is dropped, the contents inside its buffer will
+/// be discarded. Creating multiple instances of `AsyncBufWriter<W>` on the same
+/// [`AsyncWrite`] stream may cause data loss.
 pub struct AsyncBufWriter<W> {
     inner: W,
     buf: Vec<u8>,
@@ -35,7 +37,8 @@ pub struct AsyncBufWriter<W> {
 
 impl<W: AsyncWrite> AsyncBufWriter<W> {
     /// Creates a new `AsyncBufWriter<W>` with a default buffer capacity.
-    /// The default buffer capacity is 8 KB, which is the same as [`std::io::BufWriter`]
+    /// The default buffer capacity is 8 KB, which is the same as
+    /// [`std::io::BufWriter`]
     ///
     /// # Examples
     ///
@@ -114,7 +117,8 @@ impl<W: AsyncWrite> AsyncBufWriter<W> {
 
     /// Unwraps this `AsyncBufWriter<R>`, returning the underlying writer.
     ///
-    /// Any leftover data inside the internal buffer of the `AsyncBufWriter` is lost.
+    /// Any leftover data inside the internal buffer of the `AsyncBufWriter` is
+    /// lost.
     pub fn into_inner(self) -> W {
         self.inner
     }

@@ -11,12 +11,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::fmt;
+
 use crate::sys::windows::afd::{
     POLL_ABORT, POLL_ACCEPT, POLL_CONNECT_FAIL, POLL_DISCONNECT, POLL_RECEIVE, POLL_SEND,
 };
 use crate::sys::windows::iocp::CompletionStatus;
 use crate::{EventTrait, Token};
-use std::fmt;
 
 /// An io event
 #[derive(Debug)]

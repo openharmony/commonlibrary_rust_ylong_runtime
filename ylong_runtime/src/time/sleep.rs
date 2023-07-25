@@ -11,14 +11,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::time::Clock;
-use crate::time::Driver;
 use std::convert::TryInto;
 use std::future::Future;
 use std::pin::Pin;
 use std::ptr::NonNull;
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
+
+use crate::time::{Clock, Driver};
 
 const TEN_YEARS: Duration = Duration::from_secs(86400 * 365 * 10);
 
@@ -51,6 +51,7 @@ pub fn sleep(duration: Duration) -> Sleep {
 ///
 /// ```
 /// use std::time::Duration;
+///
 /// use ylong_runtime::time::sleep;
 ///
 /// async fn sleep_test() {
@@ -138,24 +139,23 @@ impl Future for Sleep {
 impl Drop for Sleep {
     fn drop(&mut self) {
         // For some uses, for example, Timeout,
-        // `Sleep` enters the `Pending` state first and inserts the `TimerHandle` into the `DRIVER`,
-        // the future of timeout returns `Ready` in advance of the next polling,
-        // as a result, the `TimerHandle` pointer in the `DRIVER` is invalid.
-        // need to cancel the `TimerHandle` operation during `Sleep` drop.
+        // `Sleep` enters the `Pending` state first and inserts the `TimerHandle` into
+        // the `DRIVER`, the future of timeout returns `Ready` in advance of the
+        // next polling, as a result, the `TimerHandle` pointer in the `DRIVER`
+        // is invalid. need to cancel the `TimerHandle` operation during `Sleep`
+        // drop.
         self.cancel()
     }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::time::sleep;
-    use crate::{block_on, spawn};
     use std::time::Duration;
 
-    /// sleep ut test case.
-    ///
-    /// # Title
-    /// new_sleep
+    use crate::time::sleep;
+    use crate::{block_on, spawn};
+
+    /// UT test cases for new_sleep
     ///
     /// # Brief
     /// 1. Uses sleep to create a Sleep Struct.
