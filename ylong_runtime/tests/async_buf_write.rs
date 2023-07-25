@@ -29,7 +29,7 @@ use ylong_runtime::net::{TcpListener, TcpStream};
 #[test]
 fn sdv_buf_writer_write() {
     let server = ylong_runtime::spawn(async move {
-        let addr = "127.0.0.1:8184".parse().unwrap();
+        let addr = "127.0.0.1:8184";
         let tcp = TcpListener::bind(addr).await.unwrap();
         let (mut stream, _) = tcp.accept().await.unwrap();
 
@@ -40,7 +40,7 @@ fn sdv_buf_writer_write() {
     });
 
     let client = ylong_runtime::spawn(async move {
-        let addr = "127.0.0.1:8184".parse().unwrap();
+        let addr = "127.0.0.1:8184";
         let mut tcp = TcpStream::connect(addr).await;
         while tcp.is_err() {
             tcp = TcpStream::connect(addr).await;
@@ -68,7 +68,7 @@ fn sdv_buf_writer_write() {
 #[test]
 fn sdv_buf_writer_write_vectored() {
     let server = ylong_runtime::spawn(async move {
-        let addr = "127.0.0.1:8185".parse().unwrap();
+        let addr = "127.0.0.1:8185";
         let tcp = TcpListener::bind(addr).await.unwrap();
         let (mut stream, _) = tcp.accept().await.unwrap();
 
@@ -79,7 +79,7 @@ fn sdv_buf_writer_write_vectored() {
     });
 
     let client = ylong_runtime::spawn(async move {
-        let addr = "127.0.0.1:8185".parse().unwrap();
+        let addr = "127.0.0.1:8185";
         let mut tcp = TcpStream::connect(addr).await;
         while tcp.is_err() {
             tcp = TcpStream::connect(addr).await;

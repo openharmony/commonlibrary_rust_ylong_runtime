@@ -23,7 +23,7 @@ use ylong_runtime::net::TcpListener;
 fn main() -> io::Result<()> {
     let runtime = RuntimeBuilder::new_multi_thread().build().unwrap();
     let handle = runtime.spawn(async move {
-        let addr = "127.0.0.1:8080".parse().unwrap();
+        let addr = "127.0.0.1:8080";
         let server = match TcpListener::bind(addr).await {
             Ok(server) => server,
             Err(_) => return,

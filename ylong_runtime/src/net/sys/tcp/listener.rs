@@ -16,6 +16,7 @@ use std::net::SocketAddr;
 
 use ylong_io::Interest;
 
+use crate::net::sys::addr::ToSocketAddrs;
 use crate::net::{AsyncSource, TcpStream};
 
 /// An asynchronous version of [`std::net::TcpListener`]. Provides async
@@ -28,7 +29,7 @@ use crate::net::{AsyncSource, TcpStream};
 /// use ylong_runtime::net::TcpListener;
 ///
 /// async fn io_func() -> io::Result<()> {
-///     let addr = "127.0.0.1:8080".parse().unwrap();
+///     let addr = "127.0.0.1:8080";
 ///     let server = TcpListener::bind(addr).await?;
 ///     let (stream, address) = server.accept().await?;
 ///     Ok(())
@@ -45,6 +46,13 @@ impl TcpListener {
     /// listens for incoming TCP connections asynchronously. These
     /// connections can be accepted by calling [`TcpListener::accept`]
     ///
+    /// # Note
+    ///
+    /// If there are multiple addresses in SocketAddr, it will attempt to
+    /// connect them in sequence until one of the addrs returns success. If
+    /// all connections fail, it returns the error of the last connection.
+    /// This behavior is consistent with std.
+    ///
     /// # Example
     /// ```rust
     /// use std::io;
@@ -52,14 +60,16 @@ impl TcpListener {
     /// use ylong_runtime::net::TcpListener;
     ///
     /// async fn io_func() -> io::Result<()> {
-    ///     let addr = "127.0.0.1:8080".parse().unwrap();
+    ///     let addr = "127.0.0.1:8080";
     ///     let server = TcpListener::bind(addr).await?;
     ///     Ok(())
     /// }
     /// ```
-    pub async fn bind(addr: SocketAddr) -> io::Result<TcpListener> {
-        let listener = ylong_io::TcpListener::bind(addr)?;
-        TcpListener::new(listener)
+    pub async fn bind<A: ToSocketAddrs>(addr: A) -> io::Result<TcpListener> {
+        super::super::addr::each_addr(addr, ylong_io::TcpListener::bind)
+            .await
+            .map(TcpListener::new)
+            .and_then(|op| op)
     }
 
     /// Asynchronously accepts a new incoming connection from this listener.
@@ -75,7 +85,7 @@ impl TcpListener {
     /// use ylong_runtime::net::TcpListener;
     ///
     /// async fn io_func() -> io::Result<()> {
-    ///     let addr = "127.0.0.1:8080".parse().unwrap();
+    ///     let addr = "127.0.0.1:8080";
     ///     let server = TcpListener::bind(addr).await?;
     ///     let (stream, address) = server.accept().await?;
     ///     Ok(())

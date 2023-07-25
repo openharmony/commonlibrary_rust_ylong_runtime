@@ -13,7 +13,6 @@
 
 //! Tcp async benchmark
 
-use std::net::SocketAddr;
 use std::time::Instant;
 
 use ylong_runtime::builder::RuntimeBuilder;
@@ -21,10 +20,9 @@ use ylong_runtime::io::{AsyncReadExt, AsyncWriteExt};
 use ylong_runtime::net::{TcpListener, TcpStream};
 
 async fn run_client(addr: &str) {
-    let socket_addr: SocketAddr = addr.parse().unwrap();
-    let mut client_stream = TcpStream::connect(socket_addr).await;
+    let mut client_stream = TcpStream::connect(addr).await;
     while client_stream.is_err() {
-        client_stream = TcpStream::connect(socket_addr).await
+        client_stream = TcpStream::connect(addr).await
     }
     let mut client = client_stream.unwrap();
     for _ in 0..100 {
@@ -38,8 +36,7 @@ async fn run_client(addr: &str) {
 }
 
 async fn run_server(addr: &str) {
-    let socket_addr: SocketAddr = addr.parse().unwrap();
-    let socket = TcpListener::bind(socket_addr).await.unwrap();
+    let socket = TcpListener::bind(addr).await.unwrap();
     let mut server = socket.accept().await.unwrap().0;
 
     for _ in 0..100 {

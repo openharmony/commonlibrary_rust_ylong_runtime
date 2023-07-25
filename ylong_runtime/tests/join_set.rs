@@ -95,7 +95,7 @@ fn sdv_join_set_spawn_io() {
     let mut set = JoinSet::new();
     let handle = ylong_runtime::spawn(async move {
         set.spawn(async move {
-            let addr = "127.0.0.1:9001".parse().unwrap();
+            let addr = "127.0.0.1:9001";
             let listener = TcpListener::bind(addr).await.unwrap();
             let mut server = listener.accept().await.unwrap().0;
             let mut buf = [0; 100];
@@ -106,7 +106,7 @@ fn sdv_join_set_spawn_io() {
         });
 
         set.spawn(async move {
-            let addr = "127.0.0.1:9001".parse().unwrap();
+            let addr = "127.0.0.1:9001";
             let mut tcp = TcpStream::connect(addr).await;
             while tcp.is_err() {
                 tcp = TcpStream::connect(addr).await;

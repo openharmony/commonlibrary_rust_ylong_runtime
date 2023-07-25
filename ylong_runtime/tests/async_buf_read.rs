@@ -34,7 +34,7 @@ use ylong_runtime::net::{TcpListener, TcpStream};
 #[test]
 fn sdv_buf_reader_read_until() {
     let server = ylong_runtime::spawn(async move {
-        let addr = "127.0.0.1:8180".parse().unwrap();
+        let addr = "127.0.0.1:8180";
         let tcp = TcpListener::bind(addr).await.unwrap();
         let (stream, _) = tcp.accept().await.unwrap();
         let mut buf_reader = AsyncBufReader::new(stream);
@@ -50,7 +50,7 @@ fn sdv_buf_reader_read_until() {
     });
 
     let client = ylong_runtime::spawn(async move {
-        let addr = "127.0.0.1:8180".parse().unwrap();
+        let addr = "127.0.0.1:8180";
         let mut tcp = TcpStream::connect(addr).await;
         while tcp.is_err() {
             tcp = TcpStream::connect(addr).await;
@@ -78,7 +78,7 @@ fn sdv_buf_reader_read_until() {
 #[test]
 fn sdv_buf_reader_read_line() {
     let server = ylong_runtime::spawn(async move {
-        let addr = "127.0.0.1:8181".parse().unwrap();
+        let addr = "127.0.0.1:8181";
         let tcp = TcpListener::bind(addr).await.unwrap();
         let (stream, _) = tcp.accept().await.unwrap();
         let mut buf_reader = AsyncBufReader::new(stream);
@@ -92,7 +92,7 @@ fn sdv_buf_reader_read_line() {
     });
 
     let client = ylong_runtime::spawn(async move {
-        let addr = "127.0.0.1:8181".parse().unwrap();
+        let addr = "127.0.0.1:8181";
         let mut tcp = TcpStream::connect(addr).await;
         while tcp.is_err() {
             tcp = TcpStream::connect(addr).await;
@@ -119,7 +119,7 @@ fn sdv_buf_reader_read_line() {
 #[test]
 fn sdv_buf_reader_split() {
     let server = ylong_runtime::spawn(async move {
-        let addr = "127.0.0.1:8182".parse().unwrap();
+        let addr = "127.0.0.1:8182";
         let tcp = TcpListener::bind(addr).await.unwrap();
         let (stream, _) = tcp.accept().await.unwrap();
         let buf_reader = AsyncBufReader::new(stream);
@@ -131,7 +131,7 @@ fn sdv_buf_reader_split() {
     });
 
     let client = ylong_runtime::spawn(async move {
-        let addr = "127.0.0.1:8182".parse().unwrap();
+        let addr = "127.0.0.1:8182";
         let mut tcp = TcpStream::connect(addr).await;
         while tcp.is_err() {
             tcp = TcpStream::connect(addr).await;
@@ -158,7 +158,7 @@ fn sdv_buf_reader_split() {
 #[test]
 fn sdv_buf_reader_lines() {
     let server = ylong_runtime::spawn(async move {
-        let addr = "127.0.0.1:8183".parse().unwrap();
+        let addr = "127.0.0.1:8183";
         let tcp = TcpListener::bind(addr).await.unwrap();
         let (stream, _) = tcp.accept().await.unwrap();
         let buf_reader = AsyncBufReader::new(stream);
@@ -179,7 +179,7 @@ fn sdv_buf_reader_lines() {
     });
 
     let client = ylong_runtime::spawn(async move {
-        let addr = "127.0.0.1:8183".parse().unwrap();
+        let addr = "127.0.0.1:8183";
         let mut tcp = TcpStream::connect(addr).await;
         while tcp.is_err() {
             tcp = TcpStream::connect(addr).await;

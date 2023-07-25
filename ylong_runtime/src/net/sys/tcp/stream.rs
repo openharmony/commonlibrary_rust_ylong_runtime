@@ -14,13 +14,14 @@
 use std::fmt::{Debug, Formatter};
 use std::io;
 use std::io::IoSlice;
-use std::net::{Shutdown, SocketAddr};
+use std::net::Shutdown;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use ylong_io::Interest;
 
 use crate::io::{AsyncRead, AsyncWrite, ReadBuf};
+use crate::net::sys::ToSocketAddrs;
 use crate::net::AsyncSource;
 
 /// An asynchronous version of [`std::net::TcpStream`]
@@ -39,7 +40,7 @@ use crate::net::AsyncSource;
 /// use ylong_runtime::net::TcpStream;
 ///
 /// async fn io_func() -> io::Result<()> {
-///     let addr = "127.0.0.1:8080".parse().unwrap();
+///     let addr = "127.0.0.1:8080";
 ///     let mut stream = TcpStream::connect(addr).await?;
 ///
 ///     let _ = stream.write(b"hello client").await?;
@@ -66,6 +67,13 @@ impl Debug for TcpStream {
 impl TcpStream {
     /// Opens a TCP connection to a remote host asynchronously.
     ///
+    /// # Note
+    ///
+    /// If there are multiple addresses in SocketAddr, it will attempt to
+    /// connect them in sequence until one of the addrs returns success. If
+    /// all connections fail, it returns the error of the last connection.
+    /// This behavior is consistent with std.
+    ///
     /// # Example
     /// ```rust
     /// use std::io;
@@ -73,13 +81,18 @@ impl TcpStream {
     /// use ylong_runtime::net::TcpStream;
     ///
     /// async fn io_func() -> io::Result<()> {
-    ///     let addr = "127.0.0.1:8080".parse().unwrap();
+    ///     let addr = "127.0.0.1:8080";
     ///     let mut stream = TcpStream::connect(addr).await?;
     ///     Ok(())
     /// }
     /// ```
-    pub async fn connect(addr: SocketAddr) -> io::Result<Self> {
-        let stream = TcpStream::new(ylong_io::TcpStream::connect(addr)?)?;
+    pub async fn connect<A: ToSocketAddrs>(addr: A) -> io::Result<Self> {
+        let stream = super::super::addr::each_addr(addr, ylong_io::TcpStream::connect).await?;
+        Self::connect_inner(stream).await
+    }
+
+    async fn connect_inner(stream: ylong_io::TcpStream) -> io::Result<Self> {
+        let stream = TcpStream::new(stream)?;
         stream
             .source
             .async_process(

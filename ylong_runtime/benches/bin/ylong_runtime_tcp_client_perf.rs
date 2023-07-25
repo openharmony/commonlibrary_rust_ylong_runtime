@@ -21,7 +21,7 @@ use ylong_runtime::net::TcpStream;
 
 fn main() -> io::Result<()> {
     let handle = ylong_runtime::spawn(async move {
-        let addr = "127.0.0.1:8080".parse().unwrap();
+        let addr = "127.0.0.1:8080";
         let mut stream = match TcpStream::connect(addr).await {
             Ok(stream) => stream,
             Err(err) => return Err(err),

@@ -24,8 +24,8 @@ use ylong_runtime::net::UdpSocket;
 /// 4. Check if the test results are correct.
 #[test]
 fn sdv_udp_send_recv() {
-    let sender_addr = "127.0.0.1:8081".parse().unwrap();
-    let receiver_addr = "127.0.0.1:8082".parse().unwrap();
+    let sender_addr = "127.0.0.1:8081";
+    let receiver_addr = "127.0.0.1:8082";
     let handle = ylong_runtime::spawn(async move {
         let sender = match UdpSocket::bind(sender_addr).await {
             Ok(socket) => socket,
@@ -80,8 +80,8 @@ fn sdv_udp_send_recv() {
 /// 4. Check if the test results are correct.
 #[test]
 fn sdv_udp_send_to_recv_from() {
-    let sender_addr = "127.0.0.1:8085".parse().unwrap();
-    let receiver_addr = "127.0.0.1:8086".parse().unwrap();
+    let sender_addr = "127.0.0.1:8085";
+    let receiver_addr = "127.0.0.1:8086";
     let handle = ylong_runtime::spawn(async move {
         let sender = match UdpSocket::bind(sender_addr).await {
             Ok(socket) => socket,
@@ -109,14 +109,14 @@ fn sdv_udp_send_to_recv_from() {
         let mut recv_buf = [0_u8; 12];
         let (len, addr) = receiver.recv_from(&mut recv_buf[..]).await.unwrap();
         assert_eq!(&recv_buf[..len], b"Hello");
-        assert_eq!(addr, sender_addr);
+        assert_eq!(addr, sender_addr.parse().unwrap());
     });
     ylong_runtime::block_on(handle).expect("block_on failed");
 }
 
 fn sdv_udp_send() {
-    let sender_addr = "127.0.0.1:8089".parse().unwrap();
-    let receiver_addr = "127.0.0.1:8090".parse().unwrap();
+    let sender_addr = "127.0.0.1:8089";
+    let receiver_addr = "127.0.0.1:8090";
     let handle = ylong_runtime::spawn(async move {
         let sender = match UdpSocket::bind(sender_addr).await {
             Ok(socket) => socket,
@@ -154,8 +154,8 @@ fn sdv_udp_send() {
 /// 4. Check if the test results are correct.
 #[test]
 fn sdv_udp_recv() {
-    let sender_addr = "127.0.0.1:8089".parse().unwrap();
-    let receiver_addr = "127.0.0.1:8090".parse().unwrap();
+    let sender_addr = "127.0.0.1:8089";
+    let receiver_addr = "127.0.0.1:8090";
     let handle = ylong_runtime::spawn(async move {
         let receiver = match UdpSocket::bind(receiver_addr).await {
             Ok(socket) => socket,
@@ -189,8 +189,8 @@ fn sdv_udp_recv() {
 /// 4. Check if the test results are correct.
 #[test]
 fn sdv_udp_try_recv_from() {
-    let sender_addr = "127.0.0.1:8091".parse().unwrap();
-    let receiver_addr = "127.0.0.1:8092".parse().unwrap();
+    let sender_addr = "127.0.0.1:8091";
+    let receiver_addr = "127.0.0.1:8092";
     let handle = ylong_runtime::spawn(async move {
         let sender = match UdpSocket::bind(sender_addr).await {
             Ok(socket) => socket,
@@ -207,10 +207,10 @@ fn sdv_udp_try_recv_from() {
         };
 
         sender.writable().await.unwrap();
-        let mut ret = sender.try_send_to(b"Hello", receiver_addr);
+        let mut ret = sender.try_send_to(b"Hello", receiver_addr.parse().unwrap());
         while let Err(ref e) = ret {
             if e.kind() == io::ErrorKind::WouldBlock {
-                ret = sender.try_send_to(b"Hello", receiver_addr);
+                ret = sender.try_send_to(b"Hello", receiver_addr.parse().unwrap());
             } else {
                 panic!("try_send_to failed: {}", e);
             }
@@ -230,14 +230,14 @@ fn sdv_udp_try_recv_from() {
         }
         let (len, peer_addr) = ret.unwrap();
         assert_eq!(&recv_buf[..len], b"Hello");
-        assert_eq!(peer_addr, sender_addr);
+        assert_eq!(peer_addr, sender_addr.parse().unwrap());
     });
     ylong_runtime::block_on(handle).expect("block_on failed");
 }
 
 fn sdv_udp_try_send() {
-    let sender_addr = "127.0.0.1:8093".parse().unwrap();
-    let receiver_addr = "127.0.0.1:8094".parse().unwrap();
+    let sender_addr = "127.0.0.1:8093";
+    let receiver_addr = "127.0.0.1:8094";
     let handle = ylong_runtime::spawn(async move {
         let sender = match UdpSocket::bind(sender_addr).await {
             Ok(socket) => socket,
@@ -278,8 +278,8 @@ fn sdv_udp_try_send() {
 /// 4. Check if the test results are correct.
 #[test]
 fn sdv_udp_try_recv() {
-    let sender_addr = "127.0.0.1:8093".parse().unwrap();
-    let receiver_addr = "127.0.0.1:8094".parse().unwrap();
+    let sender_addr = "127.0.0.1:8093";
+    let receiver_addr = "127.0.0.1:8094";
     let handle = ylong_runtime::spawn(async move {
         let receiver = match UdpSocket::bind(receiver_addr).await {
             Ok(socket) => socket,

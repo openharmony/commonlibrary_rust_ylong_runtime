@@ -20,7 +20,7 @@ fn test_tcp_client() {
     let mut recv_buf = [0_u8; 12];
     let handle = ylong_runtime::spawn(async move {
         loop {
-            let addr = "127.0.0.1:8081".parse().unwrap();
+            let addr = "127.0.0.1:8081";
             if let Ok(mut client) = TcpStream::connect(addr).await {
                 match client.write(b"hello server").await {
                     Ok(n) => {
@@ -53,7 +53,7 @@ fn test_tcp_client() {
 fn sdv_tcp_global_runtime() {
     // Start a thread as client side
     thread::spawn(test_tcp_client);
-    let addr = "127.0.0.1:8081".parse().unwrap();
+    let addr = "127.0.0.1:8081";
     let handle = ylong_runtime::spawn(async move {
         let listener = TcpListener::bind(addr).await;
         if let Err(e) = listener {
@@ -103,7 +103,7 @@ fn sdv_tcp_multi_runtime() {
     let runtime = RuntimeBuilder::new_multi_thread().build().unwrap();
 
     let server = runtime.spawn(async move {
-        let addr = "127.0.0.1:8082".parse().unwrap();
+        let addr = "127.0.0.1:8082";
         let tcp = TcpListener::bind(addr).await.unwrap();
         let (mut stream, _) = tcp.accept().await.unwrap();
         let mut buf = [0; 100];
@@ -115,7 +115,7 @@ fn sdv_tcp_multi_runtime() {
     });
 
     let client = runtime.spawn(async move {
-        let addr = "127.0.0.1:8082".parse().unwrap();
+        let addr = "127.0.0.1:8082";
         let mut tcp = TcpStream::connect(addr).await;
         while tcp.is_err() {
             tcp = TcpStream::connect(addr).await;
