@@ -59,7 +59,6 @@ pub mod util;
 
 cfg_io! {
     pub mod net;
-    pub(crate) mod schedule_io;
 }
 
 /// Using the default task setting, spawns a task onto the global runtime.
