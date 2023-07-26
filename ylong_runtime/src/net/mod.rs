@@ -16,9 +16,9 @@
 pub(crate) use driver::Handle;
 pub(crate) use linked_list::{LinkedList, Node};
 pub(crate) use ready::{Ready, ReadyEvent};
+pub(crate) use schedule_io::{ScheduleIO, Tick};
 pub use sys::{Listener, Stream};
 
-pub(crate) use crate::schedule_io::{ScheduleIO, Tick};
 pub(crate) mod async_source;
 pub(crate) mod sys;
 pub(crate) use async_source::AsyncSource;
@@ -28,6 +28,7 @@ use crate::macros::cfg_io;
 pub(crate) mod driver;
 mod linked_list;
 pub(crate) mod ready;
+pub(crate) mod schedule_io;
 
 cfg_io! {
     pub use sys::{TcpListener, TcpStream};

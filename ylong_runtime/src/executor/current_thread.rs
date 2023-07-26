@@ -194,19 +194,13 @@ mod test {
             )*
         }
     }
-    macro_rules! cfg_net {
-        ($($item:item)*) => {
-            $(
-                #[cfg(feature = "net")]
-                $item
-            )*
-        }
-    }
+
     use std::future::Future;
     use std::pin::Pin;
     use std::task::{Context, Poll};
 
     use crate::executor::current_thread::CurrentThreadSpawner;
+    use crate::macros::cfg_io;
     use crate::task::{yield_now, TaskBuilder};
 
     cfg_sync! {
@@ -247,7 +241,7 @@ mod test {
         }
     }
 
-    cfg_net! {
+    cfg_io! {
         use std::net::SocketAddr;
         use crate::net::{TcpListener, TcpStream};
         use crate::io::{AsyncReadExt, AsyncWriteExt};

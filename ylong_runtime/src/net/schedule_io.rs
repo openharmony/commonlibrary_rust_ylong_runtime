@@ -386,8 +386,7 @@ mod schedule_io_test {
     use std::io;
     use std::sync::atomic::Ordering::{Acquire, Release};
 
-    use crate::net::{Ready, ReadyEvent};
-    use crate::schedule_io::{ScheduleIO, Tick};
+    use crate::net::{Ready, ReadyEvent, ScheduleIO, Tick};
     use crate::util::slab::Entry;
 
     /// UT test cases for schedule_io defalut
