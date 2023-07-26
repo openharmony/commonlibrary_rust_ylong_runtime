@@ -23,8 +23,6 @@ pub(crate) mod async_source;
 pub(crate) mod sys;
 pub(crate) use async_source::AsyncSource;
 
-use crate::macros::cfg_io;
-
 pub(crate) mod driver;
 mod linked_list;
 pub(crate) mod ready;

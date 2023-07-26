@@ -20,8 +20,6 @@ macro_rules! cfg_io {
     }
 }
 
-pub(crate) use cfg_io;
-
 macro_rules! cfg_ffrt {
     ($($item:item)*) => {
         $(
@@ -31,8 +29,6 @@ macro_rules! cfg_ffrt {
     }
 }
 
-pub(crate) use cfg_ffrt;
-
 macro_rules! cfg_not_ffrt {
     ($($item:item)*) => {
         $(
@@ -41,5 +37,3 @@ macro_rules! cfg_not_ffrt {
         )*
     }
 }
-
-pub(crate) use cfg_not_ffrt;

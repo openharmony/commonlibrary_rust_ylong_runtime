@@ -17,7 +17,6 @@ use std::sync::{Arc, Mutex};
 
 use ylong_io::{Interest, Source, Token};
 
-use crate::macros::{cfg_ffrt, cfg_not_ffrt};
 use crate::net::{Ready, ScheduleIO, Tick};
 use crate::util::bit::{Bit, Mask};
 use crate::util::slab::{Address, Ref, Slab};

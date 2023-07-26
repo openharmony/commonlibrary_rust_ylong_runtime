@@ -16,7 +16,6 @@ use std::ops::Deref;
 
 use ylong_io::{Interest, Source};
 
-use crate::macros::cfg_io;
 use crate::net::ScheduleIO;
 use crate::util::slab::Ref;
 

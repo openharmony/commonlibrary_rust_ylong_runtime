@@ -11,13 +11,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/// Task state, include SCHEDULED  RUNNING  COMPLETED CLOSED and so on and
-/// transform method
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed};
 
 use crate::error::ErrorKind;
-use crate::macros::cfg_not_ffrt;
 
 /// Task is currently running
 const RUNNING: usize = 0b0001;

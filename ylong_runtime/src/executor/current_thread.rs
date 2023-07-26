@@ -20,9 +20,9 @@ use std::sync::atomic::Ordering::{Acquire, Release};
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 
-use crate::cfg_io;
 use crate::executor::Schedule;
 use crate::task::{JoinHandle, Task, TaskBuilder, VirtualTableType};
+
 cfg_io!(
     use std::time::Duration;
     use crate::net::Driver;

@@ -315,7 +315,6 @@ fn level_range(level: usize) -> u64 {
 
 #[cfg(test)]
 mod test {
-    use crate::macros::cfg_io;
     use crate::time::wheel::{Wheel, LEVELS_NUM};
     cfg_io!(
         use crate::time::{sleep, timeout, Driver};

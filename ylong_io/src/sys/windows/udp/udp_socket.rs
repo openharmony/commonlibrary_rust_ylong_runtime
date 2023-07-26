@@ -308,7 +308,7 @@ impl Source for UdpSocket {
         interests: Interest,
     ) -> io::Result<()> {
         self.state
-            .register(selector, token, interests, self.inner.as_raw_socket())
+            .register(selector, token, interests, self.as_raw_fd())
     }
 
     fn reregister(
@@ -337,7 +337,7 @@ impl Source for ConnectedUdpSocket {
         interests: Interest,
     ) -> io::Result<()> {
         self.state
-            .register(selector, token, interests, self.inner.as_raw_socket())
+            .register(selector, token, interests, self.as_raw_fd())
     }
 
     fn reregister(

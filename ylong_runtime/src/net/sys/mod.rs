@@ -15,8 +15,6 @@ use std::io;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use crate::macros::cfg_io;
-
 cfg_io! {
     mod tcp;
     pub use tcp::{TcpListener, TcpStream};

@@ -14,7 +14,6 @@
 use super::pariter::{Consumer, ParallelIterator};
 use crate::error::ScheduleError;
 use crate::executor::{global_default_async, AsyncHandle};
-use crate::macros::{cfg_ffrt, cfg_not_ffrt};
 use crate::task::{JoinHandle, TaskBuilder};
 cfg_not_ffrt! {
     use crate::executor::{async_pool::AsyncPoolSpawner};
