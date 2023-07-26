@@ -20,7 +20,6 @@ use std::sync::Weak;
 use std::task::{Context, Poll, Waker};
 
 use crate::executor::Schedule;
-use crate::macros::cfg_ffrt;
 use crate::task::state::TaskState;
 use crate::task::task_handle::TaskHandle;
 use crate::task::{TaskBuilder, VirtualTableType};

@@ -20,7 +20,7 @@ const WRITABLE: usize = 0b0_10;
 const READ_CLOSED: usize = 0b0_0100;
 const WRITE_CLOSED: usize = 0b0_1000;
 
-crate::macros::cfg_not_ffrt! {
+cfg_not_ffrt! {
     use ylong_io::{Event, EventTrait};
 }
 
@@ -169,7 +169,7 @@ impl ReadyEvent {
     }
 }
 
-crate::macros::cfg_ffrt! {
+cfg_ffrt! {
     fn is_readable(event: i32) -> bool {
         (event as libc::c_int & libc::EPOLLIN) != 0
             || (event as libc::c_int & libc::EPOLLPRI) != 0

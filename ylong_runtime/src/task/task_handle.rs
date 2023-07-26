@@ -18,7 +18,6 @@ use std::task::{Context, Poll, Waker};
 
 use crate::error::{ErrorKind, ScheduleError};
 use crate::executor::Schedule;
-use crate::macros::{cfg_ffrt, cfg_not_ffrt};
 use crate::task::raw::{Header, Inner, TaskMngInfo};
 use crate::task::state::StateAction;
 use crate::task::waker::WakerRefHeader;

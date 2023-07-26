@@ -44,7 +44,8 @@ use crate::error::ScheduleError;
 use crate::executor::blocking_pool::BlockPoolSpawner;
 #[cfg(any(feature = "net", feature = "time"))]
 use crate::executor::netpoller::NetLooper;
-crate::macros::cfg_not_ffrt!(
+
+cfg_not_ffrt!(
     use crate::executor::async_pool::AsyncPoolSpawner;
 );
 
