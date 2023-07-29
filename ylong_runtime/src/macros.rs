@@ -11,7 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-macro_rules! cfg_io {
+macro_rules! cfg_net {
     ($($item:item)*) => {
         $(
             #[cfg(feature = "net")]

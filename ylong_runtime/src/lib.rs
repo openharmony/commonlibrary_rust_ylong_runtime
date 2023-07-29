@@ -60,7 +60,7 @@ cfg_time! {
 
 pub mod util;
 
-cfg_io! {
+cfg_net! {
     pub mod net;
 }
 
