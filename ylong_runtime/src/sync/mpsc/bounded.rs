@@ -13,11 +13,12 @@
 
 //! Bounded channel
 
-use crate::sync::error::{RecvError, SendError};
+use crate::sync::error::{RecvError, SendError, TryRecvError, TrySendError};
 use crate::sync::mpsc::array::Array;
 use crate::sync::mpsc::channel::{channel, Rx, Tx};
 use crate::sync::mpsc::Container;
 cfg_time!(
+    use crate::sync::error::{RecvTimeoutError, SendTimeoutError};
     use crate::sync::mpsc::array::SendPosition;
     use crate::time::timeout;
     use std::time::Duration;
@@ -127,17 +128,17 @@ impl<T> BoundedSender<T> {
     ///
     /// # Return value
     /// * `Ok(T)` if receiving a value successfully.
-    /// * `Err(SendError::Full(T))` if the buffer of channel is full.
-    /// * `Err(SendError::Closed(T))` if all senders have been dropped.
+    /// * `Err(TrySendError::Full(T))` if the buffer of channel is full.
+    /// * `Err(TrySendError::Closed(T))` if all senders have been dropped.
     ///
     /// # Examples
     ///
     /// ```
-    /// use ylong_runtime::sync::error::RecvError;
+    /// use ylong_runtime::sync::error::TryRecvError;
     /// use ylong_runtime::sync::mpsc::bounded::bounded_channel;
     /// let (tx, mut rx) = bounded_channel(1);
     /// match rx.try_recv() {
-    ///     Err(RecvError::Empty) => {}
+    ///     Err(TryRecvError::Empty) => {}
     ///     _ => panic!("This won't happen"),
     /// }
     /// tx.try_send(1).unwrap();
@@ -146,7 +147,7 @@ impl<T> BoundedSender<T> {
     ///     _ => panic!("This won't happen"),
     /// }
     /// ```
-    pub fn try_send(&self, value: T) -> Result<(), SendError<T>> {
+    pub fn try_send(&self, value: T) -> Result<(), TrySendError<T>> {
         self.channel.try_send(value)
     }
 
@@ -209,17 +210,17 @@ impl<T> BoundedSender<T> {
     /// }
     /// ```
     #[cfg(feature = "time")]
-    pub async fn send_timeout(&self, value: T, time: Duration) -> Result<(), SendError<T>> {
+    pub async fn send_timeout(&self, value: T, time: Duration) -> Result<(), SendTimeoutError<T>> {
         match timeout(time, self.channel.get_position()).await {
             Ok(res) => match res {
                 SendPosition::Pos(index) => {
                     self.channel.write(index, value);
                     Ok(())
                 }
-                SendPosition::Closed => Err(SendError::Closed(value)),
+                SendPosition::Closed => Err(SendTimeoutError::Closed(value)),
                 SendPosition::Full => unreachable!(),
             },
-            Err(_) => Err(SendError::TimeOut(value)),
+            Err(_) => Err(SendTimeoutError::TimeOut(value)),
         }
     }
 
@@ -345,17 +346,17 @@ impl<T> BoundedReceiver<T> {
     ///
     /// # Return value
     /// * `Ok(T)` if receiving a value successfully.
-    /// * `Err(RecvError::Empty)` if no value has been sent yet.
-    /// * `Err(RecvError::Closed)` if all senders have been dropped.
+    /// * `Err(TryRecvError::Empty)` if no value has been sent yet.
+    /// * `Err(TryRecvError::Closed)` if all senders have been dropped.
     ///
     /// # Examples
     ///
     /// ```
-    /// use ylong_runtime::sync::error::RecvError;
+    /// use ylong_runtime::sync::error::TryRecvError;
     /// use ylong_runtime::sync::mpsc::bounded::bounded_channel;
     /// let (tx, mut rx) = bounded_channel(1);
     /// match rx.try_recv() {
-    ///     Err(RecvError::Empty) => {}
+    ///     Err(TryRecvError::Empty) => {}
     ///     _ => panic!("This won't happen"),
     /// }
     /// tx.try_send(1).unwrap();
@@ -365,11 +366,11 @@ impl<T> BoundedReceiver<T> {
     /// }
     /// drop(tx);
     /// match rx.try_recv() {
-    ///     Err(RecvError::Closed) => {}
+    ///     Err(TryRecvError::Closed) => {}
     ///     _ => panic!("This won't happen"),
     /// }
     /// ```
-    pub fn try_recv(&mut self) -> Result<T, RecvError> {
+    pub fn try_recv(&mut self) -> Result<T, TryRecvError> {
         self.channel.try_recv()
     }
 
@@ -426,10 +427,10 @@ impl<T> BoundedReceiver<T> {
     /// }
     /// ```
     #[cfg(feature = "time")]
-    pub async fn recv_timeout(&mut self, time: Duration) -> Result<T, RecvError> {
+    pub async fn recv_timeout(&mut self, time: Duration) -> Result<T, RecvTimeoutError> {
         match timeout(time, self.channel.recv()).await {
-            Ok(res) => res,
-            Err(_) => Err(RecvError::TimeOut),
+            Ok(res) => res.map_err(|_| RecvTimeoutError::Closed),
+            Err(_) => Err(RecvTimeoutError::Timeout),
         }
     }
 

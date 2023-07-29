@@ -16,48 +16,108 @@
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
 
-/// Error returned by `Sender`.
+/// Error returned by `send`
 #[derive(Debug, Eq, PartialEq)]
-pub enum SendError<T> {
-    /// The channel is full now.
-    Full(T),
-    /// The receiver of channel was closed or dropped.
-    Closed(T),
-    /// Sending timeout.
-    TimeOut(T),
-}
+pub struct SendError<T>(pub T);
 
 impl<T> Display for SendError<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SendError::Full(_) => write!(f, "channel is full"),
-            SendError::Closed(_) => write!(f, "channel is closed"),
-            SendError::TimeOut(_) => write!(f, "channel sending timeout"),
-        }
+        write!(f, "channel is closed")
     }
 }
 
 impl<T: Debug> Error for SendError<T> {}
 
-/// Error returned by `Receiver`.
-#[derive(Debug, Eq, PartialEq, Clone)]
-pub enum RecvError {
-    /// sender has not sent a value yet.
-    Empty,
-    /// sender was dropped.
-    Closed,
-    /// Receiving timeout.
-    TimeOut,
-}
+/// Error returned by `recv`
+#[derive(Debug, Eq, PartialEq)]
+pub struct RecvError;
 
 impl Display for RecvError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            RecvError::Empty => write!(f, "channel is empty"),
-            RecvError::Closed => write!(f, "channel is closed"),
-            RecvError::TimeOut => write!(f, "channel receiving timeout"),
-        }
+        write!(f, "channel is closed")
     }
 }
 
 impl Error for RecvError {}
+
+/// Error returned by `try_send`.
+#[derive(Debug, Eq, PartialEq)]
+pub enum TrySendError<T> {
+    /// The channel is full now.
+    Full(T),
+    /// The receiver of channel was closed or dropped.
+    Closed(T),
+}
+
+impl<T> Display for TrySendError<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TrySendError::Full(_) => write!(f, "channel is full"),
+            TrySendError::Closed(_) => write!(f, "channel is closed"),
+        }
+    }
+}
+
+impl<T: Debug> Error for TrySendError<T> {}
+
+/// Error returned by `try_recv`.
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub enum TryRecvError {
+    /// sender has not sent a value yet.
+    Empty,
+    /// sender was dropped.
+    Closed,
+}
+
+impl Display for TryRecvError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TryRecvError::Empty => write!(f, "channel is empty"),
+            TryRecvError::Closed => write!(f, "channel is closed"),
+        }
+    }
+}
+
+impl Error for TryRecvError {}
+
+cfg_time! {
+
+    /// Error returned by `send_timeout`
+    #[derive(Debug,Eq,PartialEq)]
+    pub enum SendTimeoutError<T> {
+        /// The receiver of channel was closed or dropped.
+        Closed(T),
+        /// Sending timeout.
+        TimeOut(T),
+    }
+
+    impl<T> Display for SendTimeoutError<T> {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            match self {
+                SendTimeoutError::Closed(_) => write!(f, "channel is closed"),
+                SendTimeoutError::TimeOut(_) => write!(f, "channel sending timeout"),
+            }
+        }
+    }
+    impl<T: Debug> Error for SendTimeoutError<T> {}
+
+    /// Error returned by `recv_timeout`.
+    #[derive(Debug, Eq, PartialEq)]
+    pub enum RecvTimeoutError {
+        /// sender was dropped.
+        Closed,
+        /// Receiving timeout.
+        Timeout,
+    }
+
+    impl Display for RecvTimeoutError {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            match self {
+                RecvTimeoutError::Closed => write!(f, "channel is closed"),
+                RecvTimeoutError::Timeout => write!(f, "channel receiving timeout"),
+            }
+        }
+    }
+
+    impl Error for RecvTimeoutError {}
+}

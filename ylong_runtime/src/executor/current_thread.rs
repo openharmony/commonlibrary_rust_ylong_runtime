@@ -200,7 +200,6 @@ mod test {
     use std::task::{Context, Poll};
 
     use crate::executor::current_thread::CurrentThreadSpawner;
-    use crate::macros::cfg_io;
     use crate::task::{yield_now, TaskBuilder};
 
     cfg_sync! {

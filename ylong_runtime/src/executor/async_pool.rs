@@ -269,9 +269,9 @@ impl MultiThreadScheduler {
             // has no task, dequeue a task from the global queue instead.
             if count % GLOBAL_POLL_INTERVAL as u32 == 0 {
                 let limit = local_run_queue.remaining() as usize;
-                // If the local queue is empty, multiple tasks are stolen from the global queue to
-                // the local queue. If the local queue has tasks, only dequeue one task from the
-                // global queue and run it.
+                // If the local queue is empty, multiple tasks are stolen from the global queue
+                // to the local queue. If the local queue has tasks, only dequeue one task from
+                // the global queue and run it.
                 let task = if limit == LOCAL_QUEUE_CAP {
                     self.global
                         .pop_batch(self.num_workers, local_run_queue, limit)

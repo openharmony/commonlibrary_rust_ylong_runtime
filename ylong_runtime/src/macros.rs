@@ -20,6 +20,15 @@ macro_rules! cfg_io {
     }
 }
 
+macro_rules! cfg_time {
+    ($($item:item)*) => {
+        $(
+            #[cfg(feature = "time")]
+            $item
+        )*
+    }
+}
+
 macro_rules! cfg_ffrt {
     ($($item:item)*) => {
         $(

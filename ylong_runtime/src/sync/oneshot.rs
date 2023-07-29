@@ -50,7 +50,7 @@ use std::task::Poll::{Pending, Ready};
 use std::task::{Context, Poll};
 
 use super::atomic_waker::AtomicWaker;
-use super::error::RecvError;
+use super::error::{RecvError, TryRecvError};
 
 /// Initial state.
 const INIT: usize = 0b00;
@@ -280,8 +280,8 @@ impl<T> Receiver<T> {
     /// # Return value
     /// The function returns:
     ///  * `Ok(T)` if receiving a value successfully.
-    ///  * `Err(RecvError::Empty)` if no value has been sent yet.
-    ///  * `Err(RecvError::Closed)` if the sender has dropped without sending
+    ///  * `Err(TryRecvError::Empty)` if no value has been sent yet.
+    ///  * `Err(TryRecvError::Closed)` if the sender has dropped without sending
     ///   a value, or if the message has already been received.
     ///
     /// # Examples
@@ -289,12 +289,12 @@ impl<T> Receiver<T> {
     /// `try_recv` before a value is sent, then after.
     ///
     /// ```
-    /// use ylong_runtime::sync::error::RecvError;
+    /// use ylong_runtime::sync::error::TryRecvError;
     /// use ylong_runtime::sync::oneshot;
     /// async fn io_func() {
     ///     let (tx, mut rx) = oneshot::channel();
     ///     match rx.try_recv() {
-    ///         Err(RecvError::Empty) => {}
+    ///         Err(TryRecvError::Empty) => {}
     ///         _ => panic!("This won't happen"),
     ///     }
     ///
@@ -311,23 +311,26 @@ impl<T> Receiver<T> {
     /// `try_recv` when the sender dropped before sending a value
     ///
     /// ```
-    /// use ylong_runtime::sync::error::RecvError;
+    /// use ylong_runtime::sync::error::TryRecvError;
     /// use ylong_runtime::sync::oneshot;
     /// async fn io_func() {
     ///     let (tx, mut rx) = oneshot::channel::<()>();
     ///     drop(tx);
     ///
     ///     match rx.try_recv() {
-    ///         Err(RecvError::Closed) => {}
+    ///         Err(TryRecvError::Closed) => {}
     ///         _ => panic!("This won't happen"),
     ///     }
     /// }
     /// ```
-    pub fn try_recv(&mut self) -> Result<T, RecvError> {
+    pub fn try_recv(&mut self) -> Result<T, TryRecvError> {
         match self.channel.state.load(Acquire) {
-            INIT => Err(RecvError::Empty),
-            SENT => self.channel.take_value_sent(),
-            CLOSED => Err(RecvError::Closed),
+            INIT => Err(TryRecvError::Empty),
+            SENT => self
+                .channel
+                .take_value_sent()
+                .map_err(|_| TryRecvError::Closed),
+            CLOSED => Err(TryRecvError::Closed),
             _ => unreachable!(),
         }
     }
@@ -397,7 +400,7 @@ impl<T> Future for Receiver<T> {
                 }
             }
             SENT => Ready(self.channel.take_value_sent()),
-            CLOSED => Ready(Err(RecvError::Closed)),
+            CLOSED => Ready(Err(RecvError)),
             _ => unreachable!(),
         }
     }
@@ -430,7 +433,7 @@ impl<T> Channel<T> {
                 self.state.store(CLOSED, Release);
                 Ok(val)
             }
-            None => Err(RecvError::Closed),
+            None => Err(RecvError),
         }
     }
 
@@ -459,7 +462,7 @@ impl<T: Debug> Debug for Channel<T> {
 #[cfg(test)]
 mod tests {
     use crate::spawn;
-    use crate::sync::error::RecvError;
+    use crate::sync::error::TryRecvError;
     use crate::sync::oneshot;
 
     /// UT test cases for `send()` and `try_recv()`.
@@ -472,21 +475,11 @@ mod tests {
     #[test]
     fn send_try_recv() {
         let (tx, mut rx) = oneshot::channel();
-        match rx.try_recv() {
-            Err(RecvError::Empty) => {}
-            _ => unreachable!(),
-        }
+        assert_eq!(rx.try_recv(), Err(TryRecvError::Empty));
         tx.send("hello").unwrap();
 
-        match rx.try_recv() {
-            Ok(value) => assert_eq!(value, "hello"),
-            _ => unreachable!(),
-        }
-
-        match rx.try_recv() {
-            Err(RecvError::Closed) => {}
-            _ => unreachable!(),
-        }
+        assert_eq!(rx.try_recv().unwrap(), "hello");
+        assert_eq!(rx.try_recv(), Err(TryRecvError::Closed));
     }
 
     /// UT test cases for `send()` and async receive.

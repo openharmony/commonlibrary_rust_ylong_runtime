@@ -26,7 +26,7 @@ use std::sync::atomic::Ordering::Relaxed;
 use std::task::Waker;
 
 pub(crate) use driver::Driver;
-pub use sleep::{sleep, sleep_until};
+pub use sleep::{sleep, sleep_until, Sleep};
 pub use timeout::timeout;
 pub use timer::{periodic_schedule, timer, timer_at, Timer};
 

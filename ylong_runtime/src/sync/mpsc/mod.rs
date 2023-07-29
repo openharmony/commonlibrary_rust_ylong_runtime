@@ -13,14 +13,6 @@
 
 //! Message passing style communication
 
-macro_rules! cfg_time {
-    ($($item:item)*) => {
-        $(
-            #[cfg(feature = "time")]
-            $item
-        )*
-    }
-}
 pub(crate) mod array;
 pub mod bounded;
 pub(crate) mod channel;
