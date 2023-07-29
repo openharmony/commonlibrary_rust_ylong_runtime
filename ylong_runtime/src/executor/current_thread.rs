@@ -25,7 +25,7 @@ use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 use crate::executor::Schedule;
 use crate::task::{JoinHandle, Task, TaskBuilder, VirtualTableType};
 
-cfg_io!(
+cfg_net!(
     use std::time::Duration;
     use crate::net::Driver;
     use crate::net::Handle;
@@ -210,7 +210,6 @@ mod test {
     use std::task::{Context, Poll};
 
     use crate::executor::current_thread::CurrentThreadSpawner;
-    use crate::macros::cfg_io;
     use crate::task::{yield_now, TaskBuilder};
 
     cfg_sync! {
@@ -251,7 +250,7 @@ mod test {
         }
     }
 
-    cfg_io! {
+    cfg_net! {
         use std::net::SocketAddr;
         use crate::net::{TcpListener, TcpStream};
         use crate::io::{AsyncReadExt, AsyncWriteExt};

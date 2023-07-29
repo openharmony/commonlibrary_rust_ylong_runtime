@@ -316,7 +316,7 @@ fn level_range(level: usize) -> u64 {
 #[cfg(test)]
 mod test {
     use crate::time::wheel::{Wheel, LEVELS_NUM};
-    cfg_io!(
+    cfg_net!(
         use crate::time::{sleep, timeout, Driver};
         use crate::net::UdpSocket;
         use crate::JoinHandle;

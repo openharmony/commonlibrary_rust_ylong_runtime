@@ -13,8 +13,8 @@
 
 use std::time::Duration;
 
+use ylong_runtime::sync::error::{RecvError, RecvTimeoutError, TryRecvError, TrySendError};
 use ylong_runtime::sync::mpsc::{bounded_channel, unbounded_channel};
-use ylong_runtime::sync::{RecvError, SendError};
 use ylong_runtime::task::JoinHandle;
 
 /// SDV test cases for `UnboundedSender`.
@@ -29,7 +29,7 @@ fn sdv_unbounded_send_recv_test() {
     let handle = ylong_runtime::spawn(async move {
         assert_eq!(rx.recv().await, Ok(1));
         assert_eq!(rx.recv().await, Ok(2));
-        assert_eq!(rx.recv().await, Err(RecvError::Closed));
+        assert_eq!(rx.recv().await, Err(RecvError));
     });
     assert!(tx.send(1).is_ok());
     assert!(tx.send(2).is_ok());
@@ -46,11 +46,11 @@ fn sdv_unbounded_send_recv_test() {
 #[test]
 fn sdv_unbounded_send_try_recv_test() {
     let (tx, mut rx) = unbounded_channel();
-    assert_eq!(rx.try_recv(), Err(RecvError::Empty));
+    assert_eq!(rx.try_recv(), Err(TryRecvError::Empty));
     assert!(tx.send(1).is_ok());
     assert_eq!(rx.try_recv(), Ok(1));
     drop(tx);
-    assert_eq!(rx.try_recv(), Err(RecvError::Closed));
+    assert_eq!(rx.try_recv(), Err(TryRecvError::Closed));
 }
 
 /// SDV test cases for `UnboundedSender`.
@@ -67,7 +67,7 @@ fn sdv_unbounded_send_recv_timeout_test() {
         assert_eq!(rx.recv_timeout(Duration::from_millis(10)).await, Ok(1));
         assert_eq!(
             rx.recv_timeout(Duration::from_millis(10)).await,
-            Err(RecvError::TimeOut)
+            Err(RecvTimeoutError::Timeout)
         );
     });
     let _ = ylong_runtime::block_on(handle);
@@ -85,7 +85,7 @@ fn sdv_bounded_send_recv_test() {
     let handle = ylong_runtime::spawn(async move {
         assert_eq!(rx.recv().await, Ok(1));
         assert_eq!(rx.recv().await, Ok(2));
-        assert_eq!(rx.recv().await, Err(RecvError::Closed));
+        assert_eq!(rx.recv().await, Err(RecvError));
     });
 
     ylong_runtime::spawn(async move {
@@ -106,12 +106,12 @@ fn sdv_bounded_send_recv_test() {
 #[test]
 fn sdv_bounded_try_send_try_recv_test() {
     let (tx, mut rx) = bounded_channel::<i32>(1);
-    assert_eq!(rx.try_recv(), Err(RecvError::Empty));
+    assert_eq!(rx.try_recv(), Err(TryRecvError::Empty));
     assert!(tx.try_send(1).is_ok());
-    assert_eq!(tx.try_send(2), Err(SendError::Full(2)));
+    assert_eq!(tx.try_send(2), Err(TrySendError::Full(2)));
     assert_eq!(rx.try_recv(), Ok(1));
     drop(tx);
-    assert_eq!(rx.try_recv(), Err(RecvError::Closed));
+    assert_eq!(rx.try_recv(), Err(TryRecvError::Closed));
 }
 
 /// SDV test cases for `BoundedSender`.
@@ -131,7 +131,7 @@ fn sdv_bounded_send_timeout_recv_timeout_test() {
         assert_eq!(rx.recv_timeout(Duration::from_millis(10)).await, Ok(1));
         assert_eq!(
             rx.recv_timeout(Duration::from_millis(10)).await,
-            Err(RecvError::TimeOut)
+            Err(RecvTimeoutError::Timeout)
         );
     });
     let _ = ylong_runtime::block_on(handle);

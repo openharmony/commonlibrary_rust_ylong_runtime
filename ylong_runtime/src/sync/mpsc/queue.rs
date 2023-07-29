@@ -22,7 +22,7 @@ use std::task::{Context, Poll};
 
 use crate::futures::poll_fn;
 use crate::sync::atomic_waker::AtomicWaker;
-use crate::sync::error::{RecvError, SendError};
+use crate::sync::error::{RecvError, SendError, TryRecvError};
 use crate::sync::mpsc::Container;
 
 /// The capacity of a block.
@@ -126,7 +126,7 @@ impl<T> Queue<T> {
         let mut block_ptr = self.tail.block.load(Acquire);
         loop {
             if tail & CLOSED == CLOSED {
-                return Err(SendError::Closed(value));
+                return Err(SendError(value));
             }
             let index = (tail >> INDEX_SHIFT) % (CAPACITY + 1);
             if index == CAPACITY {
@@ -168,7 +168,7 @@ impl<T> Queue<T> {
         }
     }
 
-    pub(crate) fn try_recv(&self) -> Result<T, RecvError> {
+    pub(crate) fn try_recv(&self) -> Result<T, TryRecvError> {
         let mut head = self.head.borrow_mut();
         let head_index = head.index;
         let block_ptr = head.block.as_ptr();
@@ -192,9 +192,9 @@ impl<T> Queue<T> {
         } else {
             let tail_index = self.tail.index.load(Acquire);
             if tail_index & CLOSED == CLOSED {
-                Err(RecvError::Closed)
+                Err(TryRecvError::Closed)
             } else {
-                Err(RecvError::Empty)
+                Err(TryRecvError::Empty)
             }
         }
     }
@@ -202,7 +202,7 @@ impl<T> Queue<T> {
     fn poll_recv(&self, cx: &mut Context<'_>) -> Poll<Result<T, RecvError>> {
         match self.try_recv() {
             Ok(val) => return Ready(Ok(val)),
-            Err(RecvError::Closed) => return Ready(Err(RecvError::Closed)),
+            Err(TryRecvError::Closed) => return Ready(Err(RecvError)),
             _ => {}
         }
 
@@ -210,9 +210,8 @@ impl<T> Queue<T> {
 
         match self.try_recv() {
             Ok(val) => Ready(Ok(val)),
-            Err(RecvError::Closed) => Ready(Err(RecvError::Closed)),
-            Err(RecvError::Empty) => Pending,
-            _ => unreachable!(),
+            Err(TryRecvError::Closed) => Ready(Err(RecvError)),
+            Err(TryRecvError::Empty) => Pending,
         }
     }
 

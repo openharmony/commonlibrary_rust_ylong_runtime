@@ -19,7 +19,7 @@ use ylong_io::{Interest, Source};
 use crate::net::ScheduleIO;
 use crate::util::slab::Ref;
 
-cfg_io!(
+cfg_net!(
     use std::task::{Context, Poll};
     use std::mem::MaybeUninit;
     use crate::io::ReadBuf;
@@ -112,7 +112,7 @@ impl<E: Source> AsyncSource<E> {
         }
     }
 
-    cfg_io! {
+    cfg_net! {
         pub(crate) fn poll_ready(
             &self,
             cx: &mut Context<'_>,

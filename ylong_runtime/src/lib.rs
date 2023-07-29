@@ -56,15 +56,18 @@ pub(crate) mod spawn;
 #[cfg(feature = "sync")]
 pub mod sync;
 pub mod task;
-#[cfg(feature = "time")]
-pub mod time;
+
+cfg_time! {
+    pub mod time;
+}
+
 pub mod util;
 cfg_metrics!(
     mod metrics;
     pub use metrics::Metrics;
 );
 
-cfg_io! {
+cfg_net! {
     pub mod net;
 }
 

@@ -22,8 +22,7 @@ use std::task::{Context, Poll};
 
 use crate::futures::poll_fn;
 use crate::sync::atomic_waker::AtomicWaker;
-use crate::sync::error::SendError::{Closed, Full};
-use crate::sync::error::{RecvError, SendError};
+use crate::sync::error::{RecvError, SendError, TryRecvError, TrySendError};
 use crate::sync::mpsc::Container;
 use crate::sync::wake_list::WakerList;
 
@@ -120,14 +119,14 @@ impl<T> Array<T> {
         Position { array: self }.await
     }
 
-    pub(crate) fn try_send(&self, value: T) -> Result<(), SendError<T>> {
+    pub(crate) fn try_send(&self, value: T) -> Result<(), TrySendError<T>> {
         match self.prepare_send() {
             SendPosition::Pos(index) => {
                 self.write(index, value);
                 Ok(())
             }
-            SendPosition::Full => Err(Full(value)),
-            SendPosition::Closed => Err(Closed(value)),
+            SendPosition::Full => Err(TrySendError::Full(value)),
+            SendPosition::Closed => Err(TrySendError::Closed(value)),
         }
     }
 
@@ -137,13 +136,13 @@ impl<T> Array<T> {
                 self.write(index, value);
                 Ok(())
             }
-            SendPosition::Closed => Err(Closed(value)),
+            SendPosition::Closed => Err(SendError(value)),
             // If the array is full, the task will wait until it's available.
             SendPosition::Full => unreachable!(),
         }
     }
 
-    pub(crate) fn try_recv(&self) -> Result<T, RecvError> {
+    pub(crate) fn try_recv(&self) -> Result<T, TryRecvError> {
         let head = *self.head.borrow();
         let index = head % self.capacity;
         let node = self.data.get(index).unwrap();
@@ -161,9 +160,9 @@ impl<T> Array<T> {
         } else {
             let tail = self.tail.load(Acquire);
             if tail & CLOSED == CLOSED {
-                Err(RecvError::Closed)
+                Err(TryRecvError::Closed)
             } else {
-                Err(RecvError::Empty)
+                Err(TryRecvError::Empty)
             }
         }
     }
@@ -171,17 +170,16 @@ impl<T> Array<T> {
     fn poll_recv(&self, cx: &mut Context<'_>) -> Poll<Result<T, RecvError>> {
         match self.try_recv() {
             Ok(val) => return Ready(Ok(val)),
-            Err(RecvError::Closed) => return Ready(Err(RecvError::Closed)),
-            _ => {}
+            Err(TryRecvError::Closed) => return Ready(Err(RecvError)),
+            Err(TryRecvError::Empty) => {}
         }
 
         self.rx_waker.register_by_ref(cx.waker());
 
         match self.try_recv() {
             Ok(val) => Ready(Ok(val)),
-            Err(RecvError::Closed) => Ready(Err(RecvError::Closed)),
-            Err(RecvError::Empty) => Pending,
-            _ => unreachable!(),
+            Err(TryRecvError::Closed) => Ready(Err(RecvError)),
+            Err(TryRecvError::Empty) => Pending,
         }
     }
 

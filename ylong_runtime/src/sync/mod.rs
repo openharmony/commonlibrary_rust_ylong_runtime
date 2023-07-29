@@ -24,7 +24,6 @@ pub(crate) mod semaphore_inner;
 pub mod waiter;
 mod wake_list;
 
-pub use error::{RecvError, SendError};
 pub use mutex::{LockError, Mutex, MutexGuard};
 pub use rwlock::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 pub use semaphore::{AutoRelSemaphore, AutoRelSemaphorePermit, Semaphore, SemaphorePermit};

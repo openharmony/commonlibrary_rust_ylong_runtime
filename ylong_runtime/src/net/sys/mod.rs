@@ -15,7 +15,7 @@ use std::io;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-cfg_io! {
+cfg_net! {
     mod tcp;
     pub use tcp::{TcpListener, TcpStream};
     mod udp;

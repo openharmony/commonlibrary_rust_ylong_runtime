@@ -13,13 +13,15 @@
 
 //! Unbounded channel
 
-use crate::sync::error::{RecvError, SendError};
+use crate::sync::error::{RecvError, SendError, TryRecvError};
 use crate::sync::mpsc::channel::{channel, Rx, Tx};
 use crate::sync::mpsc::queue::Queue;
 use crate::sync::mpsc::Container;
+
 cfg_time!(
     use crate::time::timeout;
     use std::time::Duration;
+    use crate::sync::error::RecvTimeoutError;
 );
 /// The sender of unbounded channel.
 /// A [`UnboundedSender`] and [`UnboundedReceiver`] handle pair are created by
@@ -226,17 +228,17 @@ impl<T> UnboundedReceiver<T> {
     ///
     /// # Return value
     /// * `Ok(T)` if receiving a value successfully.
-    /// * `Err(RecvError::Empty)` if no value has been sent yet.
-    /// * `Err(RecvError::Closed)` if all senders have been dropped.
+    /// * `Err(TryRecvError::Empty)` if no value has been sent yet.
+    /// * `Err(TryRecvError::Closed)` if all senders have been dropped.
     ///
     /// # Examples
     ///
     /// ```
-    /// use ylong_runtime::sync::error::RecvError;
+    /// use ylong_runtime::sync::error::TryRecvError;
     /// use ylong_runtime::sync::mpsc::unbounded::unbounded_channel;
     /// let (tx, mut rx) = unbounded_channel();
     /// match rx.try_recv() {
-    ///     Err(RecvError::Empty) => {}
+    ///     Err(TryRecvError::Empty) => {}
     ///     _ => panic!("This won't happen"),
     /// }
     /// tx.send(1).unwrap();
@@ -246,11 +248,11 @@ impl<T> UnboundedReceiver<T> {
     /// }
     /// drop(tx);
     /// match rx.try_recv() {
-    ///     Err(RecvError::Closed) => {}
+    ///     Err(TryRecvError::Closed) => {}
     ///     _ => panic!("This won't happen"),
     /// }
     /// ```
-    pub fn try_recv(&mut self) -> Result<T, RecvError> {
+    pub fn try_recv(&mut self) -> Result<T, TryRecvError> {
         self.channel.try_recv()
     }
 
@@ -305,10 +307,10 @@ impl<T> UnboundedReceiver<T> {
     /// }
     /// ```
     #[cfg(feature = "time")]
-    pub async fn recv_timeout(&mut self, time: Duration) -> Result<T, RecvError> {
+    pub async fn recv_timeout(&mut self, time: Duration) -> Result<T, RecvTimeoutError> {
         match timeout(time, self.channel.recv()).await {
-            Ok(res) => res,
-            Err(_) => Err(RecvError::TimeOut),
+            Ok(res) => res.map_err(|_| RecvTimeoutError::Closed),
+            Err(_) => Err(RecvTimeoutError::Timeout),
         }
     }
 
