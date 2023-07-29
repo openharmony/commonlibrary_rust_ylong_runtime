@@ -58,6 +58,9 @@ net = ["ylong_io/tcp", "ylong_io/udp"]
 # Macro components
 macros = ["ylong_runtime_macros"]
 
+# Metrics component
+metrics = []
+
 [dependencies]
 libc = "0.2.134"
 ylong_io = { path = "../ylong_io", optional = true }

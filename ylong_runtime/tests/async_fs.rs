@@ -277,6 +277,7 @@ fn sdv_async_fs_set_permission() {
         let ret = file.set_permissions(perms).await;
         assert!(ret.is_ok());
         let mut perms = file.metadata().await.unwrap().permissions();
+        #[allow(clippy::permissions_set_readonly_false)]
         perms.set_readonly(false);
         let ret = file.set_permissions(perms).await;
         assert!(ret.is_ok());

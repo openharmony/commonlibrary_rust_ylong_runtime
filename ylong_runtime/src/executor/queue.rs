@@ -90,12 +90,77 @@ impl LocalQueue {
     }
 }
 
+#[cfg(feature = "metrics")]
+impl LocalQueue {
+    #[inline]
+    pub(crate) fn len(&self) -> u16 {
+        self.inner.len()
+    }
+
+    #[inline]
+    pub(crate) fn count(&self) -> usize {
+        self.inner.count()
+    }
+
+    #[inline]
+    pub(crate) fn task_from_global_count(&self) -> usize {
+        self.inner.task_from_global_count()
+    }
+
+    #[inline]
+    pub(crate) fn task_to_global_count(&self) -> usize {
+        self.inner.task_to_global_count()
+    }
+}
+
 pub(crate) struct InnerBuffer {
     /// Front stores the position of both head and steal
     front: AtomicU32,
     rear: AtomicU16,
     cap: u16,
     buffer: Box<[UnsafeCell<MaybeUninit<Task>>]>,
+    #[cfg(feature = "metrics")]
+    metrics: InnerBufferMetrics,
+}
+
+/// Metrics of InnerBuffer
+#[cfg(feature = "metrics")]
+struct InnerBufferMetrics {
+    /// The total number of task which has entered this LocalQueue
+    count: AtomicUsize,
+    /// The total number of task which has entered this LocalQueue from
+    /// GlobalQueue
+    task_from_global_count: AtomicUsize,
+    /// The total number of task which has entered GlobalQueue from this
+    /// LocalQueue
+    task_to_global_count: AtomicUsize,
+}
+
+#[cfg(feature = "metrics")]
+impl InnerBuffer {
+    /// Return queue's len.
+    fn len(&self) -> u16 {
+        let rear = self.rear.load(Acquire);
+        let (_, head) = unwrap(self.front.load(Acquire));
+        rear.wrapping_sub(head)
+    }
+
+    /// Returns the total number of task which has entered this LocalQueue
+    fn count(&self) -> usize {
+        self.metrics.count.load(Acquire)
+    }
+
+    /// Returns the total number of task which has entered this LocalQueue from
+    /// GlobalQueue
+    fn task_from_global_count(&self) -> usize {
+        self.metrics.task_from_global_count.load(Acquire)
+    }
+
+    /// Returns the total number of task which has entered GlobalQueue from this
+    /// LocalQueue
+    fn task_to_global_count(&self) -> usize {
+        self.metrics.task_to_global_count.load(Acquire)
+    }
 }
 
 impl InnerBuffer {
@@ -110,6 +175,12 @@ impl InnerBuffer {
             rear: AtomicU16::new(0),
             cap,
             buffer: buffer.into(),
+            #[cfg(feature = "metrics")]
+            metrics: InnerBufferMetrics {
+                count: AtomicUsize::new(0),
+                task_from_global_count: AtomicUsize::new(0),
+                task_to_global_count: AtomicUsize::new(0),
+            },
         }
     }
 
@@ -181,6 +252,8 @@ impl InnerBuffer {
                     ptr::write((*ptr).as_mut_ptr(), task);
                 }
                 self.rear.store(rear.wrapping_add(1), Release);
+                #[cfg(feature = "metrics")]
+                self.metrics.count.fetch_add(1, AcqRel);
                 return;
             } else {
                 match self.push_overflowed(task, global, real_pos) {
@@ -229,6 +302,10 @@ impl InnerBuffer {
         }
 
         global.push_batch(tmp_buf, task);
+
+        #[cfg(feature = "metrics")]
+        self.metrics.task_to_global_count.fetch_add(1, AcqRel);
+
         Ok(())
     }
 
@@ -332,7 +409,11 @@ impl Drop for InnerBuffer {
 }
 
 pub(crate) struct GlobalQueue {
+    /// Current number of tasks
     len: AtomicUsize,
+    /// The total number of tasks which has entered global queue.
+    #[cfg(feature = "metrics")]
+    count: AtomicUsize,
     globals: Mutex<LinkedList<Task>>,
 }
 
@@ -340,6 +421,8 @@ impl GlobalQueue {
     pub(crate) fn new() -> Self {
         GlobalQueue {
             len: AtomicUsize::new(0_usize),
+            #[cfg(feature = "metrics")]
+            count: AtomicUsize::new(0_usize),
             globals: Mutex::new(LinkedList::new()),
         }
     }
@@ -356,6 +439,8 @@ impl GlobalQueue {
         }
         list.push_back(task);
         self.len.fetch_add(len, AcqRel);
+        #[cfg(feature = "metrics")]
+        self.count.fetch_add(len, AcqRel);
     }
 
     pub(super) fn pop_batch(
@@ -393,6 +478,13 @@ impl GlobalQueue {
         drop(list);
         self.len.fetch_sub(count, AcqRel);
         inner_buf.rear.store(curr, Release);
+
+        #[cfg(feature = "metrics")]
+        inner_buf
+            .metrics
+            .task_from_global_count
+            .fetch_add(1, AcqRel);
+
         Some(first_task)
     }
 
@@ -414,15 +506,27 @@ impl GlobalQueue {
         list.push_back(task);
         drop(list);
         self.len.fetch_add(1, AcqRel);
+        #[cfg(feature = "metrics")]
+        self.count.fetch_add(1, AcqRel);
     }
 
     pub(super) fn get_global(&self) -> &Mutex<LinkedList<Task>> {
         &self.globals
     }
+
+    #[cfg(feature = "metrics")]
+    pub(crate) fn get_len(&self) -> usize {
+        self.len.load(Acquire)
+    }
+
+    #[cfg(feature = "metrics")]
+    pub(crate) fn get_count(&self) -> usize {
+        self.count.load(Acquire)
+    }
 }
 
 #[cfg(feature = "multi_instance_runtime")]
-#[cfg(test)]
+#[cfg(all(test))]
 mod test {
     use std::future::Future;
     use std::pin::Pin;
@@ -432,21 +536,23 @@ mod test {
     use std::thread::park;
 
     use crate::executor::async_pool::MultiThreadScheduler;
-    use crate::executor::queue::{unwrap, GlobalQueue, InnerBuffer, LocalQueue, LOCAL_QUEUE_CAP};
+    use crate::executor::queue::{GlobalQueue, InnerBuffer, LocalQueue, LOCAL_QUEUE_CAP};
     #[cfg(feature = "net")]
     use crate::net::Driver;
     use crate::task::{Task, TaskBuilder, VirtualTableType};
 
+    #[cfg(any(not(feature = "metrics"), feature = "ffrt"))]
     impl InnerBuffer {
         fn len(&self) -> u16 {
             let front = self.front.load(Acquire);
-            let (_, real_pos) = unwrap(front);
+            let (_, real_pos) = crate::executor::queue::unwrap(front);
 
             let rear = self.rear.load(Acquire);
             rear.wrapping_sub(real_pos)
         }
     }
 
+    #[cfg(any(not(feature = "metrics"), feature = "ffrt"))]
     impl LocalQueue {
         pub fn len(&self) -> u16 {
             self.inner.len()

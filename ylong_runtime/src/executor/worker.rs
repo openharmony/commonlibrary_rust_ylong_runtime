@@ -164,7 +164,7 @@ impl Worker {
         }
         // thread 0 is responsible for dropping the tasks inside the global queue
         if self.index == 0 {
-            let mut global = self.scheduler.get_global().lock().unwrap();
+            let mut global = self.scheduler.get_global().get_global().lock().unwrap();
             loop {
                 if let Some(task) = global.pop_front() {
                     task.shutdown();
@@ -228,6 +228,18 @@ impl Worker {
             inner.is_searching = true;
             break;
         }
+    }
+
+    /// Gets Worker's Inner with ptr.
+    ///
+    /// # Safety
+    /// We can't get Inner with `RefCell::borrow()`, because the worker will
+    /// always hold the borrow_mut until drop. So we can only get Inner by ptr.
+    /// This method can only be used to obtain values
+    #[cfg(feature = "metrics")]
+    pub(crate) unsafe fn get_inner_ptr(&self) -> &Inner {
+        let ptr = self.inner.as_ptr();
+        &*ptr
     }
 
     #[inline]

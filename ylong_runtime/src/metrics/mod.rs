@@ -11,38 +11,5 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-macro_rules! cfg_io {
-    ($($item:item)*) => {
-        $(
-            #[cfg(feature = "net")]
-            $item
-        )*
-    }
-}
-
-macro_rules! cfg_ffrt {
-    ($($item:item)*) => {
-        $(
-            #[cfg(feature = "ffrt")]
-            $item
-        )*
-    }
-}
-
-macro_rules! cfg_not_ffrt {
-    ($($item:item)*) => {
-        $(
-            #[cfg(not(feature = "ffrt"))]
-            $item
-        )*
-    }
-}
-
-macro_rules! cfg_metrics {
-    ($($item:item)*) => {
-        $(
-            #[cfg(feature = "metrics")]
-            $item
-        )*
-    }
-}
+mod runtime;
+pub use runtime::Metrics;

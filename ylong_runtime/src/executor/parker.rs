@@ -70,6 +70,11 @@ impl Parker {
     pub(crate) fn release(&self) {
         self.inner.release();
     }
+
+    #[cfg(feature = "metrics")]
+    pub(crate) fn get_state(&self) -> usize {
+        self.inner.get_state()
+    }
 }
 
 impl Inner {
@@ -163,6 +168,11 @@ impl Inner {
     #[cfg(feature = "net")]
     pub(crate) fn get_driver(&self) -> &Arc<Mutex<Driver>> {
         &self.driver
+    }
+
+    #[cfg(feature = "metrics")]
+    pub(crate) fn get_state(&self) -> usize {
+        self.state.load(SeqCst)
     }
 
     fn release(&self) {

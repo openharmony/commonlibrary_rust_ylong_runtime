@@ -23,6 +23,9 @@ compile_error!("Feature ffrt can not be enabled with feature current_thread_runt
 #[cfg(all(feature = "ffrt", not(target_os = "linux")))]
 compile_error!("Feature ffrt only works on linux currently");
 
+#[cfg(all(feature = "ffrt", feature = "metrics"))]
+compile_error!("Feature ffrt can not be enabled with feature metrics");
+
 extern crate core;
 
 use std::future::Future;
@@ -56,6 +59,10 @@ pub mod task;
 #[cfg(feature = "time")]
 pub mod time;
 pub mod util;
+cfg_metrics!(
+    mod metrics;
+    pub use metrics::Metrics;
+);
 
 cfg_io! {
     pub mod net;
