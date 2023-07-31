@@ -12,7 +12,7 @@
 // limitations under the License.
 
 use std::fmt::Formatter;
-use std::net::SocketAddr;
+use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::os::unix::io::AsRawFd;
 use std::{fmt, io, net};
 
@@ -123,6 +123,37 @@ impl UdpSocket {
         self.inner.local_addr()
     }
 
+    /// Sets the value for the IP_TTL option on this socket.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ylong_io::UdpSocket;
+    ///
+    /// let sender_addr = "127.0.0.1:8081".parse().unwrap();
+    /// let socket = UdpSocket::bind(sender_addr).expect("Bind Socket Failed!");
+    /// socket.set_ttl(100).expect("set_ttl call failed");
+    /// ```
+    pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
+        self.inner.set_ttl(ttl)
+    }
+
+    /// Sets the value for the IP_TTL option on this socket.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ylong_io::UdpSocket;
+    ///
+    /// let sender_addr = "127.0.0.1:8081".parse().unwrap();
+    /// let socket = UdpSocket::bind(sender_addr).expect("Bind Socket Failed!");
+    /// socket.set_ttl(100).expect("set_ttl call failed");
+    /// assert_eq!(socket.ttl().unwrap(), 100);
+    /// ```
+    pub fn ttl(&self) -> io::Result<u32> {
+        self.inner.ttl()
+    }
+
     /// Sends data on the socket to the given address. On success, returns the
     /// number of bytes written.
     ///
@@ -183,6 +214,27 @@ impl UdpSocket {
     pub fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         let inner = &self.inner;
         inner.recv_from(buf)
+    }
+
+    /// Receives single datagram on the socket from the remote address to which
+    /// it is connected, without removing the message from input queue. On
+    /// success, returns the number of bytes peeked.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ylong_io::UdpSocket;
+    ///
+    /// let sender_addr = "127.0.0.1:8081".parse().unwrap();
+    ///
+    /// let socket = UdpSocket::bind(sender_addr).expect("couldn't bind to address");
+    /// let mut buf = [0; 10];
+    /// let (number_of_bytes, src_addr) = socket.peek_from(&mut buf).expect("Didn't receive data");
+    /// let filled_buf = &mut buf[..number_of_bytes];
+    /// ```
+    pub fn peek_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
+        let inner = &self.inner;
+        inner.peek_from(buf)
     }
 
     /// Connects the UDP socket setting the default destination for send()
@@ -259,6 +311,86 @@ impl UdpSocket {
     pub fn broadcast(&self) -> io::Result<bool> {
         self.inner.broadcast()
     }
+
+    /// Gets the value of the SO_ERROR option on this socket.
+    /// This will retrieve the stored error in the underlying socket, clearing
+    /// the field in the process. This can be useful for checking errors between
+    /// calls.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ylong_io::UdpSocket;
+    ///
+    /// let addr = "127.0.0.1:34254".parse().unwrap();
+    /// let socket = UdpSocket::bind(addr).expect("couldn't bind to address");
+    /// match socket.take_error() {
+    ///     Ok(Some(error)) => println!("UdpSocket error: {error:?}"),
+    ///     Ok(None) => println!("No error"),
+    ///     Err(error) => println!("UdpSocket.take_error failed: {error:?}"),
+    /// }
+    /// ```
+    pub fn take_error(&self) -> io::Result<Option<io::Error>> {
+        self.inner.take_error()
+    }
+
+    /// Gets the value of the IP_MULTICAST_LOOP option for this socket.
+    pub fn multicast_loop_v4(&self) -> io::Result<bool> {
+        self.inner.multicast_loop_v4()
+    }
+
+    /// Sets the value of the IP_MULTICAST_LOOP option for this socket.
+    /// If enabled, multicast packets will be looped back to the local socket.
+    /// Note that this might not have any effect on IPv6 sockets.
+    pub fn set_multicast_loop_v4(&self, multicast_loop_v4: bool) -> io::Result<()> {
+        self.inner.set_multicast_loop_v4(multicast_loop_v4)
+    }
+
+    /// Gets the value of the IP_MULTICAST_TTL option for this socket.
+    pub fn multicast_ttl_v4(&self) -> io::Result<u32> {
+        self.inner.multicast_ttl_v4()
+    }
+
+    /// Sets the value of the IP_MULTICAST_TTL option for this socket.
+    /// Indicates the time-to-live value of outgoing multicast packets for this
+    /// socket. The default value is 1 which means that multicast packets don't
+    /// leave the local network unless explicitly requested. Note that this
+    /// might not have any effect on IPv6 sockets.
+    pub fn set_multicast_ttl_v4(&self, multicast_ttl_v4: u32) -> io::Result<()> {
+        self.inner.set_multicast_ttl_v4(multicast_ttl_v4)
+    }
+
+    /// Gets the value of the IPV6_MULTICAST_LOOP option for this socket.
+    pub fn multicast_loop_v6(&self) -> io::Result<bool> {
+        self.inner.multicast_loop_v6()
+    }
+
+    /// Sets the value of the IPV6_MULTICAST_LOOP option for this socket.
+    /// Controls whether this socket sees the multicast packets it sends itself.
+    /// Note that this might not have any affect on IPv4 sockets.
+    pub fn set_multicast_loop_v6(&self, multicast_loop_v6: bool) -> io::Result<()> {
+        self.inner.set_multicast_loop_v6(multicast_loop_v6)
+    }
+
+    /// Executes an operation of the IP_ADD_MEMBERSHIP type.
+    pub fn join_multicast_v4(&self, multiaddr: &Ipv4Addr, interface: &Ipv4Addr) -> io::Result<()> {
+        self.inner.join_multicast_v4(multiaddr, interface)
+    }
+
+    /// Executes an operation of the IPV6_ADD_MEMBERSHIP type.
+    pub fn join_multicast_v6(&self, multiaddr: &Ipv6Addr, interface: u32) -> io::Result<()> {
+        self.inner.join_multicast_v6(multiaddr, interface)
+    }
+
+    /// Executes an operation of the IP_DROP_MEMBERSHIP type.
+    pub fn leave_multicast_v4(&self, multiaddr: &Ipv4Addr, interface: &Ipv4Addr) -> io::Result<()> {
+        self.inner.leave_multicast_v4(multiaddr, interface)
+    }
+
+    /// Executes an operation of the IPV6_DROP_MEMBERSHIP type.
+    pub fn leave_multicast_v6(&self, multiaddr: &Ipv6Addr, interface: u32) -> io::Result<()> {
+        self.inner.leave_multicast_v6(multiaddr, interface)
+    }
 }
 
 /// An already connected, non-blocking UdpSocket
@@ -330,6 +462,45 @@ impl ConnectedUdpSocket {
     /// ```
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
         self.inner.peer_addr()
+    }
+
+    /// Sets the value for the IP_TTL option on this socket.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ylong_io::UdpSocket;
+    ///
+    /// let sender_addr = "127.0.0.1:8081".parse().unwrap();
+    /// let socket = UdpSocket::bind(sender_addr).expect("Bind Socket Failed!");
+    /// let receiver_addr = "127.0.0.1:8081".parse().unwrap();
+    /// let connect_socket = socket
+    ///     .connect(receiver_addr)
+    ///     .expect("Connect Socket Failed!");
+    /// connect_socket.set_ttl(100).expect("set_ttl call failed");
+    /// ```
+    pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
+        self.inner.set_ttl(ttl)
+    }
+
+    /// Sets the value for the IP_TTL option on this socket.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ylong_io::UdpSocket;
+    ///
+    /// let sender_addr = "127.0.0.1:8081".parse().unwrap();
+    /// let socket = UdpSocket::bind(sender_addr).expect("Bind Socket Failed!");
+    /// let receiver_addr = "127.0.0.1:8081".parse().unwrap();
+    /// let connect_socket = socket
+    ///     .connect(receiver_addr)
+    ///     .expect("Connect Socket Failed!");
+    /// connect_socket.set_ttl(100).expect("set_ttl call failed");
+    /// assert_eq!(connect_socket.ttl().unwrap(), 100);
+    /// ```
+    pub fn ttl(&self) -> io::Result<u32> {
+        self.inner.ttl()
     }
 
     /// Sends data on the socket to the remote address that the socket is
@@ -406,6 +577,170 @@ impl ConnectedUdpSocket {
     pub fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
         let inner = &self.inner;
         inner.recv(buf)
+    }
+
+    /// Receives single datagram on the socket from the remote address to which
+    /// it is connected, without removing the message from input queue. On
+    /// success, returns the number of bytes peeked.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ylong_io::UdpSocket;
+    ///
+    /// let sender_addr = "127.0.0.1:8081".parse().unwrap();
+    /// let receiver_addr = "127.0.0.1:8082".parse().unwrap();
+    ///
+    /// let socket = UdpSocket::bind(sender_addr).expect("couldn't bind to address");
+    /// let connect_socket = socket
+    ///     .connect(receiver_addr)
+    ///     .expect("connect function failed");
+    /// let mut buf = [0; 10];
+    /// match connect_socket.peek(&mut buf) {
+    ///     Ok(received) => println!("received {received} bytes"),
+    ///     Err(e) => println!("peek function failed: {e:?}"),
+    /// }
+    /// ```
+    pub fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
+        let inner = &self.inner;
+        inner.peek(buf)
+    }
+
+    /// Sets the value of the `SO_BROADCAST` option for this socket.
+    /// When enabled, this socket is allowed to send packets to a broadcast
+    /// address.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use std::io;
+    ///
+    /// use ylong_io::UdpSocket;
+    ///
+    /// async fn io_func() -> io::Result<()> {
+    ///     let local_addr = "127.0.0.1:8080".parse().unwrap();
+    ///     let receiver_addr = "127.0.0.1:8081".parse().unwrap();
+    ///     let socket = UdpSocket::bind(local_addr)?;
+    ///     let connect_socket = socket
+    ///         .connect(receiver_addr)
+    ///         .expect("connect function failed");
+    ///     if connect_socket.broadcast()? == false {
+    ///         connect_socket.set_broadcast(true)?;
+    ///     }
+    ///     assert_eq!(connect_socket.broadcast()?, true);
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn set_broadcast(&self, on: bool) -> io::Result<()> {
+        self.inner.set_broadcast(on)
+    }
+
+    /// Gets the value of the `SO_BROADCAST` option for this socket.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use std::io;
+    ///
+    /// use ylong_io::UdpSocket;
+    ///
+    /// async fn io_func() -> io::Result<()> {
+    ///     let local_addr = "127.0.0.1:8080".parse().unwrap();
+    ///     let receiver_addr = "127.0.0.1:8081".parse().unwrap();
+    ///     let socket = UdpSocket::bind(local_addr)?;
+    ///     let connect_socket = socket
+    ///         .connect(receiver_addr)
+    ///         .expect("connect function failed");
+    ///     assert_eq!(connect_socket.broadcast()?, false);
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn broadcast(&self) -> io::Result<bool> {
+        self.inner.broadcast()
+    }
+
+    /// Gets the value of the IP_MULTICAST_LOOP option for this socket.
+    pub fn multicast_loop_v4(&self) -> io::Result<bool> {
+        self.inner.multicast_loop_v4()
+    }
+
+    /// Sets the value of the IP_MULTICAST_LOOP option for this socket.
+    /// If enabled, multicast packets will be looped back to the local socket.
+    /// Note that this might not have any effect on IPv6 sockets.
+    pub fn set_multicast_loop_v4(&self, multicast_loop_v4: bool) -> io::Result<()> {
+        self.inner.set_multicast_loop_v4(multicast_loop_v4)
+    }
+
+    /// Gets the value of the IP_MULTICAST_TTL option for this socket.
+    pub fn multicast_ttl_v4(&self) -> io::Result<u32> {
+        self.inner.multicast_ttl_v4()
+    }
+
+    /// Sets the value of the IP_MULTICAST_TTL option for this socket.
+    /// Indicates the time-to-live value of outgoing multicast packets for this
+    /// socket. The default value is 1 which means that multicast packets don't
+    /// leave the local network unless explicitly requested. Note that this
+    /// might not have any effect on IPv6 sockets.
+    pub fn set_multicast_ttl_v4(&self, multicast_ttl_v4: u32) -> io::Result<()> {
+        self.inner.set_multicast_ttl_v4(multicast_ttl_v4)
+    }
+
+    /// Gets the value of the IPV6_MULTICAST_LOOP option for this socket.
+    pub fn multicast_loop_v6(&self) -> io::Result<bool> {
+        self.inner.multicast_loop_v6()
+    }
+
+    /// Sets the value of the IPV6_MULTICAST_LOOP option for this socket.
+    /// Controls whether this socket sees the multicast packets it sends itself.
+    /// Note that this might not have any affect on IPv4 sockets.
+    pub fn set_multicast_loop_v6(&self, multicast_loop_v6: bool) -> io::Result<()> {
+        self.inner.set_multicast_loop_v6(multicast_loop_v6)
+    }
+
+    /// Executes an operation of the IP_ADD_MEMBERSHIP type.
+    pub fn join_multicast_v4(&self, multiaddr: &Ipv4Addr, interface: &Ipv4Addr) -> io::Result<()> {
+        self.inner.join_multicast_v4(multiaddr, interface)
+    }
+
+    /// Executes an operation of the IPV6_ADD_MEMBERSHIP type.
+    pub fn join_multicast_v6(&self, multiaddr: &Ipv6Addr, interface: u32) -> io::Result<()> {
+        self.inner.join_multicast_v6(multiaddr, interface)
+    }
+
+    /// Executes an operation of the IP_DROP_MEMBERSHIP type.
+    pub fn leave_multicast_v4(&self, multiaddr: &Ipv4Addr, interface: &Ipv4Addr) -> io::Result<()> {
+        self.inner.leave_multicast_v4(multiaddr, interface)
+    }
+
+    /// Executes an operation of the IPV6_DROP_MEMBERSHIP type.
+    pub fn leave_multicast_v6(&self, multiaddr: &Ipv6Addr, interface: u32) -> io::Result<()> {
+        self.inner.leave_multicast_v6(multiaddr, interface)
+    }
+
+    /// Gets the value of the SO_ERROR option on this socket.
+    /// This will retrieve the stored error in the underlying socket, clearing
+    /// the field in the process. This can be useful for checking errors between
+    /// calls.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ylong_io::UdpSocket;
+    ///
+    /// let addr = "127.0.0.1:34253".parse().unwrap();
+    /// let receiver_addr = "127.0.0.1:34254".parse().unwrap();
+    /// let socket = UdpSocket::bind(addr).expect("couldn't bind to address");
+    /// let connected_sender = socket
+    ///     .connect(receiver_addr)
+    ///     .expect("connect function failed");
+    /// match connected_sender.take_error() {
+    ///     Ok(Some(error)) => println!("ConnectedUdpSocket error: {error:?}"),
+    ///     Ok(None) => println!("No error"),
+    ///     Err(error) => println!("ConnectedUdpSocket.take_error failed: {error:?}"),
+    /// }
+    /// ```
+    pub fn take_error(&self) -> io::Result<Option<io::Error>> {
+        self.inner.take_error()
     }
 }
 

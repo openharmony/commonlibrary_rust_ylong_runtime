@@ -302,7 +302,9 @@ impl InnerBuffer {
         }
 
         #[cfg(feature = "metrics")]
-        self.metrics.task_to_global_count.fetch_add(tmp_buf.len() + 1, AcqRel);
+        self.metrics
+            .task_to_global_count
+            .fetch_add(tmp_buf.len() + 1, AcqRel);
 
         global.push_batch(tmp_buf, task);
 
@@ -536,8 +538,8 @@ mod test {
     use std::thread::park;
 
     use crate::executor::async_pool::MultiThreadScheduler;
-    use crate::executor::queue::{GlobalQueue, InnerBuffer, LocalQueue, LOCAL_QUEUE_CAP};
     use crate::executor::driver::Driver;
+    use crate::executor::queue::{GlobalQueue, InnerBuffer, LocalQueue, LOCAL_QUEUE_CAP};
     use crate::task::{Task, TaskBuilder, VirtualTableType};
 
     #[cfg(any(not(feature = "metrics"), feature = "ffrt"))]
@@ -629,14 +631,7 @@ mod test {
 
         let (arc_handle, _) = Driver::initialize();
 
-        let exe_scheduler = Arc::downgrade(
-            &Arc::new(
-                MultiThreadScheduler::new(
-                    1,
-                    arc_handle
-                )
-            )
-        );
+        let exe_scheduler = Arc::downgrade(&Arc::new(MultiThreadScheduler::new(1, arc_handle)));
         let (task, _) = Task::create_task(
             &builder,
             exe_scheduler,
@@ -670,14 +665,8 @@ mod test {
 
         let (arc_handle, _) = Driver::initialize();
 
-        let exe_scheduler = Arc::downgrade(
-            &Arc::new(
-                MultiThreadScheduler::new(
-                    1,
-                    arc_handle.clone()
-                )
-            )
-        );
+        let exe_scheduler =
+            Arc::downgrade(&Arc::new(MultiThreadScheduler::new(1, arc_handle.clone())));
         let (task, _) = Task::create_task(
             &builder,
             exe_scheduler,
@@ -690,14 +679,8 @@ mod test {
         let inner_buffer = InnerBuffer::new(LOCAL_QUEUE_CAP as u16);
         let global_queue = GlobalQueue::new();
         for _ in 0..LOCAL_QUEUE_CAP + 1 {
-            let exe_scheduler = Arc::downgrade(
-                &Arc::new(
-                    MultiThreadScheduler::new(
-                        1,
-                        arc_handle.clone()
-                    )
-                )
-            );
+            let exe_scheduler =
+                Arc::downgrade(&Arc::new(MultiThreadScheduler::new(1, arc_handle.clone())));
             let (task, _) = Task::create_task(
                 &builder,
                 exe_scheduler,
@@ -733,14 +716,8 @@ mod test {
 
         let builder = TaskBuilder::new();
         for _ in 0..LOCAL_QUEUE_CAP / 2 {
-            let exe_scheduler = Arc::downgrade(
-                &Arc::new(
-                    MultiThreadScheduler::new(
-                        2,
-                        arc_handle.clone()
-                    )
-                )
-            );
+            let exe_scheduler =
+                Arc::downgrade(&Arc::new(MultiThreadScheduler::new(2, arc_handle.clone())));
             let (task, _) = Task::create_task(
                 &builder,
                 exe_scheduler,
@@ -751,14 +728,8 @@ mod test {
         }
 
         for _ in 0..LOCAL_QUEUE_CAP / 2 {
-            let exe_scheduler = Arc::downgrade(
-                &Arc::new(
-                    MultiThreadScheduler::new(
-                        2,
-                        arc_handle.clone()
-                    )
-                )
-            );
+            let exe_scheduler =
+                Arc::downgrade(&Arc::new(MultiThreadScheduler::new(2, arc_handle.clone())));
             let (task, _) = Task::create_task(
                 &builder,
                 exe_scheduler,
@@ -778,14 +749,8 @@ mod test {
         let (arc_handle, _) = Driver::initialize();
 
         for _ in 0..LOCAL_QUEUE_CAP / 2 + 1 {
-            let exe_scheduler = Arc::downgrade(
-                &Arc::new(
-                    MultiThreadScheduler::new(
-                        2,
-                        arc_handle.clone()
-                    )
-                )
-            );
+            let exe_scheduler =
+                Arc::downgrade(&Arc::new(MultiThreadScheduler::new(2, arc_handle.clone())));
             let (task, _) = Task::create_task(
                 &builder,
                 exe_scheduler,
@@ -796,14 +761,8 @@ mod test {
         }
 
         for _ in 0..LOCAL_QUEUE_CAP / 2 {
-            let exe_scheduler = Arc::downgrade(
-                &Arc::new(
-                    MultiThreadScheduler::new(
-                        2,
-                        arc_handle.clone()
-                    )
-                )
-            );
+            let exe_scheduler =
+                Arc::downgrade(&Arc::new(MultiThreadScheduler::new(2, arc_handle.clone())));
             let (task, _) = Task::create_task(
                 &builder,
                 exe_scheduler,
@@ -848,14 +807,8 @@ mod test {
         let (arc_handle, _) = Driver::initialize();
 
         for _ in 0..LOCAL_QUEUE_CAP {
-            let exe_scheduler = Arc::downgrade(
-                &Arc::new(
-                    MultiThreadScheduler::new(
-                        2,
-                        arc_handle.clone()
-                    )
-                )
-            );
+            let exe_scheduler =
+                Arc::downgrade(&Arc::new(MultiThreadScheduler::new(2, arc_handle.clone())));
             let (task, _) = Task::create_task(
                 &builder,
                 exe_scheduler,
@@ -892,14 +845,8 @@ mod test {
         let (arc_handle, _) = Driver::initialize();
 
         for _ in 0..LOCAL_QUEUE_CAP {
-            let exe_scheduler = Arc::downgrade(
-                &Arc::new(
-                    MultiThreadScheduler::new(
-                        2,
-                        arc_handle.clone()
-                    )
-                )
-            );
+            let exe_scheduler =
+                Arc::downgrade(&Arc::new(MultiThreadScheduler::new(2, arc_handle.clone())));
             let (task, _) = Task::create_task(
                 &builder,
                 exe_scheduler,
@@ -961,14 +908,8 @@ mod test {
 
         let (arc_handle, _) = Driver::initialize();
         for _ in 0..LOCAL_QUEUE_CAP {
-            let exe_scheduler = Arc::downgrade(
-                &Arc::new(
-                    MultiThreadScheduler::new(
-                        1,
-                        arc_handle.clone(),
-                    )
-                )
-            );
+            let exe_scheduler =
+                Arc::downgrade(&Arc::new(MultiThreadScheduler::new(1, arc_handle.clone())));
             let (task, _) = Task::create_task(
                 &builder,
                 exe_scheduler,
@@ -980,14 +921,8 @@ mod test {
 
         let (arc_handle, _) = Driver::initialize();
         for _ in 0..LOCAL_QUEUE_CAP {
-            let exe_scheduler = Arc::downgrade(
-                &Arc::new(
-                    MultiThreadScheduler::new(
-                        1,
-                        arc_handle.clone(),
-                    )
-                )
-            );
+            let exe_scheduler =
+                Arc::downgrade(&Arc::new(MultiThreadScheduler::new(1, arc_handle.clone())));
             let (task, _) = Task::create_task(
                 &builder,
                 exe_scheduler,
@@ -1016,14 +951,8 @@ mod test {
 
         let (arc_handle, _) = Driver::initialize();
         for _ in 0..LOCAL_QUEUE_CAP {
-            let exe_scheduler = Arc::downgrade(
-                &Arc::new(
-                    MultiThreadScheduler::new(
-                        1,
-                        arc_handle.clone(),
-                    )
-                )
-            );
+            let exe_scheduler =
+                Arc::downgrade(&Arc::new(MultiThreadScheduler::new(1, arc_handle.clone())));
             let (task, _) = Task::create_task(
                 &builder,
                 exe_scheduler,
@@ -1050,14 +979,8 @@ mod test {
 
         let (arc_handle, _) = Driver::initialize();
         for _ in 0..LOCAL_QUEUE_CAP {
-            let exe_scheduler = Arc::downgrade(
-                &Arc::new(
-                    MultiThreadScheduler::new(
-                        1,
-                        arc_handle.clone(),
-                    )
-                )
-            );
+            let exe_scheduler =
+                Arc::downgrade(&Arc::new(MultiThreadScheduler::new(1, arc_handle.clone())));
             let (task, _) = Task::create_task(
                 &builder,
                 exe_scheduler,
@@ -1099,14 +1022,8 @@ mod test {
 
         let (arc_handle, _) = Driver::initialize();
         for _ in 0..LOCAL_QUEUE_CAP {
-            let exe_scheduler = Arc::downgrade(
-                &Arc::new(
-                    MultiThreadScheduler::new(
-                        1,
-                        arc_handle.clone(),
-                    )
-                )
-            );
+            let exe_scheduler =
+                Arc::downgrade(&Arc::new(MultiThreadScheduler::new(1, arc_handle.clone())));
             let (task, _) = Task::create_task(
                 &builder,
                 exe_scheduler,

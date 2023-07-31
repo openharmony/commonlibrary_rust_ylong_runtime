@@ -17,7 +17,6 @@ pub(crate) use driver::IoHandle;
 pub(crate) use linked_list::{LinkedList, Node};
 pub(crate) use ready::{Ready, ReadyEvent};
 pub(crate) use schedule_io::{ScheduleIO, Tick};
-pub use sys::{Listener, Stream};
 
 pub(crate) mod async_source;
 pub(crate) mod sys;
@@ -31,7 +30,7 @@ pub(crate) mod schedule_io;
 cfg_net! {
     pub use sys::{TcpListener, TcpStream};
     pub use sys::{UdpSocket, ConnectedUdpSocket};
-    pub use sys::{SplitReadHalf, SplitWriteHalf};
+    pub use sys::{SplitReadHalf, SplitWriteHalf, BorrowReadHalf, BorrowWriteHalf};
     pub use sys::ToSocketAddrs;
 }
 

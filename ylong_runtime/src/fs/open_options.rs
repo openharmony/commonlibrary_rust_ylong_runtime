@@ -261,10 +261,10 @@ impl OpenOptions {
     ///   or `create_new` is set.
     /// * [`NotFound`]: One of the directory components of the file path doesn't
     ///   exist.
-    /// * [`PermissionDenied`]: The user lacks permission to get the specified
-    ///   access rights for the file.
-    /// * [`PermissionDenied`]: The user lacks permission to open one of the
-    ///   directory components of the specified path.
+    /// * [`PermissionDenied`]: The user doesn't has permission to get the
+    ///   specified access rights for the file.
+    /// * [`PermissionDenied`]: The user doesn't has permission to open one of
+    ///   the directory components of the specified path.
     /// * [`AlreadyExists`]: `create_new` was specified and the file already
     ///   exists.
     /// * [`InvalidInput`]: Invalid combinations of open options (truncate

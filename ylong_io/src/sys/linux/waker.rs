@@ -22,11 +22,11 @@ use crate::{Interest, Selector, Token};
 /// 64-bit counter. A fixed 8-byte (64-bit) unsigned integer is written to
 /// ensure wake-up reliability.
 #[derive(Debug)]
-pub struct WakerInner {
+pub(crate) struct WakerInner {
     fd: File,
 }
 impl WakerInner {
-    pub fn new(selector: &Selector, token: Token) -> io::Result<WakerInner> {
+    pub(crate) fn new(selector: &Selector, token: Token) -> io::Result<WakerInner> {
         let fd = unsafe { libc::eventfd(0, libc::EFD_CLOEXEC | libc::EFD_NONBLOCK) };
         let file = unsafe { File::from_raw_fd(fd) };
         if fd == -1 {
@@ -39,23 +39,17 @@ impl WakerInner {
         }
     }
 
-    pub fn wake(&self) -> io::Result<()> {
+    pub(crate) fn wake(&self) -> io::Result<()> {
         let buf: [u8; 8] = 1u64.to_ne_bytes();
         match (&self.fd).write(&buf) {
             Ok(_) => Ok(()),
             Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => {
-                self.reset()?;
-                self.wake()
+                let mut buf: [u8; 8] = 0u64.to_ne_bytes();
+                match (&self.fd).read(&mut buf) {
+                    Err(err) if err.kind() != io::ErrorKind::WouldBlock => Err(err),
+                    _ => self.wake(),
+                }
             }
-            Err(err) => Err(err),
-        }
-    }
-
-    fn reset(&self) -> io::Result<()> {
-        let mut buf: [u8; 8] = 0u64.to_ne_bytes();
-        match (&self.fd).read(&mut buf) {
-            Ok(_) => Ok(()),
-            Err(ref err) if err.kind() == io::ErrorKind::WouldBlock => Ok(()),
             Err(err) => Err(err),
         }
     }

@@ -21,8 +21,8 @@ use std::{cmp, thread};
 
 use crate::builder::multi_thread_builder::MultiThreadBuilder;
 use crate::builder::CallbackHook;
-use crate::executor::parker::Parker;
 use crate::executor::driver::{Driver, Handle};
+use crate::executor::parker::Parker;
 use crate::executor::queue::{GlobalQueue, LocalQueue, LOCAL_QUEUE_CAP};
 use crate::executor::sleeper::Sleepers;
 use crate::executor::worker::{get_current_ctx, run_worker, Worker, WorkerContext};
@@ -119,10 +119,7 @@ impl Schedule for MultiThreadScheduler {
 }
 
 impl MultiThreadScheduler {
-    pub(crate) fn new(
-        thread_num: usize,
-        handle: Arc<Handle>,
-    ) -> Self {
+    pub(crate) fn new(thread_num: usize, handle: Arc<Handle>) -> Self {
         let mut locals = Vec::new();
         for _ in 0..thread_num {
             locals.push(LocalQueue::new());
@@ -158,9 +155,7 @@ impl MultiThreadScheduler {
     fn wake_up_all(&self) {
         let join_handle = self.handles.read().unwrap();
         for item in join_handle.iter() {
-            item.unpark(
-                self.handle.clone()
-            );
+            item.unpark(self.handle.clone());
         }
     }
 
@@ -178,7 +173,12 @@ impl MultiThreadScheduler {
         if let Some(index) = self.sleepers.pop() {
             self.record.inc_active_num(true);
 
-            self.handles.read().unwrap().get(index).unwrap().unpark(self.handle.clone());
+            self.handles
+                .read()
+                .unwrap()
+                .get(index)
+                .unwrap()
+                .unpark(self.handle.clone());
         }
     }
 
@@ -388,14 +388,17 @@ fn get_cpu_core() -> u8 {
 fn async_thread_proc(
     inner: Arc<Inner>,
     worker: Arc<Worker>,
-    #[cfg(any(feature = "net", feature = "time"))]
-    handle: Arc<Handle>
+    #[cfg(any(feature = "net", feature = "time"))] handle: Arc<Handle>,
 ) {
     if let Some(f) = inner.after_start.clone() {
         f();
     }
 
-    run_worker(worker, #[cfg(any(feature = "net", feature = "time"))]handle);
+    run_worker(
+        worker,
+        #[cfg(any(feature = "net", feature = "time"))]
+        handle,
+    );
     let (lock, cvar) = &*(inner.shutdown_handle.clone());
     let mut finished = lock.lock().unwrap();
     *finished += 1;
@@ -427,34 +430,18 @@ impl AsyncPoolSpawner {
                 #[cfg(feature = "metrics")]
                 workers: Mutex::new(Vec::with_capacity(thread_num.into())),
             }),
-            exe_mng_info: Arc::new(
-                MultiThreadScheduler::new(
-                    thread_num as usize,
-                    handle
-                )
-            ),
+            exe_mng_info: Arc::new(MultiThreadScheduler::new(thread_num as usize, handle)),
         };
-        spawner.create_async_thread_pool(
-            driver
-        );
+        spawner.create_async_thread_pool(driver);
         spawner
     }
 
-    pub(crate) fn create_async_thread_pool(
-        &self,
-        driver: Arc<Mutex<Driver>>
-    ) {
+    pub(crate) fn create_async_thread_pool(&self, driver: Arc<Mutex<Driver>>) {
         let mut workers = vec![];
         for index in 0..self.inner.total {
             let local_queue = self.exe_mng_info.create_local_queue(index);
-            let local_run_queue = Box::new(
-                worker::Inner::new(
-                    local_queue, 
-                    Parker::new(
-                            driver.clone()
-                    )
-                )
-            );
+            let local_run_queue =
+                Box::new(worker::Inner::new(local_queue, Parker::new(driver.clone())));
             workers.push(Arc::new(Worker {
                 index,
                 scheduler: self.exe_mng_info.clone(),
@@ -493,7 +480,7 @@ impl AsyncPoolSpawner {
                         inner,
                         worker,
                         #[cfg(any(feature = "net", feature = "time"))]
-                        work_arc_handle
+                        work_arc_handle,
                     );
                 });
 
@@ -510,7 +497,7 @@ impl AsyncPoolSpawner {
                         inner,
                         worker,
                         #[cfg(any(feature = "net", feature = "time"))]
-                        work_arc_handle
+                        work_arc_handle,
                     );
                 });
                 match result {
@@ -647,10 +634,10 @@ mod test {
     use std::sync::{Arc, Mutex};
     use std::task::{Context, Poll};
     use std::thread::spawn;
-    use crate::executor::driver::Driver;
 
     use crate::builder::RuntimeBuilder;
     use crate::executor::async_pool::{get_cpu_core, AsyncPoolSpawner, MultiThreadScheduler};
+    use crate::executor::driver::Driver;
     use crate::executor::parker::Parker;
     use crate::task::{Task, TaskBuilder, VirtualTableType};
 
@@ -691,17 +678,11 @@ mod test {
     #[test]
     fn ut_executor_mng_info_new_001() {
         let (arc_handle, _) = Driver::initialize();
-        let executor_mng_info = MultiThreadScheduler::new(
-            1,
-            arc_handle.clone()
-        );
+        let executor_mng_info = MultiThreadScheduler::new(1, arc_handle.clone());
         assert!(!executor_mng_info.is_cancel.load(Acquire));
         assert_eq!(executor_mng_info.handles.read().unwrap().capacity(), 0);
 
-        let executor_mng_info = MultiThreadScheduler::new(
-            64,
-            arc_handle
-        );
+        let executor_mng_info = MultiThreadScheduler::new(64, arc_handle);
         assert!(!executor_mng_info.is_cancel.load(Acquire));
         assert_eq!(executor_mng_info.handles.read().unwrap().capacity(), 0);
     }
@@ -714,17 +695,11 @@ mod test {
     #[test]
     fn ut_executor_mng_info_create_local_queues() {
         let (arc_handle, _) = Driver::initialize();
-        let executor_mng_info = MultiThreadScheduler::new(
-            1,
-            arc_handle.clone()
-        );
+        let executor_mng_info = MultiThreadScheduler::new(1, arc_handle.clone());
         let local_run_queue_info = executor_mng_info.create_local_queue(0);
         assert!(local_run_queue_info.is_empty());
 
-        let executor_mng_info = MultiThreadScheduler::new(
-            64,
-            arc_handle
-        );
+        let executor_mng_info = MultiThreadScheduler::new(64, arc_handle);
         let local_run_queue_info = executor_mng_info.create_local_queue(63);
         assert!(local_run_queue_info.is_empty());
     }
@@ -737,20 +712,10 @@ mod test {
     #[test]
     fn ut_executor_mng_info_enqueue() {
         let (arc_handle, _) = Driver::initialize();
-        let executor_mng_info = MultiThreadScheduler::new(
-            1,
-            arc_handle.clone()
-        );
+        let executor_mng_info = MultiThreadScheduler::new(1, arc_handle.clone());
 
         let builder = TaskBuilder::new();
-        let exe_scheduler = Arc::downgrade(
-            &Arc::new(
-                MultiThreadScheduler::new(
-                    1,
-                    arc_handle
-                )
-            )
-        );
+        let exe_scheduler = Arc::downgrade(&Arc::new(MultiThreadScheduler::new(1, arc_handle)));
         let (task, _) = Task::create_task(
             &builder,
             exe_scheduler,
@@ -770,10 +735,7 @@ mod test {
     #[test]
     fn ut_executor_mng_info_is_cancel() {
         let (arc_handle, _) = Driver::initialize();
-        let executor_mng_info = MultiThreadScheduler::new(
-            1,
-            arc_handle
-        );
+        let executor_mng_info = MultiThreadScheduler::new(1, arc_handle);
         executor_mng_info.is_cancel.store(false, Release);
         assert!(!executor_mng_info.is_cancel());
         executor_mng_info.is_cancel.store(true, Release);
@@ -787,10 +749,7 @@ mod test {
     #[test]
     fn ut_executor_mng_info_set_cancel() {
         let (arc_handle, _) = Driver::initialize();
-        let executor_mng_info = MultiThreadScheduler::new(
-            1,
-            arc_handle
-        );
+        let executor_mng_info = MultiThreadScheduler::new(1, arc_handle);
         assert!(!executor_mng_info.is_cancel.load(Acquire));
         executor_mng_info.set_cancel();
         assert!(executor_mng_info.is_cancel.load(Acquire));
@@ -803,19 +762,14 @@ mod test {
     #[test]
     fn ut_executor_mng_info_cancel() {
         let (arc_handle, arc_driver) = Driver::initialize();
-        let executor_mng_info = MultiThreadScheduler::new(
-            1,
-            arc_handle
-        );
+        let executor_mng_info = MultiThreadScheduler::new(1, arc_handle);
 
         let flag = Arc::new(Mutex::new(0));
         let (tx, rx) = channel();
 
         let (flag_clone, tx) = (flag.clone(), tx);
 
-        let mut parker = Parker::new(
-            arc_driver
-        );
+        let mut parker = Parker::new(arc_driver);
         let parker_cpy = parker.clone();
         let _ = spawn(move || {
             parker.park();
@@ -837,19 +791,14 @@ mod test {
     #[test]
     fn ut_executor_mng_info_wake_up_all() {
         let (arc_handle, arc_driver) = Driver::initialize();
-        let executor_mng_info = MultiThreadScheduler::new(
-            1,
-            arc_handle
-        );
+        let executor_mng_info = MultiThreadScheduler::new(1, arc_handle);
 
         let flag = Arc::new(Mutex::new(0));
         let (tx, rx) = channel();
 
         let (flag_clone, tx) = (flag.clone(), tx);
 
-        let mut parker = Parker::new(
-            arc_driver
-        );
+        let mut parker = Parker::new(arc_driver);
         let parker_cpy = parker.clone();
 
         let _ = spawn(move || {
@@ -873,10 +822,7 @@ mod test {
     #[test]
     fn ut_executor_mng_info_wake_up_rand_one() {
         let (arc_handle, arc_driver) = Driver::initialize();
-        let executor_mng_info = MultiThreadScheduler::new(
-            1,
-            arc_handle
-        );
+        let executor_mng_info = MultiThreadScheduler::new(1, arc_handle);
         executor_mng_info.turn_to_sleep(0, false);
 
         let flag = Arc::new(Mutex::new(0));
@@ -884,9 +830,7 @@ mod test {
 
         let (flag_clone, tx) = (flag.clone(), tx);
 
-        let mut parker = Parker::new(
-            arc_driver
-        );
+        let mut parker = Parker::new(arc_driver);
         let parker_cpy = parker.clone();
 
         let _ = spawn(move || {
@@ -910,10 +854,7 @@ mod test {
     #[test]
     fn ut_executor_mng_info_wake_up_if_one_task_left() {
         let (arc_handle, arc_driver) = Driver::initialize();
-        let executor_mng_info = MultiThreadScheduler::new(
-            1,
-            arc_handle.clone()
-        );
+        let executor_mng_info = MultiThreadScheduler::new(1, arc_handle.clone());
 
         executor_mng_info.turn_to_sleep(0, false);
 
@@ -922,9 +863,7 @@ mod test {
 
         let (flag_clone, tx) = (flag.clone(), tx);
 
-        let mut parker = Parker::new(
-            arc_driver
-        );
+        let mut parker = Parker::new(arc_driver);
         let parker_cpy = parker.clone();
 
         let _ = spawn(move || {
@@ -936,14 +875,7 @@ mod test {
         executor_mng_info.handles.write().unwrap().push(parker_cpy);
 
         let builder = TaskBuilder::new();
-        let exe_scheduler = Arc::downgrade(
-            &Arc::new(
-                MultiThreadScheduler::new(
-                    1,
-                    arc_handle
-                )
-            )
-        );
+        let exe_scheduler = Arc::downgrade(&Arc::new(MultiThreadScheduler::new(1, arc_handle)));
         let (task, _) = Task::create_task(
             &builder,
             exe_scheduler,
@@ -967,19 +899,14 @@ mod test {
     #[test]
     fn ut_from_woken_to_sleep() {
         let (arc_handle, arc_driver) = Driver::initialize();
-        let executor_mng_info = MultiThreadScheduler::new(
-            1,
-            arc_handle.clone()
-        );
+        let executor_mng_info = MultiThreadScheduler::new(1, arc_handle.clone());
 
         let flag = Arc::new(Mutex::new(0));
         let (tx, rx) = channel();
 
         let (flag_clone, tx) = (flag.clone(), tx);
 
-        let mut parker = Parker::new(
-            arc_driver
-        );
+        let mut parker = Parker::new(arc_driver);
         let parker_cpy = parker.clone();
 
         let _ = spawn(move || {
@@ -991,14 +918,7 @@ mod test {
         executor_mng_info.handles.write().unwrap().push(parker_cpy);
 
         let builder = TaskBuilder::new();
-        let exe_scheduler = Arc::downgrade(
-            &Arc::new(
-                MultiThreadScheduler::new(
-                    1,
-                    arc_handle
-                )
-            )
-        );
+        let exe_scheduler = Arc::downgrade(&Arc::new(MultiThreadScheduler::new(1, arc_handle)));
         let (task, _) = Task::create_task(
             &builder,
             exe_scheduler,
