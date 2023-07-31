@@ -56,7 +56,7 @@ impl Future for YieldTask {
                         let mut yielded = ctx.worker.yielded.borrow_mut();
                         yielded.push(cx.waker().clone());
                     }
-                    #[cfg(feature = "net")]
+                    #[cfg(any(feature = "net", feature = "time"))]
                     worker::WorkerContext::Curr(_) => cx.waker().wake_by_ref(),
                 }
             } else {

@@ -64,7 +64,7 @@ impl<E: Source> AsyncSource<E> {
         };
 
         let interest = interest.unwrap_or_else(|| Interest::WRITABLE.add(Interest::READABLE));
-        let entry = inner.register_source(&mut io, interest)?;
+        let entry = inner.io_register(&mut io, interest)?;
         Ok(AsyncSource {
             io: Some(io),
             entry,
@@ -84,7 +84,7 @@ impl<E: Source> AsyncSource<E> {
     /// returned.
     #[cfg(feature = "ffrt")]
     pub fn new(mut io: E, interest: Option<Interest>) -> io::Result<AsyncSource<E>> {
-        let inner = crate::net::Handle::get_ref();
+        let inner = crate::net::IoHandle::get_ref();
 
         let interest = interest.unwrap_or_else(|| Interest::WRITABLE.add(Interest::READABLE));
         let entry = inner.register_source(&mut io, interest)?;
@@ -256,7 +256,7 @@ impl<E: Source> Drop for AsyncSource<E> {
                     WorkerContext::Curr(ctx) => &ctx.handle,
                 }
             };
-            let _ = inner.deregister_source(&mut io);
+            let _ = inner.io_deregister(&mut io);
         }
     }
 }

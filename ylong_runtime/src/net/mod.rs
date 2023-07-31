@@ -13,7 +13,7 @@
 
 //! Asynchronous TCP/UDP binding for `ylong_runtime`
 
-pub(crate) use driver::Handle;
+pub(crate) use driver::IoHandle;
 pub(crate) use linked_list::{LinkedList, Node};
 pub(crate) use ready::{Ready, ReadyEvent};
 pub(crate) use schedule_io::{ScheduleIO, Tick};
@@ -35,4 +35,4 @@ cfg_net! {
 }
 
 #[cfg(not(feature = "ffrt"))]
-pub(crate) use driver::Driver;
+pub(crate) use driver::IoDriver;

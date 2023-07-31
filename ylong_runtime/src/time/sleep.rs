@@ -18,13 +18,26 @@ use std::ptr::NonNull;
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
 
-use crate::time::{Clock, Driver};
+#[cfg(not(feature = "ffrt"))]
+use crate::executor::worker::{get_current_ctx, WorkerContext};
+use crate::time::Clock;
+#[cfg(feature = "ffrt")]
+use crate::time::TimeDriver;
 
 const TEN_YEARS: Duration = Duration::from_secs(86400 * 365 * 10);
 
 /// Waits until 'instant' has reached.
 pub fn sleep_until(instant: Instant) -> Sleep {
-    let start_time = Driver::get_ref().start_time();
+    #[cfg(not(feature = "ffrt"))]
+    let start_time = {
+        let context = get_current_ctx().expect("not in a worker ctx");
+        match context {
+            WorkerContext::Multi(ctx) => ctx.handle.start_time(),
+            WorkerContext::Curr(ctx) => ctx.handle.start_time(),
+        }
+    };
+    #[cfg(feature = "ffrt")]
+    let start_time = TimeDriver::get_ref().start_time();
     let instant = if instant < start_time {
         start_time
     } else {
@@ -95,9 +108,17 @@ impl Sleep {
 
     // Cancels the Sleep
     fn cancel(&mut self) {
-        let driver = Driver::get_ref();
-        let mut lock = driver.wheel.lock().unwrap();
-        lock.cancel(NonNull::from(&self.timer));
+        #[cfg(not(feature = "ffrt"))]
+        let driver = {
+            let context = get_current_ctx().expect("not in a worker ctx");
+            match context {
+                WorkerContext::Multi(ctx) => &ctx.handle,
+                WorkerContext::Curr(ctx) => &ctx.handle,
+            }
+        };
+        #[cfg(feature = "ffrt")]
+        let driver = TimeDriver::get_ref();
+        driver.timer_cancel(NonNull::from(&self.timer));
     }
 }
 
@@ -105,7 +126,16 @@ impl Future for Sleep {
     type Output = ();
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let driver = Driver::get_ref();
+        #[cfg(not(feature = "ffrt"))]
+        let driver = {
+            let context = get_current_ctx().expect("not in a worker ctx");
+            match context {
+                WorkerContext::Multi(ctx) => &ctx.handle,
+                WorkerContext::Curr(ctx) => &ctx.handle,
+            }
+        };
+        #[cfg(feature = "ffrt")]
+        let driver = TimeDriver::get_ref();
         if self.need_insert {
             let ms = self
                 .deadline
@@ -117,7 +147,7 @@ impl Future for Sleep {
             self.timer.set_expiration(ms);
             self.timer.set_waker(cx.waker().clone());
 
-            match driver.insert(NonNull::from(&self.timer)) {
+            match driver.timer_register(NonNull::from(&self.timer)) {
                 Ok(_) => self.need_insert = false,
                 Err(_) => {
                     // Even if the insertion fails, there is no need to insert again here,

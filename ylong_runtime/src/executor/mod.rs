@@ -19,7 +19,7 @@ pub(crate) mod blocking_pool;
 #[cfg(feature = "current_thread_runtime")]
 pub(crate) mod current_thread;
 
-#[cfg(any(feature = "time", feature = "net"))]
+#[cfg(all(any(feature = "time", feature = "net"), feature = "ffrt"))]
 pub(crate) mod netpoller;
 use std::future::Future;
 use std::mem::MaybeUninit;
@@ -42,10 +42,11 @@ cfg_not_ffrt! {
     pub(crate) mod queue;
     mod sleeper;
     pub(crate) mod worker;
+    pub(crate) mod driver;
+    #[cfg(any(feature = "net", feature = "time"))]
+    use crate::executor::driver::Handle;
     use crate::builder::initialize_async_spawner;
     use crate::executor::async_pool::AsyncPoolSpawner;
-    #[cfg(feature = "net")]
-    use crate::net::Handle;
 }
 
 pub(crate) trait Schedule {
@@ -84,13 +85,13 @@ pub struct Runtime {
     pub(crate) async_spawner: AsyncHandle,
 }
 
-#[cfg(all(not(feature = "ffrt"), feature = "net"))]
+#[cfg(all(not(feature = "ffrt"), any(feature = "net", feature = "time")))]
 impl Runtime {
     pub(crate) fn get_handle(&self) -> std::sync::Arc<Handle> {
         match &self.async_spawner {
             #[cfg(feature = "current_thread_runtime")]
             AsyncHandle::CurrentThread(s) => s.handle.clone(),
-            AsyncHandle::MultiThread(s) => s.exe_mng_info.io_handle.clone(),
+            AsyncHandle::MultiThread(s) => s.exe_mng_info.handle.clone(),
         }
     }
 }
@@ -274,13 +275,13 @@ impl Runtime {
     where
         T: Future<Output = R>,
     {
-        // Registers io_handle to the current thread when block_on().
+        // Registers handle to the current thread when block_on().
         // so that async_source can get the handle and register it.
-        #[cfg(all(not(feature = "ffrt"), feature = "net"))]
+        #[cfg(all(not(feature = "ffrt"), any(feature = "net", feature = "time")))]
         let cur_context = worker::WorkerContext::Curr(worker::CurrentWorkerContext {
             handle: self.get_handle(),
         });
-        #[cfg(all(not(feature = "ffrt"), feature = "net"))]
+        #[cfg(all(not(feature = "ffrt"), any(feature = "net", feature = "time")))]
         worker::CURRENT_WORKER.with(|ctx| {
             ctx.set(&cur_context as *const _ as *const ());
         });
@@ -297,7 +298,7 @@ impl Runtime {
 
         // Sets the current thread variable to null,
         // otherwise the worker's CURRENT_WORKER can not be set under MultiThread.
-        #[cfg(all(not(feature = "ffrt"), feature = "net"))]
+        #[cfg(all(not(feature = "ffrt"), any(feature = "net", feature = "time")))]
         worker::CURRENT_WORKER.with(|ctx| {
             ctx.set(std::ptr::null());
         });

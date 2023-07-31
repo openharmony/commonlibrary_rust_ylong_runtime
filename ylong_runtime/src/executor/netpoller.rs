@@ -16,7 +16,7 @@ use std::sync::Arc;
 use std::thread;
 
 #[cfg(feature = "time")]
-use crate::time::Driver as TimerDriver;
+use crate::time::TimeDriver;
 
 #[cfg(any(not(feature = "ffrt"), all(feature = "net", feature = "ffrt")))]
 const NET_POLL_INTERVAL_TIME: std::time::Duration = std::time::Duration::from_millis(10);
@@ -61,7 +61,7 @@ impl NetLooper {
         loop {
             // run time driver
             #[cfg(feature = "time")]
-            TimerDriver::get_ref().run();
+            TimeDriver::get_ref().run();
 
             thread::sleep(NET_POLL_INTERVAL_TIME);
         }

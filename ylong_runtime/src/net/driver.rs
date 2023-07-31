@@ -46,7 +46,7 @@ const GENERATION: Mask = Mask::new(7, 24);
 const ADDRESS: Mask = Mask::new(24, 0);
 
 /// IO reactor that listens to fd events and wakes corresponding tasks.
-pub(crate) struct Driver {
+pub(crate) struct IoDriver {
     /// Stores every IO source that is ready
     resources: Option<Slab<ScheduleIO>>,
 
@@ -54,19 +54,19 @@ pub(crate) struct Driver {
     tick: u8,
 
     /// Used for epoll
-    #[cfg(not(feature = "ylong_ffrt"))]
+    #[cfg(not(feature = "ffrt"))]
     poll: Arc<Poll>,
 
     /// Stores IO events that need to be handled
-    #[cfg(not(feature = "ylong_ffrt"))]
+    #[cfg(not(feature = "ffrt"))]
     events: Option<Events>,
 
     /// Save Handle used in metrics.
     #[cfg(feature = "metrics")]
-    handle: Arc<Handle>,
+    handle: Arc<IoHandle>,
 }
 
-pub(crate) struct Handle {
+pub(crate) struct IoHandle {
     inner: Arc<Inner>,
     #[cfg(not(feature = "ffrt"))]
     pub(crate) waker: ylong_io::Waker,
@@ -74,31 +74,25 @@ pub(crate) struct Handle {
 
 cfg_ffrt!(
     use std::mem::MaybeUninit;
-    static mut DRIVER: MaybeUninit<Driver> = MaybeUninit::uninit();
-    static mut HANDLE: MaybeUninit<Handle> = MaybeUninit::uninit();
+    static mut DRIVER: MaybeUninit<IoDriver> = MaybeUninit::uninit();
+    static mut HANDLE: MaybeUninit<IoHandle> = MaybeUninit::uninit();
 );
 
 #[cfg(feature = "ffrt")]
-impl Handle {
+impl IoHandle {
     fn new(inner: Arc<Inner>) -> Self {
-        Handle { inner }
+        IoHandle { inner }
     }
 
     pub(crate) fn get_ref() -> &'static Self {
-        Driver::initialize();
+        IoDriver::initialize();
         unsafe { &*HANDLE.as_ptr() }
     }
 }
 
 #[cfg(not(feature = "ffrt"))]
-impl Handle {
-    fn new(inner: Arc<Inner>, waker: ylong_io::Waker) -> Self {
-        Handle { inner, waker }
-    }
-
-    pub(crate) fn wake(&self) {
-        self.waker.wake().expect("ylong_io wake failed");
-    }
+impl IoHandle {
+    fn new(inner: Arc<Inner>, waker: ylong_io::Waker) -> Self { IoHandle { inner, waker } }
 
     #[cfg(feature = "metrics")]
     pub(crate) fn get_register_count(&self) -> usize {
@@ -117,7 +111,7 @@ impl Handle {
     }
 }
 
-impl Deref for Handle {
+impl Deref for IoHandle {
     type Target = Arc<Inner>;
 
     fn deref(&self) -> &Self::Target {
@@ -140,7 +134,7 @@ pub(crate) struct Inner {
     allocator: Slab<ScheduleIO>,
 
     /// Used to register fd
-    #[cfg(not(feature = "ylong_ffrt"))]
+    #[cfg(not(feature = "ffrt"))]
     registry: Arc<Poll>,
 
     /// Metrics
@@ -158,7 +152,7 @@ struct InnerMetrics {
     ready_count: AtomicUsize,
 }
 
-impl Driver {
+impl IoDriver {
     /// IO dispatch function. Wakes the task through the token getting from the
     /// epoll events.
     fn dispatch(&mut self, token: Token, ready: Ready) {
@@ -188,38 +182,36 @@ impl Driver {
 }
 
 #[cfg(not(feature = "ffrt"))]
-impl Driver {
-    pub(crate) fn initialize() -> (Arc<Handle>, Arc<Mutex<Driver>>) {
-        let poll = Poll::new().unwrap();
-        let waker =
-            ylong_io::Waker::new(&poll, WAKE_TOKEN).expect("ylong_io waker construction failed");
-        let arc_poll = Arc::new(poll);
-        let events = Events::with_capacity(EVENTS_MAX_CAPACITY);
-        let slab = Slab::new();
-        let allocator = slab.handle();
-        let inner = Arc::new(Inner {
-            resources: Mutex::new(None),
-            allocator,
-            registry: arc_poll.clone(),
-            #[cfg(feature = "metrics")]
-            metrics: InnerMetrics {
-                register_count: AtomicUsize::new(0),
-                ready_count: AtomicUsize::new(0),
-            },
-        });
-        let arc_handle = Arc::new(Handle::new(inner, waker));
+impl IoDriver {
+    pub(crate) fn initialize() -> (IoHandle, IoDriver) {
+            let poll = Poll::new().unwrap();
+            let waker = ylong_io::Waker::new(&poll, WAKE_TOKEN)
+                .expect("ylong_io waker construction failed");
+            let arc_poll = Arc::new(poll);
+            let events = Events::with_capacity(EVENTS_MAX_CAPACITY);
+            let slab = Slab::new();
+            let allocator = slab.handle();
+            let inner = Arc::new(Inner {
+                resources: Mutex::new(None),
+                allocator,
+                registry: arc_poll.clone(),
+                #[cfg(feature = "metrics")]
+                metrics: InnerMetrics {
+                    register_count: AtomicUsize::new(0),
+                    ready_count: AtomicUsize::new(0),
+                },
+            });
 
-        let driver = Driver {
-            resources: Some(slab),
-            events: Some(events),
-            tick: DRIVER_TICK_INIT,
-            poll: arc_poll,
-            #[cfg(feature = "metrics")]
-            handle: arc_handle.clone(),
-        };
-        let arc_driver = Arc::new(Mutex::new(driver));
-
-        (arc_handle, arc_driver)
+            let driver = IoDriver {
+                resources: Some(slab),
+                events: Some(events),
+                tick: DRIVER_TICK_INIT,
+                poll: arc_poll,
+                #[cfg(feature = "metrics")]
+                handle: arc_handle.clone(),
+            };
+            
+        (IoHandle::new(inner, waker), driver)
     }
 
     /// Runs the driver. This method will blocking wait for fd events to come in
@@ -276,7 +268,7 @@ impl Driver {
 }
 
 #[cfg(feature = "ffrt")]
-impl Driver {
+impl IoDriver {
     fn initialize() {
         static ONCE: std::sync::Once = std::sync::Once::new();
         ONCE.call_once(|| unsafe {
@@ -287,18 +279,18 @@ impl Driver {
                 allocator,
             });
 
-            let driver = Driver {
+            let driver = IoDriver {
                 resources: Some(slab),
                 tick: DRIVER_TICK_INIT,
             };
-            HANDLE = MaybeUninit::new(Handle::new(inner));
+            HANDLE = MaybeUninit::new(IoHandle::new(inner));
             DRIVER = MaybeUninit::new(driver);
         });
     }
 
     /// Initializes the single instance IO driver.
-    pub(crate) fn get_mut_ref() -> &'static mut Driver {
-        Driver::initialize();
+    pub(crate) fn get_mut_ref() -> &'static mut IoDriver {
+        IoDriver::initialize();
         unsafe { &mut *DRIVER.as_mut_ptr() }
     }
 }
@@ -307,7 +299,7 @@ impl Driver {
 extern "C" fn ffrt_dispatch_event(data: *const c_void, ready: c_uint) {
     const COMPACT_INTERVAL: u8 = 255;
 
-    let driver = Driver::get_mut_ref();
+    let driver = IoDriver::get_mut_ref();
     driver.tick = driver.tick.wrapping_add(1);
     if driver.tick == COMPACT_INTERVAL {
         unsafe {

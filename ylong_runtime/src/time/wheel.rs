@@ -15,6 +15,7 @@ use std::fmt::Error;
 use std::mem;
 use std::mem::MaybeUninit;
 use std::ptr::NonNull;
+use std::time::Duration;
 
 use crate::time::Clock;
 use crate::util::link_list::LinkedList;
@@ -27,6 +28,12 @@ const LEVELS_NUM: usize = 6;
 
 // Maximum sleep duration.
 pub(crate) const MAX_DURATION: u64 = (1 << (6 * LEVELS_NUM)) - 1;
+
+pub(crate) enum TimeOut {
+    ClockEntry(NonNull<Clock>),
+    Duration(Duration),
+    None,
+}
 
 pub(crate) struct Wheel {
     // Since the wheel started,
@@ -167,22 +174,20 @@ impl Wheel {
     }
 
     // Determine which timers have timed out at the current time.
-    pub(crate) fn poll(&mut self, now: u64) -> Option<NonNull<Clock>> {
+    pub(crate) fn poll(&mut self, now: u64) -> TimeOut {
         loop {
             if let Some(handle) = self.trigger.pop_back() {
-                return Some(handle);
+                return TimeOut::ClockEntry(handle);
             }
 
-            let expiration = self.next_expiration().and_then(|expiration| {
-                if expiration.2 > now - self.last_elapsed {
-                    None
-                } else {
-                    Some(expiration)
-                }
-            });
+            let expiration = self.next_expiration();
 
             match expiration {
-                Some(ref expiration) if expiration.2 > now - self.last_elapsed() => return None,
+                Some(ref expiration) if expiration.2 > now - self.last_elapsed() => {
+                    return TimeOut::Duration(Duration::from_millis(
+                        expiration.2 - (now - self.last_elapsed()),
+                    ))
+                }
                 Some(ref expiration) => {
                     self.process_expiration(expiration);
                     self.set_elapsed(now);
@@ -194,7 +199,10 @@ impl Wheel {
             }
         }
 
-        self.trigger.pop_back()
+        match self.trigger.pop_back() {
+            None => TimeOut::None,
+            Some(handle) => TimeOut::ClockEntry(handle),
+        }
     }
 }
 
@@ -317,7 +325,9 @@ fn level_range(level: usize) -> u64 {
 mod test {
     use crate::time::wheel::{Wheel, LEVELS_NUM};
     cfg_net!(
-        use crate::time::{sleep, timeout, Driver};
+        #[cfg(feature = "ffrt")]
+        use crate::time::TimeDriver;
+        use crate::time::{sleep, timeout};
         use crate::net::UdpSocket;
         use crate::JoinHandle;
         use std::net::SocketAddr;
@@ -373,7 +383,9 @@ mod test {
         for t in tasks {
             let _ = crate::block_on(t);
         }
-        let lock = Driver::get_ref().wheel.lock().unwrap();
+        #[cfg(feature = "ffrt")]
+        let lock = TimeDriver::get_ref().wheel.lock().unwrap();
+        #[cfg(feature = "ffrt")]
         for slot in lock.levels[1].slots.iter() {
             assert!(slot.is_empty());
         }
