@@ -22,19 +22,13 @@ use std::sync::atomic::Ordering::{Acquire, Release};
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 
+use crate::executor::driver::{Driver, Handle};
 use crate::executor::Schedule;
 use crate::task::{JoinHandle, Task, TaskBuilder, VirtualTableType};
-
-cfg_net!(
-    use std::time::Duration;
-    use crate::net::Driver;
-    use crate::net::Handle;
-);
 
 pub(crate) struct CurrentThreadSpawner {
     pub(crate) scheduler: Arc<CurrentThreadScheduler>,
     pub(crate) parker: Arc<Parker>,
-    #[cfg(feature = "net")]
     pub(crate) handle: Arc<Handle>,
 }
 
@@ -66,15 +60,13 @@ impl CurrentThreadScheduler {
 
 pub(crate) struct Parker {
     is_wake: AtomicBool,
-    #[cfg(feature = "net")]
     driver: Arc<Mutex<Driver>>,
 }
 
 impl Parker {
-    fn new(#[cfg(feature = "net")] driver: Arc<Mutex<Driver>>) -> Parker {
+    fn new(driver: Arc<Mutex<Driver>>) -> Parker {
         Parker {
             is_wake: AtomicBool::new(false),
-            #[cfg(feature = "net")]
             driver,
         }
     }
@@ -119,17 +111,8 @@ fn drop(ptr: *const ()) {
 }
 
 impl CurrentThreadSpawner {
-    #[cfg(not(feature = "net"))]
     pub(crate) fn new() -> Self {
-        Self {
-            scheduler: Default::default(),
-            parker: Arc::new(Parker::new()),
-        }
-    }
-
-    #[cfg(feature = "net")]
-    pub(crate) fn new() -> Self {
-        let (handle, driver) = crate::net::Driver::initialize();
+        let (handle, driver) = Driver::initialize();
         Self {
             scheduler: Default::default(),
             parker: Arc::new(Parker::new(driver)),
@@ -182,13 +165,8 @@ impl CurrentThreadSpawner {
             }
             if let Some(task) = self.scheduler.pop() {
                 task.run();
-            } else {
-                #[cfg(feature = "net")]
-                if let Ok(mut driver) = self.parker.driver.try_lock() {
-                    let _ = driver
-                        .drive(Some(Duration::from_millis(0)))
-                        .expect("io driver failed");
-                }
+            } else if let Ok(mut driver) = self.parker.driver.try_lock() {
+                driver.run_once();
             }
         }
     }

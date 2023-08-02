@@ -15,9 +15,7 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
-
-#[cfg(feature = "net")]
-use crate::net::{Driver, Handle};
+use crate::executor::driver::{Driver, Handle};
 
 #[derive(Clone)]
 pub(crate) struct Parker {
@@ -28,25 +26,24 @@ struct Inner {
     state: AtomicUsize,
     mutex: Mutex<bool>,
     condvar: Condvar,
-    #[cfg(feature = "net")]
     driver: Arc<Mutex<Driver>>,
 }
 
 const IDLE: usize = 0;
 const PARKED_ON_CONDVAR: usize = 1;
-#[cfg(feature = "net")]
 const PARKED_ON_DRIVER: usize = 2;
 const NOTIFIED: usize = 3;
 
 impl Parker {
-    pub(crate) fn new(#[cfg(feature = "net")] driver: Arc<Mutex<Driver>>) -> Parker {
+    pub(crate) fn new(
+        driver: Arc<Mutex<Driver>>
+    ) -> Parker {
         Parker {
             inner: Arc::new(Inner {
                 state: AtomicUsize::new(IDLE),
                 mutex: Mutex::new(false),
                 condvar: Condvar::new(),
-                #[cfg(feature = "net")]
-                driver,
+                driver
             }),
         }
     }
@@ -55,14 +52,15 @@ impl Parker {
         self.inner.park();
     }
 
-    pub(crate) fn unpark(&self, #[cfg(feature = "net")] handle: Arc<Handle>) {
+    pub(crate) fn unpark(
+        &self,
+        handle: Arc<Handle>,
+    ) {
         self.inner.unpark(
-            #[cfg(feature = "net")]
-            handle,
+            handle
         );
     }
 
-    #[cfg(feature = "net")]
     pub(crate) fn get_driver(&self) -> &Arc<Mutex<Driver>> {
         self.inner.get_driver()
     }
@@ -90,7 +88,6 @@ impl Inner {
             }
             thread::yield_now();
         }
-        #[cfg(feature = "net")]
         if let Ok(mut driver) = self.driver.try_lock() {
             self.park_on_driver(&mut driver);
             return;
@@ -99,8 +96,7 @@ impl Inner {
         self.park_on_condvar();
     }
 
-    #[cfg(feature = "net")]
-    fn park_on_driver(&self, driver: &mut crate::net::Driver) {
+    fn park_on_driver(&self, driver: &mut Driver) {
         match self
             .state
             .compare_exchange(IDLE, PARKED_ON_DRIVER, SeqCst, SeqCst)
@@ -113,7 +109,7 @@ impl Inner {
             Err(actual) => panic!("inconsistent park state; actual = {}", actual),
         }
 
-        driver.drive(None).expect("io driver failed");
+        driver.run();
 
         match self.state.swap(IDLE, SeqCst) {
             // got notified by real io events or not
@@ -152,20 +148,21 @@ impl Inner {
         }
     }
 
-    fn unpark(&self, #[cfg(feature = "net")] handle: Arc<Handle>) {
+    fn unpark(
+        &self,
+        handle: Arc<Handle>
+    ) {
         match self.state.swap(NOTIFIED, SeqCst) {
             IDLE | NOTIFIED => {}
             PARKED_ON_CONDVAR => {
                 drop(self.mutex.lock());
                 self.condvar.notify_one();
             }
-            #[cfg(feature = "net")]
             PARKED_ON_DRIVER => handle.wake(),
             actual => panic!("inconsistent state in unpark; actual = {}", actual),
         }
     }
 
-    #[cfg(feature = "net")]
     pub(crate) fn get_driver(&self) -> &Arc<Mutex<Driver>> {
         &self.driver
     }

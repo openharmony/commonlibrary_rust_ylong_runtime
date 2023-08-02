@@ -20,8 +20,7 @@ use std::task::Waker;
 use crate::executor::async_pool::MultiThreadScheduler;
 use crate::executor::parker::Parker;
 use crate::executor::queue::LocalQueue;
-#[cfg(feature = "net")]
-use crate::net::Handle;
+use crate::executor::driver::Handle;
 use crate::task::yield_now::wake_yielded_tasks;
 use crate::task::Task;
 
@@ -31,11 +30,11 @@ thread_local! {
 
 pub(crate) enum WorkerContext {
     Multi(MultiWorkerContext),
-    #[cfg(feature = "net")]
-    Curr(CurrentWorkerContext),
+    #[cfg(any(feature = "net", feature = "time"))]
+    Curr(CurrentWorkerContext)
 }
 
-#[cfg(feature = "net")]
+#[cfg(any(feature = "net", feature = "time"))]
 macro_rules! get_multi_worker_context {
     ($e:expr) => {
         match $e {
@@ -45,7 +44,7 @@ macro_rules! get_multi_worker_context {
     };
 }
 
-#[cfg(not(feature = "net"))]
+#[cfg(not(any(feature = "net", feature = "time")))]
 macro_rules! get_multi_worker_context {
     ($e:expr) => {{
         let crate::executor::worker::WorkerContext::Multi(ctx) = $e;
@@ -57,11 +56,11 @@ pub(crate) use get_multi_worker_context;
 
 pub(crate) struct MultiWorkerContext {
     pub(crate) worker: Arc<Worker>,
-    #[cfg(feature = "net")]
-    pub(crate) handle: Arc<Handle>,
+    #[cfg(any(feature = "net", feature = "time"))]
+    pub(crate) handle: Arc<Handle>
 }
 
-#[cfg(feature = "net")]
+#[cfg(any(feature = "net", feature = "time"))]
 pub(crate) struct CurrentWorkerContext {
     pub(crate) handle: Arc<Handle>,
 }
@@ -91,10 +90,14 @@ impl MultiWorkerContext {
 }
 
 /// Runs the worker thread
-pub(crate) fn run_worker(worker: Arc<Worker>, #[cfg(feature = "net")] handle: Arc<Handle>) {
-    let cur_context = WorkerContext::Multi(MultiWorkerContext {
+pub(crate) fn run_worker(
+    worker: Arc<Worker>,
+    #[cfg(any(feature = "net", feature = "time"))]
+    handle: Arc<Handle>,
+) {
+    let cur_context = WorkerContext::Multi( MultiWorkerContext {
         worker,
-        #[cfg(feature = "net")]
+        #[cfg(any(feature = "net", feature = "time"))]
         handle,
     });
 
@@ -293,11 +296,8 @@ impl Inner {
     fn periodic_check(&mut self, worker: &Worker) {
         if self.count & GLOBAL_PERIODIC_INTERVAL as u32 == 0 {
             self.check_cancel(worker);
-            #[cfg(feature = "net")]
             if let Ok(mut driver) = self.parker.get_driver().try_lock() {
-                let _ = driver
-                    .drive(Some(std::time::Duration::from_millis(0)))
-                    .expect("io driver failed");
+                driver.run_once();
             }
         }
     }

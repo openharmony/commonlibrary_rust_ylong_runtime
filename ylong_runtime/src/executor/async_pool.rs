@@ -22,12 +22,11 @@ use std::{cmp, thread};
 use crate::builder::multi_thread_builder::MultiThreadBuilder;
 use crate::builder::CallbackHook;
 use crate::executor::parker::Parker;
+use crate::executor::driver::{Driver, Handle};
 use crate::executor::queue::{GlobalQueue, LocalQueue, LOCAL_QUEUE_CAP};
 use crate::executor::sleeper::Sleepers;
 use crate::executor::worker::{get_current_ctx, run_worker, Worker, WorkerContext};
 use crate::executor::{worker, Schedule};
-#[cfg(feature = "net")]
-use crate::net::{Driver, Handle};
 use crate::task::{Task, TaskBuilder, VirtualTableType};
 use crate::util::core_affinity::set_current_affinity;
 use crate::util::fastrand::fast_random;
@@ -53,8 +52,7 @@ pub(crate) struct MultiThreadScheduler {
     global: GlobalQueue,
     /// A set of all the local queues in the executor
     locals: Vec<LocalQueue>,
-    #[cfg(feature = "net")]
-    pub(crate) io_handle: Arc<Handle>,
+    pub(crate) handle: Arc<Handle>,
     #[cfg(feature = "metrics")]
     steal_count: AtomicUsize,
 }
@@ -121,7 +119,10 @@ impl Schedule for MultiThreadScheduler {
 }
 
 impl MultiThreadScheduler {
-    pub(crate) fn new(thread_num: usize, #[cfg(feature = "net")] io_handle: Arc<Handle>) -> Self {
+    pub(crate) fn new(
+        thread_num: usize,
+        handle: Arc<Handle>,
+    ) -> Self {
         let mut locals = Vec::new();
         for _ in 0..thread_num {
             locals.push(LocalQueue::new());
@@ -135,8 +136,7 @@ impl MultiThreadScheduler {
             record: Record::new(thread_num),
             global: GlobalQueue::new(),
             locals,
-            #[cfg(feature = "net")]
-            io_handle,
+            handle,
             #[cfg(feature = "metrics")]
             steal_count: AtomicUsize::new(0),
         }
@@ -159,8 +159,7 @@ impl MultiThreadScheduler {
         let join_handle = self.handles.read().unwrap();
         for item in join_handle.iter() {
             item.unpark(
-                #[cfg(feature = "net")]
-                self.io_handle.clone(),
+                self.handle.clone()
             );
         }
     }
@@ -179,10 +178,7 @@ impl MultiThreadScheduler {
         if let Some(index) = self.sleepers.pop() {
             self.record.inc_active_num(true);
 
-            self.handles.read().unwrap().get(index).unwrap().unpark(
-                #[cfg(feature = "net")]
-                self.io_handle.clone(),
-            );
+            self.handles.read().unwrap().get(index).unwrap().unpark(self.handle.clone());
         }
     }
 
@@ -392,17 +388,14 @@ fn get_cpu_core() -> u8 {
 fn async_thread_proc(
     inner: Arc<Inner>,
     worker: Arc<Worker>,
-    #[cfg(feature = "net")] handle: Arc<Handle>,
+    #[cfg(any(feature = "net", feature = "time"))]
+    handle: Arc<Handle>
 ) {
     if let Some(f) = inner.after_start.clone() {
         f();
     }
 
-    run_worker(
-        worker,
-        #[cfg(feature = "net")]
-        handle,
-    );
+    run_worker(worker, #[cfg(any(feature = "net", feature = "time"))]handle);
     let (lock, cvar) = &*(inner.shutdown_handle.clone());
     let mut finished = lock.lock().unwrap();
     *finished += 1;
@@ -419,7 +412,6 @@ fn async_thread_proc(
 
 impl AsyncPoolSpawner {
     pub(crate) fn new(builder: &MultiThreadBuilder) -> Self {
-        #[cfg(feature = "net")]
         let (handle, driver) = Driver::initialize();
 
         let thread_num = builder.core_thread_size.unwrap_or_else(get_cpu_core);
@@ -435,33 +427,34 @@ impl AsyncPoolSpawner {
                 #[cfg(feature = "metrics")]
                 workers: Mutex::new(Vec::with_capacity(thread_num.into())),
             }),
-            exe_mng_info: Arc::new(MultiThreadScheduler::new(
-                thread_num as usize,
-                #[cfg(feature = "net")]
-                handle,
-            )),
+            exe_mng_info: Arc::new(
+                MultiThreadScheduler::new(
+                    thread_num as usize,
+                    handle
+                )
+            ),
         };
         spawner.create_async_thread_pool(
-            #[cfg(feature = "net")]
-            driver,
+            driver
         );
         spawner
     }
 
     pub(crate) fn create_async_thread_pool(
         &self,
-        #[cfg(feature = "net")] io_driver: Arc<Mutex<Driver>>,
+        driver: Arc<Mutex<Driver>>
     ) {
         let mut workers = vec![];
         for index in 0..self.inner.total {
             let local_queue = self.exe_mng_info.create_local_queue(index);
-            let local_run_queue = Box::new(worker::Inner::new(
-                local_queue,
-                Parker::new(
-                    #[cfg(feature = "net")]
-                    io_driver.clone(),
-                ),
-            ));
+            let local_run_queue = Box::new(
+                worker::Inner::new(
+                    local_queue, 
+                    Parker::new(
+                            driver.clone()
+                    )
+                )
+            );
             workers.push(Arc::new(Worker {
                 index,
                 scheduler: self.exe_mng_info.clone(),
@@ -472,10 +465,10 @@ impl AsyncPoolSpawner {
         }
 
         for (worker_id, worker) in workers.drain(..).enumerate() {
+            #[cfg(any(feature = "net", feature = "time"))]
+            let work_arc_handle = self.exe_mng_info.handle.clone();
             #[cfg(feature = "metrics")]
             self.inner.workers.lock().unwrap().push(worker.clone());
-            #[cfg(feature = "net")]
-            let work_arc_handle = self.exe_mng_info.io_handle.clone();
             // set up thread attributes
             let mut builder = thread::Builder::new();
             if let Some(worker_name) = self.inner.worker_name.clone() {
@@ -499,8 +492,8 @@ impl AsyncPoolSpawner {
                     async_thread_proc(
                         inner,
                         worker,
-                        #[cfg(feature = "net")]
-                        work_arc_handle,
+                        #[cfg(any(feature = "net", feature = "time"))]
+                        work_arc_handle
                     );
                 });
 
@@ -516,8 +509,8 @@ impl AsyncPoolSpawner {
                     async_thread_proc(
                         inner,
                         worker,
-                        #[cfg(feature = "net")]
-                        work_arc_handle,
+                        #[cfg(any(feature = "net", feature = "time"))]
+                        work_arc_handle
                     );
                 });
                 match result {
@@ -654,12 +647,11 @@ mod test {
     use std::sync::{Arc, Mutex};
     use std::task::{Context, Poll};
     use std::thread::spawn;
+    use crate::executor::driver::Driver;
 
     use crate::builder::RuntimeBuilder;
     use crate::executor::async_pool::{get_cpu_core, AsyncPoolSpawner, MultiThreadScheduler};
     use crate::executor::parker::Parker;
-    #[cfg(feature = "net")]
-    use crate::net::Driver;
     use crate::task::{Task, TaskBuilder, VirtualTableType};
 
     pub struct TestFuture {
@@ -698,20 +690,17 @@ mod test {
     /// 2. Creates a ExecutorMsgInfo with thread number 2
     #[test]
     fn ut_executor_mng_info_new_001() {
-        #[cfg(feature = "net")]
         let (arc_handle, _) = Driver::initialize();
         let executor_mng_info = MultiThreadScheduler::new(
             1,
-            #[cfg(feature = "net")]
-            arc_handle.clone(),
+            arc_handle.clone()
         );
         assert!(!executor_mng_info.is_cancel.load(Acquire));
         assert_eq!(executor_mng_info.handles.read().unwrap().capacity(), 0);
 
         let executor_mng_info = MultiThreadScheduler::new(
             64,
-            #[cfg(feature = "net")]
-            arc_handle,
+            arc_handle
         );
         assert!(!executor_mng_info.is_cancel.load(Acquire));
         assert_eq!(executor_mng_info.handles.read().unwrap().capacity(), 0);
@@ -724,20 +713,17 @@ mod test {
     /// 2. index set to ExecutorMngInfo.inner.total, check the return value
     #[test]
     fn ut_executor_mng_info_create_local_queues() {
-        #[cfg(feature = "net")]
         let (arc_handle, _) = Driver::initialize();
         let executor_mng_info = MultiThreadScheduler::new(
             1,
-            #[cfg(feature = "net")]
-            arc_handle.clone(),
+            arc_handle.clone()
         );
         let local_run_queue_info = executor_mng_info.create_local_queue(0);
         assert!(local_run_queue_info.is_empty());
 
         let executor_mng_info = MultiThreadScheduler::new(
             64,
-            #[cfg(feature = "net")]
-            arc_handle,
+            arc_handle
         );
         let local_run_queue_info = executor_mng_info.create_local_queue(63);
         assert!(local_run_queue_info.is_empty());
@@ -750,20 +736,21 @@ mod test {
     /// 2. index set to ExecutorMngInfo.inner.total, check the return value
     #[test]
     fn ut_executor_mng_info_enqueue() {
-        #[cfg(feature = "net")]
         let (arc_handle, _) = Driver::initialize();
         let executor_mng_info = MultiThreadScheduler::new(
             1,
-            #[cfg(feature = "net")]
-            arc_handle.clone(),
+            arc_handle.clone()
         );
 
         let builder = TaskBuilder::new();
-        let exe_scheduler = Arc::downgrade(&Arc::new(MultiThreadScheduler::new(
-            1,
-            #[cfg(feature = "net")]
-            arc_handle,
-        )));
+        let exe_scheduler = Arc::downgrade(
+            &Arc::new(
+                MultiThreadScheduler::new(
+                    1,
+                    arc_handle
+                )
+            )
+        );
         let (task, _) = Task::create_task(
             &builder,
             exe_scheduler,
@@ -782,12 +769,10 @@ mod test {
     /// 2. The is_cancel value is set to false to check the return value
     #[test]
     fn ut_executor_mng_info_is_cancel() {
-        #[cfg(feature = "net")]
         let (arc_handle, _) = Driver::initialize();
         let executor_mng_info = MultiThreadScheduler::new(
             1,
-            #[cfg(feature = "net")]
-            arc_handle,
+            arc_handle
         );
         executor_mng_info.is_cancel.store(false, Release);
         assert!(!executor_mng_info.is_cancel());
@@ -801,12 +786,10 @@ mod test {
     /// 1. Check if the is_cancel parameter becomes true after set_cancel
     #[test]
     fn ut_executor_mng_info_set_cancel() {
-        #[cfg(feature = "net")]
         let (arc_handle, _) = Driver::initialize();
         let executor_mng_info = MultiThreadScheduler::new(
             1,
-            #[cfg(feature = "net")]
-            arc_handle,
+            arc_handle
         );
         assert!(!executor_mng_info.is_cancel.load(Acquire));
         executor_mng_info.set_cancel();
@@ -819,12 +802,10 @@ mod test {
     /// 1. Check if the is_cancel parameter becomes true after set_cancel
     #[test]
     fn ut_executor_mng_info_cancel() {
-        #[cfg(feature = "net")]
         let (arc_handle, arc_driver) = Driver::initialize();
         let executor_mng_info = MultiThreadScheduler::new(
             1,
-            #[cfg(feature = "net")]
-            arc_handle,
+            arc_handle
         );
 
         let flag = Arc::new(Mutex::new(0));
@@ -833,8 +814,7 @@ mod test {
         let (flag_clone, tx) = (flag.clone(), tx);
 
         let mut parker = Parker::new(
-            #[cfg(feature = "net")]
-            arc_driver,
+            arc_driver
         );
         let parker_cpy = parker.clone();
         let _ = spawn(move || {
@@ -856,12 +836,10 @@ mod test {
     ///    executed via thread hooks.
     #[test]
     fn ut_executor_mng_info_wake_up_all() {
-        #[cfg(feature = "net")]
         let (arc_handle, arc_driver) = Driver::initialize();
         let executor_mng_info = MultiThreadScheduler::new(
             1,
-            #[cfg(feature = "net")]
-            arc_handle,
+            arc_handle
         );
 
         let flag = Arc::new(Mutex::new(0));
@@ -870,8 +848,7 @@ mod test {
         let (flag_clone, tx) = (flag.clone(), tx);
 
         let mut parker = Parker::new(
-            #[cfg(feature = "net")]
-            arc_driver,
+            arc_driver
         );
         let parker_cpy = parker.clone();
 
@@ -895,12 +872,10 @@ mod test {
     ///    executed by a thread hook.
     #[test]
     fn ut_executor_mng_info_wake_up_rand_one() {
-        #[cfg(feature = "net")]
         let (arc_handle, arc_driver) = Driver::initialize();
         let executor_mng_info = MultiThreadScheduler::new(
             1,
-            #[cfg(feature = "net")]
-            arc_handle,
+            arc_handle
         );
         executor_mng_info.turn_to_sleep(0, false);
 
@@ -910,8 +885,7 @@ mod test {
         let (flag_clone, tx) = (flag.clone(), tx);
 
         let mut parker = Parker::new(
-            #[cfg(feature = "net")]
-            arc_driver,
+            arc_driver
         );
         let parker_cpy = parker.clone();
 
@@ -935,12 +909,10 @@ mod test {
     ///    so, wakes up a thread to continue working.
     #[test]
     fn ut_executor_mng_info_wake_up_if_one_task_left() {
-        #[cfg(feature = "net")]
         let (arc_handle, arc_driver) = Driver::initialize();
         let executor_mng_info = MultiThreadScheduler::new(
             1,
-            #[cfg(feature = "net")]
-            arc_handle.clone(),
+            arc_handle.clone()
         );
 
         executor_mng_info.turn_to_sleep(0, false);
@@ -951,8 +923,7 @@ mod test {
         let (flag_clone, tx) = (flag.clone(), tx);
 
         let mut parker = Parker::new(
-            #[cfg(feature = "net")]
-            arc_driver,
+            arc_driver
         );
         let parker_cpy = parker.clone();
 
@@ -965,11 +936,14 @@ mod test {
         executor_mng_info.handles.write().unwrap().push(parker_cpy);
 
         let builder = TaskBuilder::new();
-        let exe_scheduler = Arc::downgrade(&Arc::new(MultiThreadScheduler::new(
-            1,
-            #[cfg(feature = "net")]
-            arc_handle,
-        )));
+        let exe_scheduler = Arc::downgrade(
+            &Arc::new(
+                MultiThreadScheduler::new(
+                    1,
+                    arc_handle
+                )
+            )
+        );
         let (task, _) = Task::create_task(
             &builder,
             exe_scheduler,
@@ -992,12 +966,10 @@ mod test {
     ///     there is a task, and if so, wake up this thread.
     #[test]
     fn ut_from_woken_to_sleep() {
-        #[cfg(feature = "net")]
         let (arc_handle, arc_driver) = Driver::initialize();
         let executor_mng_info = MultiThreadScheduler::new(
             1,
-            #[cfg(feature = "net")]
-            arc_handle.clone(),
+            arc_handle.clone()
         );
 
         let flag = Arc::new(Mutex::new(0));
@@ -1006,8 +978,7 @@ mod test {
         let (flag_clone, tx) = (flag.clone(), tx);
 
         let mut parker = Parker::new(
-            #[cfg(feature = "net")]
-            arc_driver,
+            arc_driver
         );
         let parker_cpy = parker.clone();
 
@@ -1020,11 +991,14 @@ mod test {
         executor_mng_info.handles.write().unwrap().push(parker_cpy);
 
         let builder = TaskBuilder::new();
-        let exe_scheduler = Arc::downgrade(&Arc::new(MultiThreadScheduler::new(
-            1,
-            #[cfg(feature = "net")]
-            arc_handle,
-        )));
+        let exe_scheduler = Arc::downgrade(
+            &Arc::new(
+                MultiThreadScheduler::new(
+                    1,
+                    arc_handle
+                )
+            )
+        );
         let (task, _) = Task::create_task(
             &builder,
             exe_scheduler,

@@ -25,7 +25,9 @@ use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::Relaxed;
 use std::task::Waker;
 
-pub(crate) use driver::Driver;
+pub(crate) use driver::TimeDriver;
+#[cfg(not(feature = "ffrt"))]
+pub(crate) use driver::TimeHandle;
 pub use sleep::{sleep, sleep_until, Sleep};
 pub use timeout::timeout;
 pub use timer::{periodic_schedule, timer, timer_at, Timer};

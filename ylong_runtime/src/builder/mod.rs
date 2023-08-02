@@ -32,7 +32,7 @@ pub(crate) mod multi_thread_builder;
 use std::fmt::Debug;
 use std::io;
 use std::sync::Arc;
-#[cfg(any(feature = "net", feature = "time"))]
+#[cfg(all(any(feature = "time", feature = "net"), feature = "ffrt"))]
 use std::sync::Once;
 
 #[cfg(feature = "current_thread_runtime")]
@@ -42,7 +42,7 @@ pub use multi_thread_builder::MultiThreadBuilder;
 pub(crate) use crate::builder::common_builder::CommonBuilder;
 use crate::error::ScheduleError;
 use crate::executor::blocking_pool::BlockPoolSpawner;
-#[cfg(any(feature = "net", feature = "time"))]
+#[cfg(all(feature = "time", feature = "ffrt"))]
 use crate::executor::netpoller::NetLooper;
 
 cfg_not_ffrt!(
@@ -135,17 +135,13 @@ pub(crate) fn initialize_async_spawner(
 ) -> io::Result<AsyncPoolSpawner> {
     let async_spawner = AsyncPoolSpawner::new(builder);
 
-    // initialize reactor
-    #[cfg(any(feature = "net", feature = "time"))]
-    initialize_reactor()?;
-
     Ok(async_spawner)
 }
 
 #[cfg(feature = "ffrt")]
 pub(crate) fn initialize_ffrt_spawner(_builder: &MultiThreadBuilder) -> io::Result<()> {
     // initialize reactor
-    #[cfg(any(feature = "net", feature = "time"))]
+    #[cfg(any(feature = "time", feature = "net"))]
     initialize_reactor()?;
     Ok(())
 }
@@ -158,7 +154,7 @@ pub(crate) fn initialize_blocking_spawner(
     Ok(blocking_spawner)
 }
 
-#[cfg(any(feature = "time", feature = "net"))]
+#[cfg(all(feature = "time", feature = "ffrt"))]
 pub(crate) fn initialize_reactor() -> io::Result<()> {
     static ONCE: Once = Once::new();
     ONCE.call_once(|| {
