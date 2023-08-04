@@ -237,7 +237,8 @@ impl<T: ?Sized> RwLock<T> {
     ///
     /// This method takes the mutable reference of the RwLock, so there is no
     /// need to actually lock the RwLock -- the mutable borrow statically
-    /// guarantees no locks exist. ```
+    /// guarantees no locks exist.
+    /// ```
     /// use ylong_runtime::sync::rwlock::RwLock;
     ///
     /// ylong_runtime::block_on(async {

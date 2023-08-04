@@ -20,6 +20,7 @@ use std::task::Waker;
 use crate::executor::async_pool::MultiThreadScheduler;
 use crate::executor::parker::Parker;
 use crate::executor::queue::LocalQueue;
+#[cfg(any(feature = "net", feature = "time"))]
 use crate::executor::driver::Handle;
 use crate::task::yield_now::wake_yielded_tasks;
 use crate::task::Task;
