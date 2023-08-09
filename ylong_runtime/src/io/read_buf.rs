@@ -242,3 +242,61 @@ impl<'a> ReadBuf<'a> {
         self.filled = end;
     }
 }
+
+#[cfg(test)]
+mod test {
+    use crate::io::ReadBuf;
+
+    /// UT test cases for `ReadBuf`.
+    ///
+    /// # Brief
+    /// 1. Create ReadBuf.
+    /// 2. Calls functions to get parameters
+    /// 3. Check if the test results are correct.
+    #[test]
+    fn ut_test_readbuf_new() {
+        let mut buf = [0; 16];
+        let buf_len = buf.len();
+        let mut read_buf: ReadBuf<'_> = ReadBuf::new(&mut buf);
+
+        assert_eq!(read_buf.filled().len(), 0);
+        assert_eq!(read_buf.initialized_len(), 16);
+        assert_eq!(read_buf.capacity(), 16);
+        assert_eq!(read_buf.initialized().len(), 16);
+
+        read_buf.set_filled(9);
+        assert_eq!(read_buf.filled().len(), 9);
+
+        {
+            let borrow = read_buf.filled_mut();
+            borrow[0] = 1;
+        }
+        assert_eq!(read_buf.filled()[0], 1);
+
+        {
+            let borrow = read_buf.initialized();
+            assert_eq!(borrow[0], 1);
+        }
+
+        {
+            let borrow = read_buf.initialized_mut();
+            borrow[1] = 2;
+        }
+        assert_eq!(read_buf.filled()[1], 2);
+
+        let buf_b = read_buf.initialize_unfilled_to(3);
+        assert_eq!(buf_b.len(), 3);
+
+        let buf_b = read_buf.initialize_unfilled();
+        assert_eq!(buf_b.len(), buf_len - 9);
+
+        let buf_b = read_buf.inner_mut();
+        assert_eq!(buf_b.len(), buf_len);
+
+        read_buf.clear();
+        assert_eq!(read_buf.filled().len(), 0);
+
+        let new_read_buf = read_buf.take(8);
+        assert_eq!(new_read_buf.initialized_len(), 0);
+    }
+}
