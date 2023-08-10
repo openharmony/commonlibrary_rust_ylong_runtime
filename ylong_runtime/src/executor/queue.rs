@@ -301,10 +301,10 @@ impl InnerBuffer {
             src_front_steal = src_front_steal.wrapping_add(1);
         }
 
-        global.push_batch(tmp_buf, task);
-
         #[cfg(feature = "metrics")]
-        self.metrics.task_to_global_count.fetch_add(1, AcqRel);
+        self.metrics.task_to_global_count.fetch_add(tmp_buf.len() + 1, AcqRel);
+
+        global.push_batch(tmp_buf, task);
 
         Ok(())
     }

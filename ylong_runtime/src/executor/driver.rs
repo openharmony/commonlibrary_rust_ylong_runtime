@@ -101,6 +101,16 @@ impl Handle {
     pub(crate) fn io_deregister(&self, io: &mut impl Source) -> io::Result<()> {
         self.io.deregister_source(io)
     }
+
+    #[cfg(feature = "metrics")]
+    pub(crate) fn get_register_count(&self) -> usize {
+        self.io.get_register_count()
+    }
+
+    #[cfg(feature = "metrics")]
+    pub(crate) fn get_ready_count(&self) -> usize {
+        self.io.get_ready_count()
+    }
 }
 
 #[cfg(feature = "time")]
