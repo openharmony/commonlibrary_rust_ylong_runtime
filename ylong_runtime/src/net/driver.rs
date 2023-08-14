@@ -63,7 +63,7 @@ pub(crate) struct IoDriver {
 
     /// Save Handle used in metrics.
     #[cfg(feature = "metrics")]
-    handle: Arc<IoHandle>,
+    io_handle_inner: Arc<Inner>,
 }
 
 pub(crate) struct IoHandle {
@@ -208,7 +208,7 @@ impl IoDriver {
                 tick: DRIVER_TICK_INIT,
                 poll: arc_poll,
                 #[cfg(feature = "metrics")]
-                handle: arc_handle.clone(),
+                io_handle_inner: inner.clone(),
             };
             
         (IoHandle::new(inner, waker), driver)
@@ -257,7 +257,7 @@ impl IoDriver {
             self.dispatch(token, ready);
         }
         #[cfg(feature = "metrics")]
-        self.handle
+        self.io_handle_inner
             .metrics
             .ready_count
             .fetch_add(events.len(), std::sync::atomic::Ordering::AcqRel);
