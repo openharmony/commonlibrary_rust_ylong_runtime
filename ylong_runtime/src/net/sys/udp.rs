@@ -247,7 +247,7 @@ impl UdpSocket {
     /// The function returns:
     /// * `Ok(n)` n is the number of bytes sent.
     /// * `Err(e)` if an error is encountered.
-    /// When the remote cannot receive the message, an [`ErrorKind::WouldBlock`]
+    /// When the remote cannot receive the message, an [`io::ErrorKind::WouldBlock`]
     /// will be returned. This will return an error If the IP version of the
     /// local socket does not match that returned from SocketAddr.
     ///
@@ -355,7 +355,7 @@ impl UdpSocket {
     /// * `Ok(n, addr)` n is the number of bytes received, addr is the address
     ///   of the remote.
     /// * `Err(e)` if an error is encountered.
-    /// If there is no pending data, an [`ErrorKind::WouldBlock`] will be
+    /// If there is no pending data, an [`io::ErrorKind::WouldBlock`] will be
     /// returned.
     ///
     /// # Examples
@@ -634,7 +634,7 @@ impl ConnectedUdpSocket {
     /// The function returns:
     /// * `Ok(n)` n is the number of bytes sent.
     /// * `Err(e)` if an error is encountered.
-    /// When the remote cannot receive the message, an [`ErrorKind::WouldBlock`]
+    /// When the remote cannot receive the message, an [`io::ErrorKind::WouldBlock`]
     /// will be returned.
     ///
     /// # Examples
@@ -757,7 +757,7 @@ impl ConnectedUdpSocket {
     /// * `Ok(n, addr)` n is the number of bytes received, addr is the address
     ///   of the remote.
     /// * `Err(e)` if an error is encountered.
-    /// If there is no pending data, an [`ErrorKind::WouldBlock`] will be
+    /// If there is no pending data, an [`io::ErrorKind::WouldBlock`] will be
     /// returned.
     ///
     /// # Examples

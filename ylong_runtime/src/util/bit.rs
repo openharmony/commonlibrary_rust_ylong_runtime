@@ -78,14 +78,16 @@ impl Mask {
     /// ```
     /// When width < machine word length and width + shift > machine word
     /// length, it will ensure that width remains unchanged and shift becomes
-    /// machine word length - width. ```rust
+    /// machine word length - width.
+    /// ```rust
     /// use ylong_runtime::util::bit::Mask;
     ///
     /// let width = 32;
     /// let shift = 64;
     /// let mask = Mask::new(width, shift);
     /// // On a 64-bit machine, the mask is 0xffff_ffff_0000_0000, the offset
-    /// becomes 32. ```
+    /// // becomes 32.
+    /// ```
     pub const fn new(width: u32, shift: u32) -> Self {
         const USIZE_LEN: u32 = 0usize.wrapping_sub(1).count_ones();
         if width >= USIZE_LEN {
