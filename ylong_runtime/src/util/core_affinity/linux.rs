@@ -102,3 +102,17 @@ pub fn get_other_thread_affinity(pid: i32) -> Vec<usize> {
 fn new_cpu_set() -> cpu_set_t {
     unsafe { zeroed::<cpu_set_t>() }
 }
+
+#[cfg(test)]
+mod test {
+    /// UT test cases for get_other_thread_affinity usage
+    ///
+    /// # Brief
+    /// 1. Uses get_other_thread_affinity() to get thread affinity.
+    /// 2. Returns all available cpu's because no cores are bound.
+    #[test]
+    fn ut_core_affinity_other_thread() {
+        let cpus: Vec<usize> = crate::util::core_affinity::get_other_thread_affinity(0);
+        assert!(cpus.len() > 0);
+    }
+}
