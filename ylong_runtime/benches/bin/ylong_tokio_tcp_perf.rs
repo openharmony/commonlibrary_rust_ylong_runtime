@@ -34,7 +34,7 @@ fn ylong_create_client() {
     let mut recv_buf = [0_u8; 12];
     let runtime = RuntimeBuilder::new_multi_thread().build().unwrap();
     let handle = runtime.spawn(async move {
-        let addr = "127.0.0.1:9081".parse().unwrap();
+        let addr = "127.0.0.1:9081";
         loop {
             if let Ok(mut client) = TcpStream::connect(addr).await {
                 match client.write(b"hello server").await {
@@ -104,7 +104,7 @@ fn main() {
     println!("ylong tcp read()+write() Loops: {}", LOOP_NUMS);
 
     let runtime = RuntimeBuilder::new_multi_thread().build().unwrap();
-    let addr = "127.0.0.1:9081".parse().unwrap();
+    let addr = "127.0.0.1:9081";
 
     let st = Instant::now();
     for _ in 0..LOOP_NUMS {

@@ -16,6 +16,8 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 cfg_net! {
+    mod addr;
+    pub use addr::ToSocketAddrs;
     mod tcp;
     pub use tcp::{TcpListener, TcpStream};
     mod udp;

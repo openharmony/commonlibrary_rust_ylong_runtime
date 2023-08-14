@@ -36,8 +36,8 @@ mod udp_bench {
     /// 2. Bind and Connect.
     #[bench]
     fn ylong_udp_connect(b: &mut Bencher) {
-        let sender_addr = "127.0.0.1:8093".parse().unwrap();
-        let receiver_addr = "127.0.0.1:8094".parse().unwrap();
+        let sender_addr = "127.0.0.1:8093";
+        let receiver_addr = "127.0.0.1:8094";
         b.iter(|| {
             let handle = ylong_runtime::spawn(async move {
                 let sender = UdpSocket::bind(sender_addr).await.unwrap();

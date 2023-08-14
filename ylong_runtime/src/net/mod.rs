@@ -32,6 +32,7 @@ cfg_net! {
     pub use sys::{TcpListener, TcpStream};
     pub use sys::{UdpSocket, ConnectedUdpSocket};
     pub use sys::{SplitReadHalf, SplitWriteHalf};
+    pub use sys::ToSocketAddrs;
 }
 
 #[cfg(not(feature = "ffrt"))]

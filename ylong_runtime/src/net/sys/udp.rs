@@ -20,6 +20,7 @@ use std::task::{Context, Poll};
 use ylong_io::Interest;
 
 use crate::io::ReadBuf;
+use crate::net::sys::ToSocketAddrs;
 use crate::net::AsyncSource;
 
 /// Asynchronous UdpSocket.
@@ -32,8 +33,8 @@ use crate::net::AsyncSource;
 /// use ylong_runtime::net::UdpSocket;
 ///
 /// async fn io_func() -> io::Result<()> {
-///     let sender_addr = "127.0.0.1:8081".parse().unwrap();
-///     let receiver_addr = "127.0.0.1:8082".parse().unwrap();
+///     let sender_addr = "127.0.0.1:8081";
+///     let receiver_addr = "127.0.0.1:8082";
 ///     let mut sender = UdpSocket::bind(sender_addr).await?;
 ///     let mut receiver = UdpSocket::bind(sender_addr).await?;
 ///
@@ -87,8 +88,14 @@ impl Debug for ConnectedUdpSocket {
 }
 
 impl UdpSocket {
-    /// Creates a new UDP socket and attempts to bind it to the address
-    /// provided,
+    /// Creates a new UDP socket and attempts to bind it to the address provided
+    ///
+    /// # Note
+    ///
+    /// If there are multiple addresses in SocketAddr, it will attempt to
+    /// connect them in sequence until one of the addrs returns success. If
+    /// all connections fail, it returns the error of the last connection.
+    /// This behavior is consistent with std.
     ///
     /// # Examples
     ///
@@ -98,13 +105,16 @@ impl UdpSocket {
     /// use ylong_runtime::net::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
-    ///     let addr = "127.0.0.1:8080".parse().unwrap();
+    ///     let addr = "127.0.0.1:8080";
     ///     let mut sock = UdpSocket::bind(addr).await?;
     ///     Ok(())
     /// }
     /// ```
-    pub async fn bind(addr: SocketAddr) -> io::Result<Self> {
-        UdpSocket::new(ylong_io::UdpSocket::bind(addr)?)
+    pub async fn bind<A: ToSocketAddrs>(addr: A) -> io::Result<Self> {
+        super::addr::each_addr(addr, ylong_io::UdpSocket::bind)
+            .await
+            .map(UdpSocket::new)
+            .and_then(|op| op)
     }
 
     /// Internal interfaces.
@@ -119,6 +129,14 @@ impl UdpSocket {
     /// those that are read via recv from the specific address.
     ///
     /// Returns the connected UdpSocket if succeeds.
+    ///
+    /// # Note
+    ///
+    /// If there are multiple addresses in SocketAddr, it will attempt to
+    /// connect them in sequence until one of the addrs returns success. If
+    /// all connections fail, it returns the error of the last connection.
+    /// This behavior is consistent with std.
+    ///
     /// # Examples
     ///
     /// ```rust
@@ -127,9 +145,9 @@ impl UdpSocket {
     /// use ylong_runtime::net::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
-    ///     let local_addr = "127.0.0.1:8080".parse().unwrap();
+    ///     let local_addr = "127.0.0.1:8080";
     ///     let sock = UdpSocket::bind(local_addr).await?;
-    ///     let remote_addr = "127.0.0.1:8081".parse().unwrap();
+    ///     let remote_addr = "127.0.0.1:8081";
     ///     let connected_sock = match sock.connect(remote_addr).await {
     ///         Ok(socket) => socket,
     ///         Err(e) => {
@@ -139,15 +157,26 @@ impl UdpSocket {
     ///     Ok(())
     /// }
     /// ```
-    pub async fn connect(self, addr: SocketAddr) -> io::Result<ConnectedUdpSocket> {
+    pub async fn connect<A: ToSocketAddrs>(self, addr: A) -> io::Result<ConnectedUdpSocket> {
         let local_addr = self.local_addr().unwrap();
         drop(self);
-        let socket = ylong_io::UdpSocket::bind(local_addr)?;
-        let connected_socket = match socket.connect(addr) {
-            Ok(socket) => socket,
-            Err(e) => return Err(e),
-        };
-        ConnectedUdpSocket::new(connected_socket)
+
+        let addrs = addr.to_socket_addrs().await?;
+
+        let mut last_e = None;
+
+        for addr in addrs {
+            let socket = ylong_io::UdpSocket::bind(local_addr)?;
+            match socket.connect(addr) {
+                Ok(socket) => return ConnectedUdpSocket::new(socket),
+                Err(e) => last_e = Some(e),
+            }
+        }
+
+        Err(last_e.unwrap_or(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "addr could not resolve to any address",
+        )))
     }
 
     /// Returns the local address that this socket is bound to.
@@ -160,7 +189,7 @@ impl UdpSocket {
     /// use ylong_runtime::net::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
-    ///     let addr = "127.0.0.1:8080".parse().unwrap();
+    ///     let addr = "127.0.0.1:8080";
     ///     let mut sock = UdpSocket::bind(addr).await?;
     ///     let local_addr = sock.local_addr()?;
     ///     Ok(())
@@ -188,18 +217,26 @@ impl UdpSocket {
     /// use ylong_runtime::net::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
-    ///     let local_addr = "127.0.0.1:8080".parse().unwrap();
+    ///     let local_addr = "127.0.0.1:8080";
     ///     let sock = UdpSocket::bind(local_addr).await?;
-    ///     let remote_addr = "127.0.0.1:8081".parse().unwrap();
+    ///     let remote_addr = "127.0.0.1:8081";
     ///     let len = sock.send_to(b"hello world", remote_addr).await?;
     ///     println!("Sent {} bytes", len);
     ///     Ok(())
     /// }
     /// ```
-    pub async fn send_to(&self, buf: &[u8], target: SocketAddr) -> io::Result<usize> {
-        self.source
-            .async_process(Interest::WRITABLE, || self.source.send_to(buf, target))
-            .await
+    pub async fn send_to<A: ToSocketAddrs>(&self, buf: &[u8], target: A) -> io::Result<usize> {
+        match target.to_socket_addrs().await?.next() {
+            Some(addr) => {
+                self.source
+                    .async_process(Interest::WRITABLE, || self.source.send_to(buf, addr))
+                    .await
+            }
+            None => Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "addr could not resolve to address",
+            )),
+        }
     }
 
     /// Attempts to send data on the socket to the given address.
@@ -222,7 +259,7 @@ impl UdpSocket {
     /// use ylong_runtime::net::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
-    ///     let local_addr = "127.0.0.1:8080".parse().unwrap();
+    ///     let local_addr = "127.0.0.1:8080";
     ///     let sock = UdpSocket::bind(local_addr).await?;
     ///     let remote_addr = "127.0.0.1:8081".parse().unwrap();
     ///     let len = sock.try_send_to(b"hello world", remote_addr)?;
@@ -254,7 +291,7 @@ impl UdpSocket {
     /// use ylong_runtime::net::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
-    ///     let local_addr = "127.0.0.1:8080".parse().unwrap();
+    ///     let local_addr = "127.0.0.1:8080";
     ///     let sock = UdpSocket::bind(local_addr).await?;
     ///     let remote_addr = "127.0.0.1:8081".parse().unwrap();
     ///     let len = poll_fn(|cx| sock.poll_send_to(cx, b"Hello", remote_addr)).await?;
@@ -292,7 +329,7 @@ impl UdpSocket {
     /// use ylong_runtime::net::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
-    ///     let local_addr = "127.0.0.1:8080".parse().unwrap();
+    ///     let local_addr = "127.0.0.1:8080";
     ///     let sock = UdpSocket::bind(local_addr).await?;
     ///     let mut recv_buf = [0_u8; 12];
     ///     let (len, addr) = sock.recv_from(&mut recv_buf).await?;
@@ -329,7 +366,7 @@ impl UdpSocket {
     /// use ylong_runtime::net::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
-    ///     let local_addr = "127.0.0.1:8080".parse().unwrap();
+    ///     let local_addr = "127.0.0.1:8080";
     ///     let sock = UdpSocket::bind(local_addr).await?;
     ///     let mut recv_buf = [0_u8; 12];
     ///     let (len, addr) = sock.try_recv_from(&mut recv_buf)?;
@@ -353,7 +390,7 @@ impl UdpSocket {
     /// use ylong_runtime::net::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
-    ///     let local_addr = "127.0.0.1:8080".parse().unwrap();
+    ///     let local_addr = "127.0.0.1:8080";
     ///     let sock = UdpSocket::bind(local_addr).await?;
     ///     sock.readable().await?;
     ///     let mut buf = [0; 12];
@@ -377,7 +414,7 @@ impl UdpSocket {
     /// use ylong_runtime::net::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
-    ///     let local_addr = "127.0.0.1:8080".parse().unwrap();
+    ///     let local_addr = "127.0.0.1:8080";
     ///     let remote_addr = "127.0.0.1:8080".parse().unwrap();
     ///     let sock = UdpSocket::bind(local_addr).await?;
     ///     sock.writable().await?;
@@ -412,7 +449,7 @@ impl UdpSocket {
     /// use ylong_runtime::net::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
-    ///     let local_addr = "127.0.0.1:8080".parse().unwrap();
+    ///     let local_addr = "127.0.0.1:8080";
     ///     let sock = UdpSocket::bind(local_addr).await?;
     ///     let mut recv_buf = [0_u8; 12];
     ///     let mut read = ReadBuf::new(&mut recv_buf);
@@ -453,7 +490,7 @@ impl UdpSocket {
     /// use ylong_runtime::net::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
-    ///     let local_addr = "127.0.0.1:8080".parse().unwrap();
+    ///     let local_addr = "127.0.0.1:8080";
     ///     let broadcast_socket = UdpSocket::bind(local_addr).await?;
     ///     if broadcast_socket.broadcast()? == false {
     ///         broadcast_socket.set_broadcast(true)?;
@@ -476,7 +513,7 @@ impl UdpSocket {
     /// use ylong_runtime::net::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
-    ///     let local_addr = "127.0.0.1:8080".parse().unwrap();
+    ///     let local_addr = "127.0.0.1:8080";
     ///     let broadcast_socket = UdpSocket::bind(local_addr).await?;
     ///     assert_eq!(broadcast_socket.broadcast()?, false);
     ///     Ok(())
@@ -506,9 +543,9 @@ impl ConnectedUdpSocket {
     /// use ylong_runtime::net::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
-    ///     let addr = "127.0.0.1:8080".parse().unwrap();
+    ///     let addr = "127.0.0.1:8080";
     ///     let mut sock = UdpSocket::bind(addr).await?;
-    ///     let remote_addr = "127.0.0.1:8081".parse().unwrap();
+    ///     let remote_addr = "127.0.0.1:8081";
     ///     let connected_sock = match sock.connect(remote_addr).await {
     ///         Ok(socket) => socket,
     ///         Err(e) => {
@@ -534,8 +571,8 @@ impl ConnectedUdpSocket {
     /// use ylong_runtime::net::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
-    ///     let addr = "127.0.0.1:8080".parse().unwrap();
-    ///     let peer_addr = "127.0.0.1:8081".parse().unwrap();
+    ///     let addr = "127.0.0.1:8080";
+    ///     let peer_addr = "127.0.0.1:8081";
     ///     let mut sock = UdpSocket::bind(addr).await?;
     ///     let connected_sock = match sock.connect(peer_addr).await {
     ///         Ok(socket) => socket,
@@ -543,7 +580,7 @@ impl ConnectedUdpSocket {
     ///             return Err(e);
     ///         }
     ///     };
-    ///     assert_eq!(connected_sock.peer_addr()?, peer_addr);
+    ///     assert_eq!(connected_sock.peer_addr()?, peer_addr.parse().unwrap());
     ///     Ok(())
     /// }
     /// ```
@@ -568,9 +605,9 @@ impl ConnectedUdpSocket {
     /// use ylong_runtime::net::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
-    ///     let local_addr = "127.0.0.1:8080".parse().unwrap();
+    ///     let local_addr = "127.0.0.1:8080";
     ///     let sock = UdpSocket::bind(local_addr).await?;
-    ///     let remote_addr = "127.0.0.1:8081".parse().unwrap();
+    ///     let remote_addr = "127.0.0.1:8081";
     ///     let connected_sock = match sock.connect(remote_addr).await {
     ///         Ok(socket) => socket,
     ///         Err(e) => {
@@ -608,9 +645,9 @@ impl ConnectedUdpSocket {
     /// use ylong_runtime::net::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
-    ///     let local_addr = "127.0.0.1:8080".parse().unwrap();
+    ///     let local_addr = "127.0.0.1:8080";
     ///     let sock = UdpSocket::bind(local_addr).await?;
-    ///     let remote_addr = "127.0.0.1:8081".parse().unwrap();
+    ///     let remote_addr = "127.0.0.1:8081";
     ///     let connected_sock = match sock.connect(remote_addr).await {
     ///         Ok(socket) => socket,
     ///         Err(e) => {
@@ -648,9 +685,9 @@ impl ConnectedUdpSocket {
     /// use ylong_runtime::net::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
-    ///     let local_addr = "127.0.0.1:8080".parse().unwrap();
+    ///     let local_addr = "127.0.0.1:8080";
     ///     let sock = UdpSocket::bind(local_addr).await?;
-    ///     let remote_addr = "127.0.0.1:8081".parse().unwrap();
+    ///     let remote_addr = "127.0.0.1:8081";
     ///     let connected_sock = match sock.connect(remote_addr).await {
     ///         Ok(socket) => socket,
     ///         Err(e) => {
@@ -686,9 +723,9 @@ impl ConnectedUdpSocket {
     /// use ylong_runtime::net::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
-    ///     let local_addr = "127.0.0.1:8080".parse().unwrap();
+    ///     let local_addr = "127.0.0.1:8080";
     ///     let sock = UdpSocket::bind(local_addr).await?;
-    ///     let remote_addr = "127.0.0.1:8081".parse().unwrap();
+    ///     let remote_addr = "127.0.0.1:8081";
     ///     let connected_sock = match sock.connect(remote_addr).await {
     ///         Ok(socket) => socket,
     ///         Err(e) => {
@@ -731,9 +768,9 @@ impl ConnectedUdpSocket {
     /// use ylong_runtime::net::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
-    ///     let local_addr = "127.0.0.1:8080".parse().unwrap();
+    ///     let local_addr = "127.0.0.1:8080";
     ///     let sock = UdpSocket::bind(local_addr).await?;
-    ///     let remote_addr = "127.0.0.1:8081".parse().unwrap();
+    ///     let remote_addr = "127.0.0.1:8081";
     ///     let connected_sock = match sock.connect(remote_addr).await {
     ///         Ok(socket) => socket,
     ///         Err(e) => {
@@ -776,9 +813,9 @@ impl ConnectedUdpSocket {
     /// use ylong_runtime::net::UdpSocket;
     ///
     /// async fn io_func() -> io::Result<()> {
-    ///     let local_addr = "127.0.0.1:8080".parse().unwrap();
+    ///     let local_addr = "127.0.0.1:8080";
     ///     let sock = UdpSocket::bind(local_addr).await?;
-    ///     let remote_addr = "127.0.0.1:8081".parse().unwrap();
+    ///     let remote_addr = "127.0.0.1:8081";
     ///     let connected_sock = match sock.connect(remote_addr).await {
     ///         Ok(socket) => socket,
     ///         Err(e) => {
@@ -820,9 +857,9 @@ impl ConnectedUdpSocket {
     /// use ylong_runtime::net::{ConnectedUdpSocket, UdpSocket};
     ///
     /// async fn io_func() -> io::Result<()> {
-    ///     let local_addr = "127.0.0.1:8080".parse().unwrap();
+    ///     let local_addr = "127.0.0.1:8080";
     ///     let sock = UdpSocket::bind(local_addr).await?;
-    ///     let remote_addr = "127.0.0.1:8081".parse().unwrap();
+    ///     let remote_addr = "127.0.0.1:8081";
     ///     let connected_sock = match sock.connect(remote_addr).await {
     ///         Ok(socket) => socket,
     ///         Err(e) => {
@@ -852,9 +889,9 @@ impl ConnectedUdpSocket {
     /// use ylong_runtime::net::{ConnectedUdpSocket, UdpSocket};
     ///
     /// async fn io_func() -> io::Result<()> {
-    ///     let local_addr = "127.0.0.1:8080".parse().unwrap();
+    ///     let local_addr = "127.0.0.1:8080";
     ///     let sock = UdpSocket::bind(local_addr).await?;
-    ///     let remote_addr = "127.0.0.1:8081".parse().unwrap();
+    ///     let remote_addr = "127.0.0.1:8081";
     ///     let connected_sock = match sock.connect(remote_addr).await {
     ///         Ok(socket) => socket,
     ///         Err(e) => {
@@ -875,6 +912,8 @@ impl ConnectedUdpSocket {
 
 #[cfg(test)]
 mod tests {
+    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+
     use crate::futures::poll_fn;
     use crate::io::ReadBuf;
     use crate::net::UdpSocket;
@@ -889,8 +928,8 @@ mod tests {
     /// 4. Check if the test results are correct.
     #[test]
     fn test_send_recv_poll() {
-        let sender_addr = "127.0.0.1:8083".parse().unwrap();
-        let receiver_addr = "127.0.0.1:8084".parse().unwrap();
+        let sender_addr = "127.0.0.1:8083";
+        let receiver_addr = "127.0.0.1:8084";
         let handle = spawn(async move {
             let sender = match UdpSocket::bind(sender_addr).await {
                 Ok(socket) => socket,
@@ -949,8 +988,9 @@ mod tests {
     /// 4. Check if the test results are correct.
     #[test]
     fn test_send_to_recv_from_poll() {
-        let sender_addr = "127.0.0.1:8087".parse().unwrap();
-        let receiver_addr = "127.0.0.1:8088".parse().unwrap();
+        let sender_addr = "127.0.0.1:8087";
+        let receiver_addr = "127.0.0.1:8088";
+        let receiver_addr_socket = "127.0.0.1:8088".parse().unwrap();
         let handle = spawn(async move {
             let sender = match UdpSocket::bind(sender_addr).await {
                 Ok(socket) => socket,
@@ -966,7 +1006,7 @@ mod tests {
                 }
             };
 
-            match poll_fn(|cx| sender.poll_send_to(cx, b"Hello", receiver_addr)).await {
+            match poll_fn(|cx| sender.poll_send_to(cx, b"Hello", receiver_addr_socket)).await {
                 Ok(n) => {
                     assert_eq!(n, "Hello".len());
                 }
@@ -981,7 +1021,7 @@ mod tests {
                 .await
                 .unwrap();
             assert_eq!(read.filled(), b"Hello");
-            assert_eq!(addr, sender_addr);
+            assert_eq!(addr, sender_addr.parse().unwrap());
         });
         block_on(handle).expect("block_on failed");
     }
@@ -995,7 +1035,7 @@ mod tests {
     /// 4. Check if the test results are correct.
     #[test]
     fn ut_set_get_broadcast() {
-        let local_addr = "127.0.0.1:8091".parse().unwrap();
+        let local_addr = "127.0.0.1:8091";
 
         let handle = spawn(async move {
             let broadcast_socket = match UdpSocket::bind(local_addr).await {
@@ -1021,8 +1061,8 @@ mod tests {
     /// 3. Check if the test results are correct.
     #[test]
     fn ut_get_local_addr() {
-        let local_addr = "127.0.0.1:8092".parse().unwrap();
-        let remote_addr = "127.0.0.1:8093".parse().unwrap();
+        let local_addr = "127.0.0.1:8092";
+        let remote_addr = "127.0.0.1:8093";
 
         let handle = spawn(async move {
             let sock = match UdpSocket::bind(local_addr).await {
@@ -1038,7 +1078,7 @@ mod tests {
                 }
             };
             let local_addr1 = connected_sock.local_addr().expect("local_addr failed");
-            assert_eq!(local_addr1, local_addr);
+            assert_eq!(local_addr1, local_addr.parse().unwrap());
         });
         block_on(handle).expect("block_on failed");
     }
@@ -1052,8 +1092,8 @@ mod tests {
     /// 3. Check if the test results are correct.
     #[test]
     fn ut_get_peer_addr() {
-        let local_addr = "127.0.0.1:8094".parse().unwrap();
-        let peer_addr = "127.0.0.1:8095".parse().unwrap();
+        let local_addr = "127.0.0.1:8094";
+        let peer_addr = "127.0.0.1:8095";
         let handle = spawn(async move {
             let sock = match UdpSocket::bind(local_addr).await {
                 Ok(socket) => socket,
@@ -1069,9 +1109,102 @@ mod tests {
             };
             assert_eq!(
                 connected_sock.peer_addr().expect("peer_addr failed"),
-                peer_addr
+                peer_addr.parse().unwrap()
             );
         });
         block_on(handle).expect("block_on failed");
+    }
+
+    macro_rules! socket_addr {
+        ($sender_addr:ident, $receiver_addr:ident) => {
+            let handle = spawn(async move {
+                let sender = match UdpSocket::bind($sender_addr).await {
+                    Ok(socket) => socket,
+                    Err(e) => {
+                        panic!("Bind Socket Failed {}", e);
+                    }
+                };
+
+                let connected_sender = match sender.connect($receiver_addr).await {
+                    Ok(socket) => socket,
+                    Err(e) => {
+                        panic!("Connect Socket Failed {}", e);
+                    }
+                };
+
+                match connected_sender.send(b"Hello").await {
+                    Ok(n) => assert_eq!(n, 5),
+                    Err(e) => {
+                        panic!("send message Failed {}", e);
+                    }
+                }
+            });
+            block_on(handle).expect("block_on failed");
+        };
+    }
+
+    /// UT test cases for `ToSocketAddrs` blocking.
+    ///
+    /// # Brief
+    /// 1. Create UdpSocket with "localhost".
+    /// 2. Connect to the remote address.
+    /// 3. Check if the test results are correct.
+    #[test]
+    fn test_udp_to_socket_addrs_blocking() {
+        let sender_addr = "localhost:8096";
+        let receiver_addr = "localhost:8097";
+        socket_addr!(sender_addr, receiver_addr);
+    }
+
+    /// UT test cases for `ToSocketAddrs` (&str, u16).
+    ///
+    /// # Brief
+    /// 1. Create UdpSocket with (&str, u16).
+    /// 2. Connect to the remote address.
+    /// 3. Check if the test results are correct.
+    #[test]
+    fn test_udp_to_socket_addrs_str_u16() {
+        let sender_addr = ("localhost", 8098);
+        let receiver_addr = ("localhost", 8099);
+        socket_addr!(sender_addr, receiver_addr);
+    }
+
+    /// UT test cases for `ToSocketAddrs` (IpAddr, u16).
+    ///
+    /// # Brief
+    /// 1. Create UdpSocket with (IpAddr, u16).
+    /// 2. Connect to the remote address.
+    /// 3. Check if the test results are correct.
+    #[test]
+    fn test_udp_to_socket_addrs_ipaddr_u16() {
+        let sender_addr = (IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8101);
+        let receiver_addr = (IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8102);
+        socket_addr!(sender_addr, receiver_addr);
+    }
+
+    /// UT test cases for `ToSocketAddrs` (Ipv4Addr, u16).
+    ///
+    /// # Brief
+    /// 1. Create UdpSocket with (Ipv4Addr, u16).
+    /// 2. Connect to the remote address.
+    /// 3. Check if the test results are correct.
+    #[test]
+    fn test_udp_to_socket_addrs_ipv4addr_u16() {
+        let sender_addr = (Ipv4Addr::new(127, 0, 0, 1), 8103);
+        let receiver_addr = (Ipv4Addr::new(127, 0, 0, 1), 8104);
+        socket_addr!(sender_addr, receiver_addr);
+    }
+
+    /// UT test cases for `ToSocketAddrs` (Ipv6Addr, u16).
+    ///
+    /// # Brief
+    /// 1. Create UdpSocket with (Ipv6Addr, u16).
+    /// 2. Connect to the remote address.
+    /// 3. Check if the test results are correct.
+    #[test]
+    fn test_udp_to_socket_addrs_ipv6addr_u16() {
+        let sender_addr = (Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1), 8105);
+        let receiver_addr = (Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1), 8106);
+        socket_addr!(sender_addr, receiver_addr);
     }
 }
