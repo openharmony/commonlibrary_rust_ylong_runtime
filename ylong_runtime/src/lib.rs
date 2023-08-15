@@ -49,9 +49,7 @@ pub mod iter;
 #[cfg(feature = "macros")]
 mod select;
 #[cfg(feature = "macros")]
-pub use ylong_runtime_macros::main;
-#[cfg(feature = "macros")]
-pub use ylong_runtime_macros::test;
+pub use ylong_runtime_macros::tuple_form;
 pub(crate) mod spawn;
 #[cfg(feature = "sync")]
 pub mod sync;
