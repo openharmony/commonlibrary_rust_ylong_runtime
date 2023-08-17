@@ -27,11 +27,11 @@
       "sub_component": [],
       "inner_kits": [
         {
+          "name": "//commonlibrary/rust/ylong_runtime/ylong_runtime:lib",
           "header": {
             "header_base": [],
             "header_files": []
-          },
-          "name": "//commonlibrary/rust/ylong_runtime/ylong_runtime:lib"
+          }
         }
       ],
       "test": []
