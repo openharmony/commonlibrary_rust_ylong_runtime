@@ -50,6 +50,7 @@ pub(crate) struct TaskVirtualTable {
     pub(crate) cancel: unsafe fn(NonNull<Header>),
 }
 
+#[repr(C)]
 pub(crate) struct Header {
     pub(crate) state: TaskState,
     #[cfg(feature = "ffrt")]
@@ -149,6 +150,7 @@ pub(crate) enum Stage<T: Future> {
     UsedData,
 }
 
+#[repr(C)]
 pub(crate) struct Inner<T: Future, S: Schedule> {
     /// The execution stage of the future
     pub(crate) stage: UnsafeCell<Stage<T>>,

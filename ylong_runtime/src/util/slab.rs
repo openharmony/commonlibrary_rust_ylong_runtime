@@ -429,6 +429,7 @@ impl<T> Slots<T> {
 }
 
 #[derive(Debug)]
+#[repr(C)]
 struct Slot<T> {
     pub value: UnsafeCell<Value<T>>,
     pub next: u32,
@@ -445,6 +446,7 @@ impl<T> Slot<T> {
 }
 
 #[derive(Debug)]
+#[repr(C)]
 struct Value<T> {
     pub value: T,
     pub page: *const Page<T>,
