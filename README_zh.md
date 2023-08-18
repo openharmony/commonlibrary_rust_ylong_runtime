@@ -88,17 +88,27 @@ ylong_runtime
 
 ## 编译构建
 
-方法一：在 `Cargo.toml` 中引入 `ylong_runtime`
-
+### 使用Cargo编译
+1. 在 `Cargo.toml` 中引入 `ylong_runtime`
 ```toml
-#[dependencies]
+[dependencies]
 ylong_runtime = { git = "https://gitee.com/openharmony-sig/commonlibrary_rust_ylong_runtime.git", features = ["full"]}
 ```
 
-方法二：在 `BUILD.gn` 合适的地方添加依赖
-
+### 使用gn编译
+1. 在`bundle.json`中添加`ylong_runtime_mod`
 ```
-deps += ["//commonlibrary/rust/ylong_runtime/ylong_runtime:lib"]
+  "deps": {
+    "components": ["ylong_runtime_mod"]
+  }
+```
+2. 在`BUILD.gn`中添加`ylong_runtime_mod:lib`
+```
+external_deps += ["ylong_runtime_mod:lib"]
+```
+3. 目前通过gn编译使用ylong_runtime时需要加上inner
+```
+use ylong_runtime_inner
 ```
 
 ## 用户指南
