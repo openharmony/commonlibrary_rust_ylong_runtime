@@ -23,6 +23,7 @@ use windows_sys::Win32::System::IO::{
 
 use super::Handle;
 use crate::sys::Overlapped;
+use crate::{Event, Token};
 
 /// IOCP's HANDLE.
 #[derive(Debug)]
@@ -85,7 +86,11 @@ impl CompletionPort {
     }
 
     /// Posts an I/O completion packet to an I/O completion port.
-    pub(crate) fn post(&self, status: CompletionStatus) -> io::Result<()> {
+    pub(crate) fn post(&self, token: Token) -> io::Result<()> {
+        let mut event = Event::new(token);
+        event.set_readable();
+
+        let status = event.as_completion_status();
         syscall!(
             PostQueuedCompletionStatus(
                 self.handle.raw(),

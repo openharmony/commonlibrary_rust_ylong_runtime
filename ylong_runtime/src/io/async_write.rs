@@ -293,6 +293,36 @@ pub trait AsyncWriteExt: AsyncWrite {
     {
         ShutdownTask::new(self)
     }
+
+    /// Creates a "by reference" adaptor for this instance of `AsyncRead`.
+    ///
+    /// The returned adapter also implements `AsyncRead` and will simply borrow
+    /// this current reader.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use std::io;
+    ///
+    /// use ylong_runtime::fs::File;
+    /// use ylong_runtime::io::AsyncWriteExt;
+    ///
+    /// async fn async_io() -> io::Result<()> {
+    ///     let mut buffer = File::create("foo.txt").await?;
+    ///
+    ///     let reference = buffer.by_ref();
+    ///
+    ///     // we can use reference just like our original buffer
+    ///     reference.write_all(b"some bytes").await?;
+    ///     Ok(())
+    /// }
+    /// ```
+    fn by_ref(&mut self) -> &mut Self
+    where
+        Self: Sized,
+    {
+        self
+    }
 }
 
 impl<R: AsyncWrite + ?Sized> AsyncWriteExt for R {}

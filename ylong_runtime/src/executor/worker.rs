@@ -18,10 +18,10 @@ use std::task::Waker;
 
 /// worker struct info and method
 use crate::executor::async_pool::MultiThreadScheduler;
-use crate::executor::parker::Parker;
-use crate::executor::queue::LocalQueue;
 #[cfg(any(feature = "net", feature = "time"))]
 use crate::executor::driver::Handle;
+use crate::executor::parker::Parker;
+use crate::executor::queue::LocalQueue;
 use crate::task::yield_now::wake_yielded_tasks;
 use crate::task::Task;
 
@@ -32,7 +32,7 @@ thread_local! {
 pub(crate) enum WorkerContext {
     Multi(MultiWorkerContext),
     #[cfg(any(feature = "net", feature = "time"))]
-    Curr(CurrentWorkerContext)
+    Curr(CurrentWorkerContext),
 }
 
 #[cfg(any(feature = "net", feature = "time"))]
@@ -58,7 +58,7 @@ pub(crate) use get_multi_worker_context;
 pub(crate) struct MultiWorkerContext {
     pub(crate) worker: Arc<Worker>,
     #[cfg(any(feature = "net", feature = "time"))]
-    pub(crate) handle: Arc<Handle>
+    pub(crate) handle: Arc<Handle>,
 }
 
 #[cfg(any(feature = "net", feature = "time"))]
@@ -93,10 +93,9 @@ impl MultiWorkerContext {
 /// Runs the worker thread
 pub(crate) fn run_worker(
     worker: Arc<Worker>,
-    #[cfg(any(feature = "net", feature = "time"))]
-    handle: Arc<Handle>,
+    #[cfg(any(feature = "net", feature = "time"))] handle: Arc<Handle>,
 ) {
-    let cur_context = WorkerContext::Multi( MultiWorkerContext {
+    let cur_context = WorkerContext::Multi(MultiWorkerContext {
         worker,
         #[cfg(any(feature = "net", feature = "time"))]
         handle,

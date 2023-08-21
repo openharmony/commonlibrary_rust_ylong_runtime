@@ -15,17 +15,17 @@ use std::io;
 use std::sync::Arc;
 
 use crate::sys::windows::iocp::CompletionPort;
-use crate::{Event, Selector, Token};
+use crate::{Selector, Token};
 
 #[derive(Debug)]
-pub struct WakerInner {
+pub(crate) struct WakerInner {
     token: Token,
     completion_port: Arc<CompletionPort>,
 }
 
 impl WakerInner {
     /// Creates a new WakerInner.
-    pub fn new(selector: &Selector, token: Token) -> io::Result<WakerInner> {
+    pub(crate) fn new(selector: &Selector, token: Token) -> io::Result<WakerInner> {
         Ok(WakerInner {
             token,
             completion_port: selector.clone_cp(),
@@ -33,10 +33,7 @@ impl WakerInner {
     }
 
     /// Waker allows cross-thread waking of Poll.
-    pub fn wake(&self) -> io::Result<()> {
-        let mut event = Event::new(self.token);
-        event.set_readable();
-
-        self.completion_port.post(event.as_completion_status())
+    pub(crate) fn wake(&self) -> io::Result<()> {
+        self.completion_port.post(self.token)
     }
 }

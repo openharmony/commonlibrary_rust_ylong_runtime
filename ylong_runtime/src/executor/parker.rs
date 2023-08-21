@@ -15,6 +15,7 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
+
 use crate::executor::driver::{Driver, Handle};
 
 #[derive(Clone)]
@@ -35,15 +36,13 @@ const PARKED_ON_DRIVER: usize = 2;
 const NOTIFIED: usize = 3;
 
 impl Parker {
-    pub(crate) fn new(
-        driver: Arc<Mutex<Driver>>
-    ) -> Parker {
+    pub(crate) fn new(driver: Arc<Mutex<Driver>>) -> Parker {
         Parker {
             inner: Arc::new(Inner {
                 state: AtomicUsize::new(IDLE),
                 mutex: Mutex::new(false),
                 condvar: Condvar::new(),
-                driver
+                driver,
             }),
         }
     }
@@ -52,13 +51,8 @@ impl Parker {
         self.inner.park();
     }
 
-    pub(crate) fn unpark(
-        &self,
-        handle: Arc<Handle>,
-    ) {
-        self.inner.unpark(
-            handle
-        );
+    pub(crate) fn unpark(&self, handle: Arc<Handle>) {
+        self.inner.unpark(handle);
     }
 
     pub(crate) fn get_driver(&self) -> &Arc<Mutex<Driver>> {
@@ -148,10 +142,7 @@ impl Inner {
         }
     }
 
-    fn unpark(
-        &self,
-        handle: Arc<Handle>
-    ) {
+    fn unpark(&self, handle: Arc<Handle>) {
         match self.state.swap(NOTIFIED, SeqCst) {
             IDLE | NOTIFIED => {}
             PARKED_ON_CONDVAR => {

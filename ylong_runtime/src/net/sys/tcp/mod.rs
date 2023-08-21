@@ -16,3 +16,6 @@ pub use listener::TcpListener;
 
 mod stream;
 pub use stream::TcpStream;
+
+mod split;
+pub use split::{BorrowReadHalf, BorrowWriteHalf, SplitReadHalf, SplitWriteHalf};

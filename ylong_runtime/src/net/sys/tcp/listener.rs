@@ -100,10 +100,145 @@ impl TcpListener {
         Ok((stream, addr))
     }
 
+    /// Returns the local socket address of this listener.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use std::io;
+    ///
+    /// use ylong_runtime::net::TcpListener;
+    ///
+    /// async fn io_func() -> io::Result<()> {
+    ///     let addr = "127.0.0.1:1234";
+    ///     let mut server = TcpListener::bind(addr).await.unwrap();
+    ///     let ret = server.local_addr().unwrap();
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn local_addr(&self) -> io::Result<SocketAddr> {
+        self.source.local_addr()
+    }
+
+    /// Gets the value of the IP_TTL option for this socket.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use std::io;
+    ///
+    /// use ylong_runtime::net::TcpListener;
+    ///
+    /// async fn io_func() -> io::Result<()> {
+    ///     let addr = "127.0.0.1:1234";
+    ///     let mut server = TcpListener::bind(addr).await.unwrap();
+    ///     let ret = server.ttl().unwrap();
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn ttl(&self) -> io::Result<u32> {
+        self.source.ttl()
+    }
+
+    /// Sets the value for the IP_TTL option on this socket.
+    /// This value sets the time-to-live field that is used in every packet sent
+    /// from this socket.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use std::io;
+    ///
+    /// use ylong_runtime::net::TcpListener;
+    ///
+    /// async fn io_func() -> io::Result<()> {
+    ///     let addr = "127.0.0.1:1234";
+    ///     let mut server = TcpListener::bind(addr).await.unwrap();
+    ///     let ret = server.set_ttl(100).unwrap();
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
+        self.source.set_ttl(ttl)
+    }
+
+    /// Sets the value for the IP_TTL option on this socket.
+    /// This value sets the time-to-live field that is used in every packet sent
+    /// from this socket.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use std::io;
+    ///
+    /// use ylong_runtime::net::TcpListener;
+    ///
+    /// async fn io_func() -> io::Result<()> {
+    ///     let addr = "127.0.0.1:1234";
+    ///     let mut server = TcpListener::bind(addr).await.unwrap();
+    ///     let ret = server.take_error().unwrap();
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn take_error(&self) -> io::Result<Option<io::Error>> {
+        self.source.take_error()
+    }
+
     // Registers the ylong_io::TcpListener's fd to the reactor, and returns the
     // async TcpListener
     pub(crate) fn new(listener: ylong_io::TcpListener) -> io::Result<Self> {
         let source = AsyncSource::new(listener, None)?;
         Ok(TcpListener { source })
+    }
+}
+
+#[cfg(windows)]
+use std::os::windows::io::{AsRawSocket, RawSocket};
+
+#[cfg(windows)]
+impl AsRawSocket for TcpListener {
+    fn as_raw_socket(&self) -> RawSocket {
+        self.source.as_raw_socket()
+    }
+}
+
+#[cfg(unix)]
+use std::os::fd::{AsRawFd, RawFd};
+
+#[cfg(unix)]
+use ylong_io::Source;
+
+#[cfg(unix)]
+impl AsRawFd for TcpListener {
+    fn as_raw_fd(&self) -> RawFd {
+        self.source.as_raw_fd()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::net::SocketAddr;
+
+    use crate::net::TcpListener;
+
+    /// UT test cases for `TcpListener`.
+    ///
+    /// # Brief
+    /// 1. Bind `TcpListener`.
+    /// 2. Call local_addr(), set_ttl(), ttl(), take_error().
+    /// 3. Check result is correct.
+    #[test]
+    fn ut_tcp_listener_basic() {
+        crate::block_on(async {
+            let addr: SocketAddr = "127.0.0.1:8081".parse().unwrap();
+            let server = TcpListener::bind(addr).await.unwrap();
+
+            assert_eq!(server.local_addr().unwrap(), addr);
+
+            server.set_ttl(101).unwrap();
+            assert_eq!(server.ttl().unwrap(), 101);
+
+            assert!(server.take_error().unwrap().is_none());
+        })
     }
 }

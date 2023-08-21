@@ -20,7 +20,11 @@ mod open_options;
 
 use std::io;
 
-pub use async_dir::{create_dir, create_dir_all, read_dir, remove_dir, remove_dir_all};
+pub use async_dir::{
+    canonicalize, copy, create_dir, create_dir_all, hard_link, metadata, read, read_dir, read_link,
+    read_to_string, remove_dir, remove_dir_all, remove_file, rename, set_permissions,
+    symlink_metadata, write,
+};
 pub use async_file::File;
 pub use open_options::OpenOptions;
 

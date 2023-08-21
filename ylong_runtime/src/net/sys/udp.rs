@@ -14,7 +14,7 @@
 use std::fmt::{Debug, Formatter};
 use std::io;
 use std::mem::MaybeUninit;
-use std::net::SocketAddr;
+use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::task::{Context, Poll};
 
 use ylong_io::Interest;
@@ -247,9 +247,10 @@ impl UdpSocket {
     /// The function returns:
     /// * `Ok(n)` n is the number of bytes sent.
     /// * `Err(e)` if an error is encountered.
-    /// When the remote cannot receive the message, an [`io::ErrorKind::WouldBlock`]
-    /// will be returned. This will return an error If the IP version of the
-    /// local socket does not match that returned from SocketAddr.
+    /// When the remote cannot receive the message, an
+    /// [`io::ErrorKind::WouldBlock`] will be returned. This will return an
+    /// error If the IP version of the local socket does not match that
+    /// returned from SocketAddr.
     ///
     /// # Examples
     ///
@@ -376,6 +377,110 @@ impl UdpSocket {
     pub fn try_recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         self.source
             .try_io(Interest::READABLE, || self.source.recv_from(buf))
+    }
+
+    /// Attempts to receives single datagram on the socket from the remote
+    /// address to which it is connected, without removing the message from
+    /// input queue. On success, returns the number of bytes peeked.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use std::io;
+    ///
+    /// use ylong_runtime::net::UdpSocket;
+    ///
+    /// async fn io_func() -> io::Result<()> {
+    ///     let local_addr = "127.0.0.1:8080";
+    ///     let sock = UdpSocket::bind(local_addr).await?;
+    ///     let mut buf = [0; 10];
+    ///     let (number_of_bytes, src_addr) =
+    ///         sock.peek_from(&mut buf).await.expect("Didn't receive data");
+    ///     let filled_buf = &mut buf[..number_of_bytes];
+    ///     Ok(())
+    /// }
+    /// ```
+    pub async fn peek_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
+        self.source
+            .async_process(Interest::READABLE, || self.source.peek_from(buf))
+            .await
+    }
+
+    /// Attempts to Receives single datagram on the socket from the remote
+    /// address to which it is connected, without removing the message from
+    /// input queue. On success, returns the number of bytes peeked.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use std::io;
+    ///
+    /// use ylong_runtime::net::UdpSocket;
+    ///
+    /// async fn io_func() -> io::Result<()> {
+    ///     let local_addr = "127.0.0.1:8080";
+    ///     let sock = UdpSocket::bind(local_addr).await?;
+    ///     let mut buf = [0; 10];
+    ///     let (number_of_bytes, src_addr) = sock
+    ///         .try_peek_from(&mut buf)
+    ///         .await
+    ///         .expect("Didn't receive data");
+    ///     Ok(())
+    /// }
+    /// ```
+    pub async fn try_peek_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
+        self.source
+            .try_io(Interest::READABLE, || self.source.peek_from(buf))
+    }
+
+    /// Attempts to receives single datagram on the socket from the remote
+    /// address to which it is connected, without removing the message from
+    /// input queue. On success, returns the number of bytes peeked.
+    ///
+    /// # Return value
+    /// The function returns:
+    /// * `Poll::Pending` if the socket is not ready to read
+    /// * `Poll::Ready(Ok(addr))` reads data from addr into ReadBuf if the
+    ///   socket is ready
+    /// * `Poll::Ready(Err(e))` if an error is encountered.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use std::io;
+    ///
+    /// use ylong_runtime::futures::poll_fn;
+    /// use ylong_runtime::io::ReadBuf;
+    /// use ylong_runtime::net::UdpSocket;
+    ///
+    /// async fn io_func() -> io::Result<()> {
+    ///     let local_addr = "127.0.0.1:8080";
+    ///     let sock = UdpSocket::bind(local_addr).await?;
+    ///     let mut recv_buf = [0_u8; 12];
+    ///     let mut read = ReadBuf::new(&mut recv_buf);
+    ///     let addr = poll_fn(|cx| sock.poll_peek_from(cx, &mut read)).await?;
+    ///     println!("received {:?} from {:?}", read.filled(), addr);
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn poll_peek_from(
+        &self,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<SocketAddr>> {
+        let ret = self.source.poll_read_io(cx, || unsafe {
+            let slice = &mut *(buf.unfilled_mut() as *mut [MaybeUninit<u8>] as *mut [u8]);
+            self.source.peek_from(slice)
+        });
+        let (r_len, r_addr) = match ret {
+            Poll::Ready(Ok(x)) => x,
+            Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
+            Poll::Pending => return Poll::Pending,
+        };
+        buf.assume_init(r_len);
+        buf.advance(r_len);
+
+        Poll::Ready(Ok(r_addr))
     }
 
     /// Waits for the socket to become readable.
@@ -522,6 +627,131 @@ impl UdpSocket {
     pub fn broadcast(&self) -> io::Result<bool> {
         self.source.broadcast()
     }
+
+    /// Sets the value for the IP_TTL option on this socket.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use std::io;
+    ///
+    /// use ylong_runtime::net::UdpSocket;
+    ///
+    /// async fn io_func() -> io::Result<()> {
+    ///     let local_addr = "127.0.0.1:8080";
+    ///     let socket = UdpSocket::bind(local_addr).await?;
+    ///     socket.set_ttl(100).expect("set_ttl call failed");
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
+        self.source.set_ttl(ttl)
+    }
+
+    /// Sets the value for the IP_TTL option on this socket.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use std::io;
+    ///
+    /// use ylong_runtime::net::UdpSocket;
+    ///
+    /// async fn io_func() -> io::Result<()> {
+    ///     let local_addr = "127.0.0.1:8080";
+    ///     let socket = UdpSocket::bind(local_addr).await?;
+    ///     socket.set_ttl(100).expect("set_ttl call failed");
+    ///     assert_eq!(socket.ttl().unwrap(), 100);
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn ttl(&self) -> io::Result<u32> {
+        self.source.ttl()
+    }
+
+    /// Gets the value of the SO_ERROR option on this socket.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use std::io;
+    ///
+    /// use ylong_runtime::net::UdpSocket;
+    ///
+    /// async fn io_func() -> io::Result<()> {
+    ///     let addr = "127.0.0.1:34254";
+    ///     let socket = UdpSocket::bind(addr)
+    ///         .await
+    ///         .expect("couldn't bind to address");
+    ///     match socket.take_error() {
+    ///         Ok(Some(error)) => println!("UdpSocket error: {error:?}"),
+    ///         Ok(None) => println!("No error"),
+    ///         Err(error) => println!("UdpSocket.take_error failed: {error:?}"),
+    ///     }
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn take_error(&self) -> io::Result<Option<io::Error>> {
+        self.source.take_error()
+    }
+
+    /// Gets the value of the IP_MULTICAST_LOOP option for this socket.
+    pub fn multicast_loop_v4(&self) -> io::Result<bool> {
+        self.source.multicast_loop_v4()
+    }
+
+    /// Sets the value of the IP_MULTICAST_LOOP option for this socket.
+    /// If enabled, multicast packets will be looped back to the local socket.
+    /// Note that this might not have any effect on IPv6 sockets.
+    pub fn set_multicast_loop_v4(&self, multicast_loop_v4: bool) -> io::Result<()> {
+        self.source.set_multicast_loop_v4(multicast_loop_v4)
+    }
+
+    /// Gets the value of the IP_MULTICAST_TTL option for this socket.
+    pub fn multicast_ttl_v4(&self) -> io::Result<u32> {
+        self.source.multicast_ttl_v4()
+    }
+
+    /// Sets the value of the IP_MULTICAST_TTL option for this socket.
+    /// Indicates the time-to-live value of outgoing multicast packets for this
+    /// socket. The default value is 1 which means that multicast packets don't
+    /// leave the local network unless explicitly requested. Note that this
+    /// might not have any effect on IPv6 sockets.
+    pub fn set_multicast_ttl_v4(&self, multicast_ttl_v4: u32) -> io::Result<()> {
+        self.source.set_multicast_ttl_v4(multicast_ttl_v4)
+    }
+
+    /// Gets the value of the IPV6_MULTICAST_LOOP option for this socket.
+    pub fn multicast_loop_v6(&self) -> io::Result<bool> {
+        self.source.multicast_loop_v6()
+    }
+
+    /// Sets the value of the IPV6_MULTICAST_LOOP option for this socket.
+    /// Controls whether this socket sees the multicast packets it sends itself.
+    /// Note that this might not have any affect on IPv4 sockets.
+    pub fn set_multicast_loop_v6(&self, multicast_loop_v6: bool) -> io::Result<()> {
+        self.source.set_multicast_loop_v6(multicast_loop_v6)
+    }
+
+    /// Executes an operation of the IP_ADD_MEMBERSHIP type.
+    pub fn join_multicast_v4(&self, multiaddr: &Ipv4Addr, interface: &Ipv4Addr) -> io::Result<()> {
+        self.source.join_multicast_v4(multiaddr, interface)
+    }
+
+    /// Executes an operation of the IPV6_ADD_MEMBERSHIP type.
+    pub fn join_multicast_v6(&self, multiaddr: &Ipv6Addr, interface: u32) -> io::Result<()> {
+        self.source.join_multicast_v6(multiaddr, interface)
+    }
+
+    /// Executes an operation of the IP_DROP_MEMBERSHIP type.
+    pub fn leave_multicast_v4(&self, multiaddr: &Ipv4Addr, interface: &Ipv4Addr) -> io::Result<()> {
+        self.source.leave_multicast_v4(multiaddr, interface)
+    }
+
+    /// Executes an operation of the IPV6_DROP_MEMBERSHIP type.
+    pub fn leave_multicast_v6(&self, multiaddr: &Ipv6Addr, interface: u32) -> io::Result<()> {
+        self.source.leave_multicast_v6(multiaddr, interface)
+    }
 }
 
 impl ConnectedUdpSocket {
@@ -588,6 +818,110 @@ impl ConnectedUdpSocket {
         self.source.peer_addr()
     }
 
+    /// Sets the value of the `SO_BROADCAST` option for this socket.
+    /// When enabled, this socket is allowed to send packets to a broadcast
+    /// address.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use std::io;
+    ///
+    /// use ylong_runtime::net::UdpSocket;
+    ///
+    /// async fn io_func() -> io::Result<()> {
+    ///     let local_addr = "127.0.0.1:8080";
+    ///     let peer_addr = "127.0.0.1:8081";
+    ///     let socket = UdpSocket::bind(local_addr).await?;
+    ///     let connected_sock = match socket.connect(peer_addr).await {
+    ///         Ok(socket) => socket,
+    ///         Err(e) => {
+    ///             return Err(e);
+    ///         }
+    ///     };
+    ///     if connected_sock.broadcast()? == false {
+    ///         connected_sock.set_broadcast(true)?;
+    ///     }
+    ///     assert_eq!(connected_sock.broadcast()?, true);
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn set_broadcast(&self, on: bool) -> io::Result<()> {
+        self.source.set_broadcast(on)
+    }
+
+    /// Gets the value of the `SO_BROADCAST` option for this socket.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use std::io;
+    ///
+    /// use ylong_runtime::net::UdpSocket;
+    ///
+    /// async fn io_func() -> io::Result<()> {
+    ///     let local_addr = "127.0.0.1:8080";
+    ///     let peer_addr = "127.0.0.1:8081";
+    ///     let socket = UdpSocket::bind(local_addr).await?;
+    ///     let connected_sock = match socket.connect(peer_addr).await {
+    ///         Ok(socket) => socket,
+    ///         Err(e) => {
+    ///             return Err(e);
+    ///         }
+    ///     };
+    ///     assert_eq!(connected_sock.broadcast()?, false);
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn broadcast(&self) -> io::Result<bool> {
+        self.source.broadcast()
+    }
+
+    /// Sets the value for the IP_TTL option on this socket.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use std::io;
+    ///
+    /// use ylong_runtime::net::UdpSocket;
+    ///
+    /// async fn io_func() -> io::Result<()> {
+    ///     let local_addr = "127.0.0.1:8080";
+    ///     let peer_addr = "127.0.0.1:8081";
+    ///     let socket = UdpSocket::bind(local_addr).await?;
+    ///     let connect_socket = socket.connect(peer_addr).await?;
+    ///     connect_socket.set_ttl(100).expect("set_ttl call failed");
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
+        self.source.set_ttl(ttl)
+    }
+
+    /// Sets the value for the IP_TTL option on this socket.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use std::io;
+    ///
+    /// use ylong_runtime::net::UdpSocket;
+    ///
+    /// async fn io_func() -> io::Result<()> {
+    ///     let local_addr = "127.0.0.1:8080";
+    ///     let peer_addr = "127.0.0.1:8081";
+    ///     let socket = UdpSocket::bind(local_addr).await?;
+    ///     let connect_socket = socket.connect(peer_addr).await?;
+    ///     connect_socket.set_ttl(100).expect("set_ttl call failed");
+    ///     assert_eq!(connect_socket.ttl().unwrap(), 100);
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn ttl(&self) -> io::Result<u32> {
+        self.source.ttl()
+    }
+
     /// Sends data on the socket to the remote address that the socket is
     /// connected to. The connect method will connect this socket to a
     /// remote address. This method will fail if the socket is not
@@ -634,8 +968,8 @@ impl ConnectedUdpSocket {
     /// The function returns:
     /// * `Ok(n)` n is the number of bytes sent.
     /// * `Err(e)` if an error is encountered.
-    /// When the remote cannot receive the message, an [`io::ErrorKind::WouldBlock`]
-    /// will be returned.
+    /// When the remote cannot receive the message, an
+    /// [`io::ErrorKind::WouldBlock`] will be returned.
     ///
     /// # Examples
     ///
@@ -845,6 +1179,71 @@ impl ConnectedUdpSocket {
         Poll::Ready(Ok(()))
     }
 
+    /// Receives single datagram on the socket from the remote address to which
+    /// it is connected, without removing the message from input queue. On
+    /// success, returns the number of bytes peeked.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use std::io;
+    ///
+    /// use ylong_runtime::net::UdpSocket;
+    ///
+    /// async fn io_func() -> io::Result<()> {
+    ///     let local_addr = "127.0.0.1:8080";
+    ///     let receiver_addr = "127.0.0.1:8081";
+    ///     let socket = UdpSocket::bind(local_addr).await?;
+    ///     let connect_socket = socket
+    ///         .connect(receiver_addr)
+    ///         .await
+    ///         .expect("connect function failed");
+    ///     let mut buf = [0; 10];
+    ///     match connect_socket.peek(&mut buf).await {
+    ///         Ok(received) => println!("received {received} bytes"),
+    ///         Err(e) => println!("peek function failed: {e:?}"),
+    ///     }
+    ///     Ok(())
+    /// }
+    /// ```
+    pub async fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
+        self.source
+            .async_process(Interest::READABLE, || self.source.peek(buf))
+            .await
+    }
+
+    /// Attempts to Receives single datagram on the socket from the remote
+    /// address to which it is connected, without removing the message from
+    /// input queue. On success, returns the number of bytes peeked.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use std::io;
+    ///
+    /// use ylong_runtime::net::UdpSocket;
+    ///
+    /// async fn io_func() -> io::Result<()> {
+    ///     let local_addr = "127.0.0.1:8080";
+    ///     let receiver_addr = "127.0.0.1:8081";
+    ///     let socket = UdpSocket::bind(local_addr).await?;
+    ///     let connect_socket = socket
+    ///         .connect(receiver_addr)
+    ///         .await
+    ///         .expect("connect function failed");
+    ///     let mut buf = [0; 10];
+    ///     match connect_socket.try_peek(&mut buf) {
+    ///         Ok(received) => println!("received {received} bytes"),
+    ///         Err(e) => println!("try_peek function failed: {e:?}"),
+    ///     }
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn try_peek(&self, buf: &mut [u8]) -> io::Result<usize> {
+        self.source
+            .try_io(Interest::READABLE, || self.source.peek(buf))
+    }
+
     /// Waits for the socket to become readable.
     ///
     /// This function is usually paired up with [`UdpSocket::try_recv_from`]
@@ -908,16 +1307,219 @@ impl ConnectedUdpSocket {
         self.source.entry.readiness(Interest::WRITABLE).await?;
         Ok(())
     }
+
+    /// Gets the value of the SO_ERROR option on this socket.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use std::io;
+    ///
+    /// use ylong_runtime::net::UdpSocket;
+    ///
+    /// async fn io_func() -> io::Result<()> {
+    ///     let local_addr = "127.0.0.1:8080";
+    ///     let socket = UdpSocket::bind(local_addr)
+    ///         .await
+    ///         .expect("couldn't bind to address");
+    ///     let remote_addr = "127.0.0.1:8081";
+    ///     let connected_sock = match socket.connect(remote_addr).await {
+    ///         Ok(socket) => socket,
+    ///         Err(e) => {
+    ///             return Err(e);
+    ///         }
+    ///     };
+    ///     match connected_sock.take_error() {
+    ///         Ok(Some(error)) => println!("UdpSocket error: {error:?}"),
+    ///         Ok(None) => println!("No error"),
+    ///         Err(error) => println!("UdpSocket.take_error failed: {error:?}"),
+    ///     }
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn take_error(&self) -> io::Result<Option<io::Error>> {
+        self.source.take_error()
+    }
+
+    /// Gets the value of the IP_MULTICAST_LOOP option for this socket.
+    pub fn multicast_loop_v4(&self) -> io::Result<bool> {
+        self.source.multicast_loop_v4()
+    }
+
+    /// Sets the value of the IP_MULTICAST_LOOP option for this socket.
+    /// If enabled, multicast packets will be looped back to the local socket.
+    /// Note that this might not have any effect on IPv6 sockets.
+    pub fn set_multicast_loop_v4(&self, multicast_loop_v4: bool) -> io::Result<()> {
+        self.source.set_multicast_loop_v4(multicast_loop_v4)
+    }
+
+    /// Gets the value of the IP_MULTICAST_TTL option for this socket.
+    pub fn multicast_ttl_v4(&self) -> io::Result<u32> {
+        self.source.multicast_ttl_v4()
+    }
+
+    /// Sets the value of the IP_MULTICAST_TTL option for this socket.
+    /// Indicates the time-to-live value of outgoing multicast packets for this
+    /// socket. The default value is 1 which means that multicast packets don't
+    /// leave the local network unless explicitly requested. Note that this
+    /// might not have any effect on IPv6 sockets.
+    pub fn set_multicast_ttl_v4(&self, multicast_ttl_v4: u32) -> io::Result<()> {
+        self.source.set_multicast_ttl_v4(multicast_ttl_v4)
+    }
+
+    /// Gets the value of the IPV6_MULTICAST_LOOP option for this socket.
+    pub fn multicast_loop_v6(&self) -> io::Result<bool> {
+        self.source.multicast_loop_v6()
+    }
+
+    /// Sets the value of the IPV6_MULTICAST_LOOP option for this socket.
+    /// Controls whether this socket sees the multicast packets it sends itself.
+    /// Note that this might not have any affect on IPv4 sockets.
+    pub fn set_multicast_loop_v6(&self, multicast_loop_v6: bool) -> io::Result<()> {
+        self.source.set_multicast_loop_v6(multicast_loop_v6)
+    }
+
+    /// Executes an operation of the IP_ADD_MEMBERSHIP type.
+    pub fn join_multicast_v4(&self, multiaddr: &Ipv4Addr, interface: &Ipv4Addr) -> io::Result<()> {
+        self.source.join_multicast_v4(multiaddr, interface)
+    }
+
+    /// Executes an operation of the IPV6_ADD_MEMBERSHIP type.
+    pub fn join_multicast_v6(&self, multiaddr: &Ipv6Addr, interface: u32) -> io::Result<()> {
+        self.source.join_multicast_v6(multiaddr, interface)
+    }
+
+    /// Executes an operation of the IP_DROP_MEMBERSHIP type.
+    pub fn leave_multicast_v4(&self, multiaddr: &Ipv4Addr, interface: &Ipv4Addr) -> io::Result<()> {
+        self.source.leave_multicast_v4(multiaddr, interface)
+    }
+
+    /// Executes an operation of the IPV6_DROP_MEMBERSHIP type.
+    pub fn leave_multicast_v6(&self, multiaddr: &Ipv6Addr, interface: u32) -> io::Result<()> {
+        self.source.leave_multicast_v6(multiaddr, interface)
+    }
+}
+
+#[cfg(windows)]
+use std::os::windows::io::{AsRawSocket, RawSocket};
+
+#[cfg(windows)]
+impl AsRawSocket for UdpSocket {
+    fn as_raw_socket(&self) -> RawSocket {
+        self.source.as_raw_socket()
+    }
+}
+
+#[cfg(windows)]
+impl AsRawSocket for ConnectedUdpSocket {
+    fn as_raw_socket(&self) -> RawSocket {
+        self.source.as_raw_socket()
+    }
+}
+
+#[cfg(unix)]
+use std::os::fd::{AsRawFd, RawFd};
+
+#[cfg(unix)]
+use ylong_io::Source;
+
+#[cfg(unix)]
+impl AsRawFd for UdpSocket {
+    fn as_raw_fd(&self) -> RawFd {
+        self.source.as_raw_fd()
+    }
+}
+
+#[cfg(unix)]
+impl AsRawFd for ConnectedUdpSocket {
+    fn as_raw_fd(&self) -> RawFd {
+        self.source.as_raw_fd()
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV6};
 
     use crate::futures::poll_fn;
     use crate::io::ReadBuf;
     use crate::net::UdpSocket;
     use crate::{block_on, spawn};
+
+    /// Basic UT test cases for `UdpSocket` with `SocketAddrV4`.
+    ///
+    /// # Brief
+    /// 1. Bind and connect `UdpSocket`.
+    /// 2. Call set_ttl(), ttl(), take_error(), set_multicast_loop_v4(),
+    ///    multicast_loop_v4(), set_multicast_ttl_v4(), multicast_ttl_v4() for
+    ///    `UdpSocket` and `ConnectedUdpSocket`.
+    /// 3. Check result is correct.
+    #[test]
+    fn ut_udp_basic_v4() {
+        block_on(async {
+            let sender_addr = "127.0.0.1:8096";
+            let receiver_addr = "127.0.0.1:8097";
+
+            let sender = UdpSocket::bind(sender_addr).await.unwrap();
+            let receiver = UdpSocket::bind(receiver_addr).await.unwrap();
+
+            sender.set_ttl(101).unwrap();
+            assert_eq!(sender.ttl().unwrap(), 101);
+            assert!(sender.take_error().unwrap().is_none());
+            sender.set_multicast_loop_v4(false).unwrap();
+            assert!(!sender.multicast_loop_v4().unwrap());
+            sender.set_multicast_ttl_v4(42).unwrap();
+            assert_eq!(sender.multicast_ttl_v4().unwrap(), 42);
+
+            let connected_sender = sender.connect(receiver_addr).await.unwrap();
+            let _connected_receiver = receiver.connect(sender_addr).await.unwrap();
+
+            connected_sender.set_ttl(101).unwrap();
+            assert_eq!(connected_sender.ttl().unwrap(), 101);
+            assert!(connected_sender.take_error().unwrap().is_none());
+            connected_sender.set_multicast_loop_v4(false).unwrap();
+            assert!(!connected_sender.multicast_loop_v4().unwrap());
+            connected_sender.set_multicast_ttl_v4(42).unwrap();
+            assert_eq!(connected_sender.multicast_ttl_v4().unwrap(), 42);
+        });
+    }
+
+    /// Basic UT test cases for `UdpSocket` with `SocketAddrV6`.
+    ///
+    /// # Brief
+    /// 1. Bind and connect `UdpSocket`.
+    /// 2. Call set_multicast_loop_v6(), multicast_loop_v6() for `UdpSocket` and
+    ///    `ConnectedUdpSocket`.
+    /// 3. Check result is correct.
+    #[test]
+    fn ut_udp_basic_v6() {
+        block_on(async {
+            let sender_addr: SocketAddr = SocketAddr::V6(SocketAddrV6::new(
+                Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1),
+                32511,
+                0,
+                0,
+            ));
+            let receiver_addr: SocketAddr = SocketAddr::V6(SocketAddrV6::new(
+                Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1),
+                32512,
+                0,
+                0,
+            ));
+
+            let sender = UdpSocket::bind(sender_addr).await.unwrap();
+            let receiver = UdpSocket::bind(receiver_addr).await.unwrap();
+
+            sender.set_multicast_loop_v6(false).unwrap();
+            assert!(!sender.multicast_loop_v6().unwrap());
+
+            let connected_sender = sender.connect(receiver_addr).await.unwrap();
+            let _connected_receiver = receiver.connect(sender_addr).await.unwrap();
+
+            connected_sender.set_multicast_loop_v6(false).unwrap();
+            assert!(!connected_sender.multicast_loop_v6().unwrap());
+        });
+    }
 
     /// UT test cases for `poll_send()` and `poll_recv()`.
     ///
@@ -979,7 +1581,7 @@ mod tests {
     }
 
     /// UT test cases for `poll_send_to()` and `poll_recv_from()`.
-
+    ///
     /// # Brief
     /// 1. Create UdpSocket.
     /// 2. Sender calls poll_fn() to send message to the specified address.
@@ -1051,6 +1653,17 @@ mod tests {
             assert!(broadcast_socket.broadcast().expect("get broadcast failed"));
         });
         block_on(handle).expect("block_on failed");
+
+        let handle = spawn(async move {
+            let socket = UdpSocket::bind(local_addr).await.unwrap();
+            let broadcast_socket = socket.connect("127.0.0.1:8092").await.unwrap();
+            broadcast_socket
+                .set_broadcast(true)
+                .expect("set_broadcast failed");
+
+            assert!(broadcast_socket.broadcast().expect("get broadcast failed"));
+        });
+        block_on(handle).expect("block_on failed");
     }
 
     /// UT test cases for `local_addr()`.
@@ -1061,8 +1674,8 @@ mod tests {
     /// 3. Check if the test results are correct.
     #[test]
     fn ut_get_local_addr() {
-        let local_addr = "127.0.0.1:8092";
-        let remote_addr = "127.0.0.1:8093";
+        let local_addr = "127.0.0.1:8093";
+        let remote_addr = "127.0.0.1:8094";
 
         let handle = spawn(async move {
             let sock = match UdpSocket::bind(local_addr).await {
@@ -1092,8 +1705,8 @@ mod tests {
     /// 3. Check if the test results are correct.
     #[test]
     fn ut_get_peer_addr() {
-        let local_addr = "127.0.0.1:8094";
-        let peer_addr = "127.0.0.1:8095";
+        let local_addr = "127.0.0.1:8095";
+        let peer_addr = "127.0.0.1:8096";
         let handle = spawn(async move {
             let sock = match UdpSocket::bind(local_addr).await {
                 Ok(socket) => socket,
@@ -1151,8 +1764,8 @@ mod tests {
     /// 3. Check if the test results are correct.
     #[test]
     fn test_udp_to_socket_addrs_blocking() {
-        let sender_addr = "localhost:8096";
-        let receiver_addr = "localhost:8097";
+        let sender_addr = "localhost:8097";
+        let receiver_addr = "localhost:8098";
         socket_addr!(sender_addr, receiver_addr);
     }
 
@@ -1164,8 +1777,8 @@ mod tests {
     /// 3. Check if the test results are correct.
     #[test]
     fn test_udp_to_socket_addrs_str_u16() {
-        let sender_addr = ("localhost", 8098);
-        let receiver_addr = ("localhost", 8099);
+        let sender_addr = ("localhost", 8099);
+        let receiver_addr = ("localhost", 8100);
         socket_addr!(sender_addr, receiver_addr);
     }
 
