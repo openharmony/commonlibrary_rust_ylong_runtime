@@ -10,8 +10,13 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-#![cfg(target_os = "linux")]
-#![cfg(not(feature = "ffrt"))]
+
+#![cfg(all(
+    target_os = "linux",
+    not(feature = "ffrt"),
+    feature = "multi_instance_runtime"
+))]
+
 use std::ffi::OsString;
 use std::fs;
 

@@ -11,17 +11,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub async fn test_future(num: usize) -> usize {
-    num
-}
+#![cfg(gn_test)]
 
-pub async fn test_multi_future_in_async(i: usize, j: usize) -> (usize, usize) {
-    let result_one = test_future(i).await;
-    let result_two = test_future(j).await;
-
-    (result_one, result_two)
-}
-
-pub async fn test_async_in_async(i: usize, j: usize) -> (usize, usize) {
-    test_multi_future_in_async(i, j).await
-}
+mod async_buf_read;
+mod async_buf_write;
+mod async_dir;
+mod async_fs;
+mod async_pool;
+mod async_read;
+mod block_on;
+mod builder;
+mod core_affinity;
+mod join_set;
+mod mpsc_test;
+mod mutex;
+mod num_cpus;
+mod par_iter;
+mod semaphore_test;
+mod singleton_runtime;
+mod slab;
+mod slots;
+mod spawn;
+mod spawn_blocking;
+mod sync;
+mod task_cancel;
+mod tcp_test;
+mod timer_test;
+mod udp_test;

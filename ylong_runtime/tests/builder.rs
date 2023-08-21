@@ -11,6 +11,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#![cfg(feature = "multi_instance_runtime")]
+
 use std::sync::{Arc, Mutex};
 
 use ylong_runtime::builder::RuntimeBuilder;

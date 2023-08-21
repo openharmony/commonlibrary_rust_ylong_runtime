@@ -14,11 +14,11 @@
 import("//build/ohos.gni")
 
 ohos_rust_proc_macro("ylong_runtime_macros") {
+  part_name = "ylong_runtime"
+  subsystem_name = "commonlibrary"
+
   crate_name = "ylong_runtime_macros"
   edition = "2021"
-
-  part_name = "ylong_runtime_mod"
-  subsystem_name = "commonlibrary"
 
   sources = [ "src/lib.rs" ]
 }

@@ -14,13 +14,20 @@
 import("//build/ohos.gni")
 import("//build/test.gni")
 
-ohos_rust_shared_library("lib") {
-  crate_name = "ylong_runtime_inner"
-  edition = "2021"
-  crate_root = "src/lib.rs"
-
-  part_name = "ylong_runtime_mod"
+ohos_rust_shared_library("ylong_runtime") {
+  part_name = "ylong_runtime"
   subsystem_name = "commonlibrary"
+
+  crate_name = "ylong_runtime"
+  edition = "2021"
+
+  features = [
+    "fs",
+    "macros",
+    "net",
+    "sync",
+    "time",
+  ]
 
   sources = [ "src/lib.rs" ]
   deps = [
@@ -28,29 +35,39 @@ ohos_rust_shared_library("lib") {
     "../ylong_runtime_macros:ylong_runtime_macros(${host_toolchain})",
     "//third_party/rust/crates/libc:lib",
   ]
-  features = [
-    "net",
-    "macros",
-    "sync",
-    "fs",
-    "time",
+}
+
+ohos_rust_unittest("unittest") {
+  module_out_path = "ylong_runtime/ylong_runtime"
+
+  rustflags = [
+    "--cfg=feature=\"fs\"",
+    "--cfg=feature=\"macros\"",
+    "--cfg=feature=\"net\"",
+    "--cfg=feature=\"sync\"",
+    "--cfg=feature=\"time\"",
+  ]
+
+  sources = [ "src/lib.rs" ]
+  deps = [
+    "../ylong_io:ylong_io",
+    "../ylong_runtime_macros:ylong_runtime_macros(${host_toolchain})",
+    "//third_party/rust/crates/libc:lib",
   ]
 }
 
-ohos_rust_unittest("rust_ylong_runtime_unit_test") {
-  module_out_path = "commonlibrary/rust/ylong_runtime"
-  sources = [ "src/lib.rs" ]
-  deps = [
-    ":lib",
-    "../ylong_io:ylong_io",
-    "//third_party/rust/crates/libc:lib",
-  ]
-  clippy_lints = "none"
+ohos_rust_systemtest("sdvtest") {
+  module_out_path = "ylong_runtime/ylong_runtime"
 
   rustflags = [
-    "--cfg=feature=\"time\"",
-    "--cfg=feature=\"sync\"",
+    "--cfg=gn_test",
     "--cfg=feature=\"fs\"",
+    "--cfg=feature=\"macros\"",
     "--cfg=feature=\"net\"",
+    "--cfg=feature=\"sync\"",
+    "--cfg=feature=\"time\"",
   ]
+
+  sources = [ "tests/entry.rs" ]
+  deps = [ ":ylong_runtime" ]
 }

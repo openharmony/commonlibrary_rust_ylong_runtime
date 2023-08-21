@@ -14,17 +14,17 @@
 import("//build/ohos.gni")
 
 ohos_rust_static_library("ylong_io") {
-  crate_name = "ylong_io"
-  crate_root = "src/lib.rs"
-  edition = "2021"
-
-  part_name = "ylong_runtime_mod"
+  part_name = "ylong_runtime"
   subsystem_name = "commonlibrary"
 
-  sources = [ "src/lib.rs" ]
-  deps = [ "//third_party/rust/crates/libc:lib" ]
+  crate_name = "ylong_io"
+  edition = "2021"
+
   features = [
     "tcp",
     "udp",
   ]
+
+  sources = [ "src/lib.rs" ]
+  deps = [ "//third_party/rust/crates/libc:lib" ]
 }

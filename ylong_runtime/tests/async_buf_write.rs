@@ -11,11 +11,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::fs;
-use std::io::{IoSlice, SeekFrom};
+#![cfg(all(feature = "fs", feature = "net"))]
+use std::io::IoSlice;
 
-use ylong_runtime::fs::File;
-use ylong_runtime::io::{AsyncBufWriter, AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
+use ylong_runtime::io::{AsyncBufWriter, AsyncReadExt, AsyncWriteExt};
 use ylong_runtime::net::{TcpListener, TcpStream};
 
 /// SDV test cases for AsyncBufWriter `write`
@@ -106,8 +105,15 @@ fn sdv_buf_writer_write_vectored() {
 /// 2. Open the file, seek to three different positions in the file and read
 ///    data.
 /// 3. Check the read buf.
+#[cfg(not(gn_test))]
 #[test]
 fn sdv_buf_writer_seek() {
+    use std::fs;
+    use std::io::SeekFrom;
+
+    use ylong_runtime::fs::File;
+    use ylong_runtime::io::AsyncSeekExt;
+
     let handle = ylong_runtime::spawn(async move {
         let mut file = File::create("./tests/buf_writer_seek_file").await.unwrap();
         let buf = "lorem-ipsum-dolor".as_bytes();

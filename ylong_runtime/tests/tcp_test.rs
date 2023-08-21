@@ -11,6 +11,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#![cfg(feature = "net")]
+
 use std::thread;
 
 use ylong_runtime::io::{AsyncReadExt, AsyncWriteExt};

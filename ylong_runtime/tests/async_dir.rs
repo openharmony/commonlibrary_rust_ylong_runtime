@@ -11,6 +11,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#![cfg(not(gn_test))]
+#![cfg(feature = "fs")]
+
 use ylong_runtime::fs::{create_dir, create_dir_all, read_dir, remove_dir, remove_dir_all, File};
 
 /// SDV test cases for directory operations.

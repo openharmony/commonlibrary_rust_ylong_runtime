@@ -267,394 +267,390 @@ impl Bit {
 /// UT test cases for mask new function
 ///
 /// # Brief  
-/// 1. Get the current machine word length.
-/// 2. Call the new function according to the machine word length, pass in the
-///    parameters, and create the Mask.
-/// 3. Check return value.
+/// 1. pass in the parameters, and create the Mask.
+/// 2. Check return value.
+#[cfg(target_pointer_width = "32")]
 #[test]
-fn ut_mask_new() {
-    const USIZE_LEN: u32 = 0usize.wrapping_sub(1).count_ones();
+fn ut_mask_new_bit32() {
+    assert_eq!(
+        Mask::new(0, 0),
+        Mask {
+            mask: 0x0,
+            shift: 0
+        }
+    );
+    assert_eq!(
+        Mask::new(0, 16),
+        Mask {
+            mask: 0x0,
+            shift: 0
+        }
+    );
+    assert_eq!(
+        Mask::new(0, 32),
+        Mask {
+            mask: 0x0,
+            shift: 0
+        }
+    );
+    assert_eq!(
+        Mask::new(0, 64),
+        Mask {
+            mask: 0x0,
+            shift: 0
+        }
+    );
+    assert_eq!(
+        Mask::new(1, 0),
+        Mask {
+            mask: 0x1,
+            shift: 0
+        }
+    );
+    assert_eq!(
+        Mask::new(1, 16),
+        Mask {
+            mask: 0x1_0000,
+            shift: 16
+        }
+    );
+    assert_eq!(
+        Mask::new(1, 31),
+        Mask {
+            mask: 0x8000_0000,
+            shift: 31
+        }
+    );
+    assert_eq!(
+        Mask::new(1, 32),
+        Mask {
+            mask: 0x8000_0000,
+            shift: 31
+        }
+    );
+    assert_eq!(
+        Mask::new(1, 128),
+        Mask {
+            mask: 0x8000_0000,
+            shift: 31
+        }
+    );
+    assert_eq!(
+        Mask::new(4, 0),
+        Mask {
+            mask: 0xf,
+            shift: 0
+        }
+    );
+    assert_eq!(
+        Mask::new(4, 16),
+        Mask {
+            mask: 0xf_0000,
+            shift: 16
+        }
+    );
+    assert_eq!(
+        Mask::new(4, 28),
+        Mask {
+            mask: 0xf000_0000,
+            shift: 28
+        }
+    );
+    assert_eq!(
+        Mask::new(4, 32),
+        Mask {
+            mask: 0xf000_0000,
+            shift: 28
+        }
+    );
+    assert_eq!(
+        Mask::new(4, 64),
+        Mask {
+            mask: 0xf000_0000,
+            shift: 28
+        }
+    );
+    assert_eq!(
+        Mask::new(16, 0),
+        Mask {
+            mask: 0xffff,
+            shift: 0
+        }
+    );
+    assert_eq!(
+        Mask::new(16, 16),
+        Mask {
+            mask: 0xffff_0000,
+            shift: 16
+        }
+    );
+    assert_eq!(
+        Mask::new(16, 32),
+        Mask {
+            mask: 0xffff_0000,
+            shift: 16
+        }
+    );
+    assert_eq!(
+        Mask::new(16, 64),
+        Mask {
+            mask: 0xffff_0000,
+            shift: 16
+        }
+    );
+    assert_eq!(
+        Mask::new(32, 0),
+        Mask {
+            mask: 0xffff_ffff,
+            shift: 0
+        }
+    );
+    assert_eq!(
+        Mask::new(32, 16),
+        Mask {
+            mask: 0xffff_ffff,
+            shift: 0
+        }
+    );
+    assert_eq!(
+        Mask::new(32, 32),
+        Mask {
+            mask: 0xffff_ffff,
+            shift: 0
+        }
+    );
+    assert_eq!(
+        Mask::new(32, 64),
+        Mask {
+            mask: 0xffff_ffff,
+            shift: 0
+        }
+    );
+    assert_eq!(
+        Mask::new(64, 0),
+        Mask {
+            mask: 0xffff_ffff,
+            shift: 0
+        }
+    );
+    assert_eq!(
+        Mask::new(64, 16),
+        Mask {
+            mask: 0xffff_ffff,
+            shift: 0
+        }
+    );
+    assert_eq!(
+        Mask::new(64, 32),
+        Mask {
+            mask: 0xffff_ffff,
+            shift: 0
+        }
+    );
+    assert_eq!(
+        Mask::new(64, 64),
+        Mask {
+            mask: 0xffff_ffff,
+            shift: 0
+        }
+    );
+}
 
-    match USIZE_LEN {
-        32 => ut_mask_new_bit32(),
-        64 => ut_mask_new_bit64(),
-        _ => {}
-    }
+/// UT test cases for mask new function
+///
+/// # Brief  
+/// 1. pass in the parameters, and create the Mask.
+/// 2. Check return value.
+#[cfg(target_pointer_width = "64")]
+#[test]
+fn ut_mask_new_bit64() {
+    assert_eq!(
+        Mask::new(0, 0),
+        Mask {
+            mask: 0x0,
+            shift: 0
+        }
+    );
+    assert_eq!(
+        Mask::new(0, 32),
+        Mask {
+            mask: 0x0,
+            shift: 0
+        }
+    );
+    assert_eq!(
+        Mask::new(0, 64),
+        Mask {
+            mask: 0x0,
+            shift: 0
+        }
+    );
+    assert_eq!(
+        Mask::new(0, 128),
+        Mask {
+            mask: 0x0,
+            shift: 0
+        }
+    );
 
-    fn ut_mask_new_bit32() {
-        assert_eq!(
-            Mask::new(0, 0),
-            Mask {
-                mask: 0x0,
-                shift: 0
-            }
-        );
-        assert_eq!(
-            Mask::new(0, 16),
-            Mask {
-                mask: 0x0,
-                shift: 0
-            }
-        );
-        assert_eq!(
-            Mask::new(0, 32),
-            Mask {
-                mask: 0x0,
-                shift: 0
-            }
-        );
-        assert_eq!(
-            Mask::new(0, 64),
-            Mask {
-                mask: 0x0,
-                shift: 0
-            }
-        );
-        assert_eq!(
-            Mask::new(1, 0),
-            Mask {
-                mask: 0x1,
-                shift: 0
-            }
-        );
-        assert_eq!(
-            Mask::new(1, 16),
-            Mask {
-                mask: 0x1_0000,
-                shift: 16
-            }
-        );
-        assert_eq!(
-            Mask::new(1, 31),
-            Mask {
-                mask: 0x8000_0000,
-                shift: 31
-            }
-        );
-        assert_eq!(
-            Mask::new(1, 32),
-            Mask {
-                mask: 0x8000_0000,
-                shift: 31
-            }
-        );
-        assert_eq!(
-            Mask::new(1, 128),
-            Mask {
-                mask: 0x8000_0000,
-                shift: 31
-            }
-        );
-        assert_eq!(
-            Mask::new(4, 0),
-            Mask {
-                mask: 0xf,
-                shift: 0
-            }
-        );
-        assert_eq!(
-            Mask::new(4, 16),
-            Mask {
-                mask: 0xf_0000,
-                shift: 16
-            }
-        );
-        assert_eq!(
-            Mask::new(4, 28),
-            Mask {
-                mask: 0xf000_0000,
-                shift: 28
-            }
-        );
-        assert_eq!(
-            Mask::new(4, 32),
-            Mask {
-                mask: 0xf000_0000,
-                shift: 28
-            }
-        );
-        assert_eq!(
-            Mask::new(4, 64),
-            Mask {
-                mask: 0xf000_0000,
-                shift: 28
-            }
-        );
-        assert_eq!(
-            Mask::new(16, 0),
-            Mask {
-                mask: 0xffff,
-                shift: 0
-            }
-        );
-        assert_eq!(
-            Mask::new(16, 16),
-            Mask {
-                mask: 0xffff_0000,
-                shift: 16
-            }
-        );
-        assert_eq!(
-            Mask::new(16, 32),
-            Mask {
-                mask: 0xffff_0000,
-                shift: 16
-            }
-        );
-        assert_eq!(
-            Mask::new(16, 64),
-            Mask {
-                mask: 0xffff_0000,
-                shift: 16
-            }
-        );
-        assert_eq!(
-            Mask::new(32, 0),
-            Mask {
-                mask: 0xffff_ffff,
-                shift: 0
-            }
-        );
-        assert_eq!(
-            Mask::new(32, 16),
-            Mask {
-                mask: 0xffff_ffff,
-                shift: 0
-            }
-        );
-        assert_eq!(
-            Mask::new(32, 32),
-            Mask {
-                mask: 0xffff_ffff,
-                shift: 0
-            }
-        );
-        assert_eq!(
-            Mask::new(32, 64),
-            Mask {
-                mask: 0xffff_ffff,
-                shift: 0
-            }
-        );
-        assert_eq!(
-            Mask::new(64, 0),
-            Mask {
-                mask: 0xffff_ffff,
-                shift: 0
-            }
-        );
-        assert_eq!(
-            Mask::new(64, 16),
-            Mask {
-                mask: 0xffff_ffff,
-                shift: 0
-            }
-        );
-        assert_eq!(
-            Mask::new(64, 32),
-            Mask {
-                mask: 0xffff_ffff,
-                shift: 0
-            }
-        );
-        assert_eq!(
-            Mask::new(64, 64),
-            Mask {
-                mask: 0xffff_ffff,
-                shift: 0
-            }
-        );
-    }
+    assert_eq!(
+        Mask::new(1, 0),
+        Mask {
+            mask: 0x1,
+            shift: 0
+        }
+    );
+    assert_eq!(
+        Mask::new(1, 32),
+        Mask {
+            mask: 0x1_0000_0000,
+            shift: 32
+        }
+    );
+    assert_eq!(
+        Mask::new(1, 63),
+        Mask {
+            mask: 0x8000_0000_0000_0000,
+            shift: 63
+        }
+    );
+    assert_eq!(
+        Mask::new(1, 64),
+        Mask {
+            mask: 0x8000_0000_0000_0000,
+            shift: 63
+        }
+    );
+    assert_eq!(
+        Mask::new(1, 128),
+        Mask {
+            mask: 0x8000_0000_0000_0000,
+            shift: 63
+        }
+    );
 
-    fn ut_mask_new_bit64() {
-        assert_eq!(
-            Mask::new(0, 0),
-            Mask {
-                mask: 0x0,
-                shift: 0
-            }
-        );
-        assert_eq!(
-            Mask::new(0, 32),
-            Mask {
-                mask: 0x0,
-                shift: 0
-            }
-        );
-        assert_eq!(
-            Mask::new(0, 64),
-            Mask {
-                mask: 0x0,
-                shift: 0
-            }
-        );
-        assert_eq!(
-            Mask::new(0, 128),
-            Mask {
-                mask: 0x0,
-                shift: 0
-            }
-        );
+    assert_eq!(
+        Mask::new(4, 0),
+        Mask {
+            mask: 0xf,
+            shift: 0
+        }
+    );
+    assert_eq!(
+        Mask::new(4, 32),
+        Mask {
+            mask: 0xf_0000_0000,
+            shift: 32
+        }
+    );
+    assert_eq!(
+        Mask::new(4, 60),
+        Mask {
+            mask: 0xf000_0000_0000_0000,
+            shift: 60
+        }
+    );
+    assert_eq!(
+        Mask::new(4, 64),
+        Mask {
+            mask: 0xf000_0000_0000_0000,
+            shift: 60
+        }
+    );
+    assert_eq!(
+        Mask::new(4, 128),
+        Mask {
+            mask: 0xf000_0000_0000_0000,
+            shift: 60
+        }
+    );
 
-        assert_eq!(
-            Mask::new(1, 0),
-            Mask {
-                mask: 0x1,
-                shift: 0
-            }
-        );
-        assert_eq!(
-            Mask::new(1, 32),
-            Mask {
-                mask: 0x1_0000_0000,
-                shift: 32
-            }
-        );
-        assert_eq!(
-            Mask::new(1, 63),
-            Mask {
-                mask: 0x8000_0000_0000_0000,
-                shift: 63
-            }
-        );
-        assert_eq!(
-            Mask::new(1, 64),
-            Mask {
-                mask: 0x8000_0000_0000_0000,
-                shift: 63
-            }
-        );
-        assert_eq!(
-            Mask::new(1, 128),
-            Mask {
-                mask: 0x8000_0000_0000_0000,
-                shift: 63
-            }
-        );
+    assert_eq!(
+        Mask::new(32, 0),
+        Mask {
+            mask: 0xffff_ffff,
+            shift: 0
+        }
+    );
+    assert_eq!(
+        Mask::new(32, 32),
+        Mask {
+            mask: 0xffff_ffff_0000_0000,
+            shift: 32
+        }
+    );
+    assert_eq!(
+        Mask::new(32, 64),
+        Mask {
+            mask: 0xffff_ffff_0000_0000,
+            shift: 32
+        }
+    );
+    assert_eq!(
+        Mask::new(32, 128),
+        Mask {
+            mask: 0xffff_ffff_0000_0000,
+            shift: 32
+        }
+    );
 
-        assert_eq!(
-            Mask::new(4, 0),
-            Mask {
-                mask: 0xf,
-                shift: 0
-            }
-        );
-        assert_eq!(
-            Mask::new(4, 32),
-            Mask {
-                mask: 0xf_0000_0000,
-                shift: 32
-            }
-        );
-        assert_eq!(
-            Mask::new(4, 60),
-            Mask {
-                mask: 0xf000_0000_0000_0000,
-                shift: 60
-            }
-        );
-        assert_eq!(
-            Mask::new(4, 64),
-            Mask {
-                mask: 0xf000_0000_0000_0000,
-                shift: 60
-            }
-        );
-        assert_eq!(
-            Mask::new(4, 128),
-            Mask {
-                mask: 0xf000_0000_0000_0000,
-                shift: 60
-            }
-        );
+    assert_eq!(
+        Mask::new(64, 0),
+        Mask {
+            mask: 0xffff_ffff_ffff_ffff,
+            shift: 0
+        }
+    );
+    assert_eq!(
+        Mask::new(64, 32),
+        Mask {
+            mask: 0xffff_ffff_ffff_ffff,
+            shift: 0
+        }
+    );
+    assert_eq!(
+        Mask::new(64, 64),
+        Mask {
+            mask: 0xffff_ffff_ffff_ffff,
+            shift: 0
+        }
+    );
+    assert_eq!(
+        Mask::new(64, 128),
+        Mask {
+            mask: 0xffff_ffff_ffff_ffff,
+            shift: 0
+        }
+    );
 
-        assert_eq!(
-            Mask::new(32, 0),
-            Mask {
-                mask: 0xffff_ffff,
-                shift: 0
-            }
-        );
-        assert_eq!(
-            Mask::new(32, 32),
-            Mask {
-                mask: 0xffff_ffff_0000_0000,
-                shift: 32
-            }
-        );
-        assert_eq!(
-            Mask::new(32, 64),
-            Mask {
-                mask: 0xffff_ffff_0000_0000,
-                shift: 32
-            }
-        );
-        assert_eq!(
-            Mask::new(32, 128),
-            Mask {
-                mask: 0xffff_ffff_0000_0000,
-                shift: 32
-            }
-        );
-
-        assert_eq!(
-            Mask::new(64, 0),
-            Mask {
-                mask: 0xffff_ffff_ffff_ffff,
-                shift: 0
-            }
-        );
-        assert_eq!(
-            Mask::new(64, 32),
-            Mask {
-                mask: 0xffff_ffff_ffff_ffff,
-                shift: 0
-            }
-        );
-        assert_eq!(
-            Mask::new(64, 64),
-            Mask {
-                mask: 0xffff_ffff_ffff_ffff,
-                shift: 0
-            }
-        );
-        assert_eq!(
-            Mask::new(64, 128),
-            Mask {
-                mask: 0xffff_ffff_ffff_ffff,
-                shift: 0
-            }
-        );
-
-        assert_eq!(
-            Mask::new(128, 0),
-            Mask {
-                mask: 0xffff_ffff_ffff_ffff,
-                shift: 0
-            }
-        );
-        assert_eq!(
-            Mask::new(128, 32),
-            Mask {
-                mask: 0xffff_ffff_ffff_ffff,
-                shift: 0
-            }
-        );
-        assert_eq!(
-            Mask::new(128, 64),
-            Mask {
-                mask: 0xffff_ffff_ffff_ffff,
-                shift: 0
-            }
-        );
-        assert_eq!(
-            Mask::new(128, 128),
-            Mask {
-                mask: 0xffff_ffff_ffff_ffff,
-                shift: 0
-            }
-        );
-    }
+    assert_eq!(
+        Mask::new(128, 0),
+        Mask {
+            mask: 0xffff_ffff_ffff_ffff,
+            shift: 0
+        }
+    );
+    assert_eq!(
+        Mask::new(128, 32),
+        Mask {
+            mask: 0xffff_ffff_ffff_ffff,
+            shift: 0
+        }
+    );
+    assert_eq!(
+        Mask::new(128, 64),
+        Mask {
+            mask: 0xffff_ffff_ffff_ffff,
+            shift: 0
+        }
+    );
+    assert_eq!(
+        Mask::new(128, 128),
+        Mask {
+            mask: 0xffff_ffff_ffff_ffff,
+            shift: 0
+        }
+    );
 }
 
 /// UT test cases for bit from_usize function
@@ -741,159 +737,158 @@ fn ut_bit_clear() {
 /// 1. Create a Bit instance, create a Mask instance.
 /// 2. Call set_by_mask().
 /// 3. Verify the Bit instance.
+#[cfg(target_pointer_width = "32")]
 #[test]
-fn ut_bit_set_by_mask() {
-    const USIZE_LEN: u32 = 0usize.wrapping_sub(1).count_ones();
+fn ut_bit_set_by_mask_bit32() {
+    let val = 0x0usize;
+    let mut bit = Bit::from_usize(val);
+    bit.set_by_mask(Mask::new(0, 0), 0x0);
+    assert_eq!(bit, Bit::from_usize(0x0));
 
-    match USIZE_LEN {
-        32 => ut_bit_set_by_mask_bit32(),
-        64 => ut_bit_set_by_mask_bit64(),
-        _ => {}
-    }
+    bit.clear();
+    bit.set_by_mask(Mask::new(4, 0), 0xf);
+    assert_eq!(bit, Bit::from_usize(0xf));
 
-    fn ut_bit_set_by_mask_bit32() {
-        let val = 0x0usize;
-        let mut bit = Bit::from_usize(val);
-        bit.set_by_mask(Mask::new(0, 0), 0x0);
-        assert_eq!(bit, Bit::from_usize(0x0));
+    bit.clear();
+    bit.set_by_mask(Mask::new(8, 0), 0xff);
+    assert_eq!(bit, Bit::from_usize(0xff));
 
-        bit.clear();
-        bit.set_by_mask(Mask::new(4, 0), 0xf);
-        assert_eq!(bit, Bit::from_usize(0xf));
+    bit.clear();
+    bit.set_by_mask(Mask::new(4, 4), 0xf);
+    assert_eq!(bit, Bit::from_usize(0xf0));
 
-        bit.clear();
-        bit.set_by_mask(Mask::new(8, 0), 0xff);
-        assert_eq!(bit, Bit::from_usize(0xff));
+    bit.clear();
+    bit.set_by_mask(Mask::new(4, 28), 0xf);
+    assert_eq!(bit, Bit::from_usize(0xf000_0000));
 
-        bit.clear();
-        bit.set_by_mask(Mask::new(4, 4), 0xf);
-        assert_eq!(bit, Bit::from_usize(0xf0));
+    bit.clear();
+    bit.set_by_mask(Mask::new(0, 0), 0xffff_ffff);
+    assert_eq!(bit, Bit::from_usize(0x0));
 
-        bit.clear();
-        bit.set_by_mask(Mask::new(4, 28), 0xf);
-        assert_eq!(bit, Bit::from_usize(0xf000_0000));
+    bit.clear();
+    bit.set_by_mask(Mask::new(4, 0), 0xffff_ffff);
+    assert_eq!(bit, Bit::from_usize(0xf));
 
-        bit.clear();
-        bit.set_by_mask(Mask::new(0, 0), 0xffff_ffff);
-        assert_eq!(bit, Bit::from_usize(0x0));
+    bit.clear();
+    bit.set_by_mask(Mask::new(4, 4), 0xffff_ffff);
+    assert_eq!(bit, Bit::from_usize(0xf0));
 
-        bit.clear();
-        bit.set_by_mask(Mask::new(4, 0), 0xffff_ffff);
-        assert_eq!(bit, Bit::from_usize(0xf));
+    let val = 0xffff_ffff;
+    let mut bit = Bit::from_usize(val);
+    bit.set_by_mask(Mask::new(0, 0), 0x0);
+    assert_eq!(bit, Bit::from_usize(0xffff_ffff));
 
-        bit.clear();
-        bit.set_by_mask(Mask::new(4, 4), 0xffff_ffff);
-        assert_eq!(bit, Bit::from_usize(0xf0));
+    bit.set(val);
+    bit.set_by_mask(Mask::new(4, 0), 0x0);
+    assert_eq!(bit, Bit::from_usize(0xffff_fff0));
 
-        let val = 0xffff_ffff;
-        let mut bit = Bit::from_usize(val);
-        bit.set_by_mask(Mask::new(0, 0), 0x0);
-        assert_eq!(bit, Bit::from_usize(0xffff_ffff));
+    bit.set(val);
+    bit.set_by_mask(Mask::new(4, 4), 0x0);
+    assert_eq!(bit, Bit::from_usize(0xffff_ff0f));
 
-        bit.set(val);
-        bit.set_by_mask(Mask::new(4, 0), 0x0);
-        assert_eq!(bit, Bit::from_usize(0xffff_fff0));
+    bit.set(val);
+    bit.set_by_mask(Mask::new(4, 8), 0x0);
+    assert_eq!(bit, Bit::from_usize(0xffff_f0ff));
 
-        bit.set(val);
-        bit.set_by_mask(Mask::new(4, 4), 0x0);
-        assert_eq!(bit, Bit::from_usize(0xffff_ff0f));
+    bit.set(val);
+    bit.set_by_mask(Mask::new(4, 0), 0xabcd);
+    assert_eq!(bit, Bit::from_usize(0xffff_fffd));
 
-        bit.set(val);
-        bit.set_by_mask(Mask::new(4, 8), 0x0);
-        assert_eq!(bit, Bit::from_usize(0xffff_f0ff));
+    bit.set(val);
+    bit.set_by_mask(Mask::new(8, 0), 0xabcd);
+    assert_eq!(bit, Bit::from_usize(0xffff_ffcd));
 
-        bit.set(val);
-        bit.set_by_mask(Mask::new(4, 0), 0xabcd);
-        assert_eq!(bit, Bit::from_usize(0xffff_fffd));
+    bit.set(val);
+    bit.set_by_mask(Mask::new(16, 0), 0xabcd);
+    assert_eq!(bit, Bit::from_usize(0xffff_abcd));
 
-        bit.set(val);
-        bit.set_by_mask(Mask::new(8, 0), 0xabcd);
-        assert_eq!(bit, Bit::from_usize(0xffff_ffcd));
+    bit.set(val);
+    bit.set_by_mask(Mask::new(16, 16), 0xabcd);
+    assert_eq!(bit, Bit::from_usize(0xabcd_ffff));
 
-        bit.set(val);
-        bit.set_by_mask(Mask::new(16, 0), 0xabcd);
-        assert_eq!(bit, Bit::from_usize(0xffff_abcd));
+    bit.set(val);
+    bit.set_by_mask(Mask::new(32, 0), 0xabcd);
+    assert_eq!(bit, Bit::from_usize(0x0000_abcd));
+}
 
-        bit.set(val);
-        bit.set_by_mask(Mask::new(16, 16), 0xabcd);
-        assert_eq!(bit, Bit::from_usize(0xabcd_ffff));
+/// UT test cases for bit set_by_mask function
+///
+/// # Brief  
+/// 1. Create a Bit instance, create a Mask instance.
+/// 2. Call set_by_mask().
+/// 3. Verify the Bit instance.
+#[cfg(target_pointer_width = "64")]
+#[test]
+fn ut_bit_set_by_mask_bit64() {
+    let val = 0x0usize;
+    let mut bit = Bit::from_usize(val);
+    bit.set_by_mask(Mask::new(0, 0), 0x0);
+    assert_eq!(bit, Bit::from_usize(0x0));
 
-        bit.set(val);
-        bit.set_by_mask(Mask::new(32, 0), 0xabcd);
-        assert_eq!(bit, Bit::from_usize(0x0000_abcd));
-    }
+    bit.clear();
+    bit.set_by_mask(Mask::new(4, 0), 0xf);
+    assert_eq!(bit, Bit::from_usize(0xf));
 
-    fn ut_bit_set_by_mask_bit64() {
-        let val = 0x0usize;
-        let mut bit = Bit::from_usize(val);
-        bit.set_by_mask(Mask::new(0, 0), 0x0);
-        assert_eq!(bit, Bit::from_usize(0x0));
+    bit.clear();
+    bit.set_by_mask(Mask::new(8, 0), 0xff);
+    assert_eq!(bit, Bit::from_usize(0xff));
 
-        bit.clear();
-        bit.set_by_mask(Mask::new(4, 0), 0xf);
-        assert_eq!(bit, Bit::from_usize(0xf));
+    bit.clear();
+    bit.set_by_mask(Mask::new(4, 4), 0xf);
+    assert_eq!(bit, Bit::from_usize(0xf0));
 
-        bit.clear();
-        bit.set_by_mask(Mask::new(8, 0), 0xff);
-        assert_eq!(bit, Bit::from_usize(0xff));
+    bit.clear();
+    bit.set_by_mask(Mask::new(4, 32), 0xf);
+    assert_eq!(bit, Bit::from_usize(0xf_0000_0000));
 
-        bit.clear();
-        bit.set_by_mask(Mask::new(4, 4), 0xf);
-        assert_eq!(bit, Bit::from_usize(0xf0));
+    bit.clear();
+    bit.set_by_mask(Mask::new(4, 0), 0xffff_ffff_ffff_ffff);
+    assert_eq!(bit, Bit::from_usize(0xf));
 
-        bit.clear();
-        bit.set_by_mask(Mask::new(4, 32), 0xf);
-        assert_eq!(bit, Bit::from_usize(0xf_0000_0000));
+    bit.clear();
+    bit.set_by_mask(Mask::new(4, 4), 0xffff_ffff_ffff_ffff);
+    assert_eq!(bit, Bit::from_usize(0xf0));
 
-        bit.clear();
-        bit.set_by_mask(Mask::new(4, 0), 0xffff_ffff_ffff_ffff);
-        assert_eq!(bit, Bit::from_usize(0xf));
+    bit.clear();
+    bit.set_by_mask(Mask::new(0, 0), 0xffff_ffff_ffff_ffff);
+    assert_eq!(bit, Bit::from_usize(0));
 
-        bit.clear();
-        bit.set_by_mask(Mask::new(4, 4), 0xffff_ffff_ffff_ffff);
-        assert_eq!(bit, Bit::from_usize(0xf0));
+    let val = 0xffff_ffff_ffff_ffffusize;
+    let mut bit = Bit::from_usize(val);
+    bit.set_by_mask(Mask::new(0, 0), 0x0);
+    assert_eq!(bit, Bit::from_usize(0xffff_ffff_ffff_ffff));
 
-        bit.clear();
-        bit.set_by_mask(Mask::new(0, 0), 0xffff_ffff_ffff_ffff);
-        assert_eq!(bit, Bit::from_usize(0));
+    bit.set(0xffff_ffff_ffff_ffff);
+    bit.set_by_mask(Mask::new(4, 0), 0x0);
+    assert_eq!(bit, Bit::from_usize(0xffff_ffff_ffff_fff0));
 
-        let val = 0xffff_ffff_ffff_ffffusize;
-        let mut bit = Bit::from_usize(val);
-        bit.set_by_mask(Mask::new(0, 0), 0x0);
-        assert_eq!(bit, Bit::from_usize(0xffff_ffff_ffff_ffff));
+    bit.set(0xffff_ffff_ffff_ffff);
+    bit.set_by_mask(Mask::new(4, 4), 0x0);
+    assert_eq!(bit, Bit::from_usize(0xffff_ffff_ffff_ff0f));
 
-        bit.set(0xffff_ffff_ffff_ffff);
-        bit.set_by_mask(Mask::new(4, 0), 0x0);
-        assert_eq!(bit, Bit::from_usize(0xffff_ffff_ffff_fff0));
+    bit.set(0xffff_ffff_ffff_ffff);
+    bit.set_by_mask(Mask::new(4, 32), 0x0);
+    assert_eq!(bit, Bit::from_usize(0xffff_fff0_ffff_ffff));
 
-        bit.set(0xffff_ffff_ffff_ffff);
-        bit.set_by_mask(Mask::new(4, 4), 0x0);
-        assert_eq!(bit, Bit::from_usize(0xffff_ffff_ffff_ff0f));
+    bit.set(0xffff_ffff_ffff_ffff);
+    bit.set_by_mask(Mask::new(4, 60), 0x0);
+    assert_eq!(bit, Bit::from_usize(0x0fff_ffff_ffff_ffff));
 
-        bit.set(0xffff_ffff_ffff_ffff);
-        bit.set_by_mask(Mask::new(4, 32), 0x0);
-        assert_eq!(bit, Bit::from_usize(0xffff_fff0_ffff_ffff));
+    bit.set(0xffff_ffff_ffff_ffff);
+    bit.set_by_mask(Mask::new(16, 0), 0xabcd);
+    assert_eq!(bit, Bit::from_usize(0xffff_ffff_ffff_abcd));
 
-        bit.set(0xffff_ffff_ffff_ffff);
-        bit.set_by_mask(Mask::new(4, 60), 0x0);
-        assert_eq!(bit, Bit::from_usize(0x0fff_ffff_ffff_ffff));
+    bit.set(0xffff_ffff_ffff_ffff);
+    bit.set_by_mask(Mask::new(32, 0), 0xabcd);
+    assert_eq!(bit, Bit::from_usize(0xffff_ffff_0000_abcd));
 
-        bit.set(0xffff_ffff_ffff_ffff);
-        bit.set_by_mask(Mask::new(16, 0), 0xabcd);
-        assert_eq!(bit, Bit::from_usize(0xffff_ffff_ffff_abcd));
+    bit.set(0xffff_ffff_ffff_ffff);
+    bit.set_by_mask(Mask::new(12, 0), 0xabcd);
+    assert_eq!(bit, Bit::from_usize(0xffff_ffff_ffff_fbcd));
 
-        bit.set(0xffff_ffff_ffff_ffff);
-        bit.set_by_mask(Mask::new(32, 0), 0xabcd);
-        assert_eq!(bit, Bit::from_usize(0xffff_ffff_0000_abcd));
-
-        bit.set(0xffff_ffff_ffff_ffff);
-        bit.set_by_mask(Mask::new(12, 0), 0xabcd);
-        assert_eq!(bit, Bit::from_usize(0xffff_ffff_ffff_fbcd));
-
-        bit.set(0xffff_ffff_ffff_ffff);
-        bit.set_by_mask(Mask::new(16, 8), 0xabcd);
-        assert_eq!(bit, Bit::from_usize(0xffff_ffff_ffab_cdff));
-    }
+    bit.set(0xffff_ffff_ffff_ffff);
+    bit.set_by_mask(Mask::new(16, 8), 0xabcd);
+    assert_eq!(bit, Bit::from_usize(0xffff_ffff_ffab_cdff));
 }
 
 /// UT test cases for bit get_by_mask function
@@ -902,90 +897,89 @@ fn ut_bit_set_by_mask() {
 /// 1. Create a Bit instance, create a Mask instance.
 /// 2. Call get_by_mask().
 /// 3. Check return value.
+#[cfg(target_pointer_width = "32")]
 #[test]
-fn ut_bit_get_by_mask() {
-    const USIZE_LEN: u32 = 0usize.wrapping_sub(1).count_ones();
+fn ut_bit_get_by_mask_bit32() {
+    let val = 0x0usize;
+    let bit = Bit::from_usize(val);
+    assert_eq!(bit.get_by_mask(Mask::new(0, 0)), 0x0);
+    assert_eq!(bit.get_by_mask(Mask::new(1, 0)), 0x0);
+    assert_eq!(bit.get_by_mask(Mask::new(16, 0)), 0x0);
+    assert_eq!(bit.get_by_mask(Mask::new(32, 0)), 0x0);
 
-    match USIZE_LEN {
-        32 => ut_bit_get_by_mask_bit32(),
-        64 => ut_bit_get_by_mask_bit64(),
-        _ => {}
-    }
+    let val = 0xffff_ffffusize;
+    let bit = Bit::from_usize(val);
+    assert_eq!(bit.get_by_mask(Mask::new(0, 0)), 0x0);
+    assert_eq!(bit.get_by_mask(Mask::new(1, 0)), 0x1);
+    assert_eq!(bit.get_by_mask(Mask::new(16, 0)), 0xffff);
+    assert_eq!(bit.get_by_mask(Mask::new(32, 0)), 0xffff_ffff);
 
-    fn ut_bit_get_by_mask_bit32() {
-        let val = 0x0usize;
-        let bit = Bit::from_usize(val);
-        assert_eq!(bit.get_by_mask(Mask::new(0, 0)), 0x0);
-        assert_eq!(bit.get_by_mask(Mask::new(1, 0)), 0x0);
-        assert_eq!(bit.get_by_mask(Mask::new(16, 0)), 0x0);
-        assert_eq!(bit.get_by_mask(Mask::new(32, 0)), 0x0);
+    let val = 0x1234_cdefusize;
+    let bit = Bit::from_usize(val);
+    assert_eq!(bit.get_by_mask(Mask::new(0, 0)), 0x0);
+    assert_eq!(bit.get_by_mask(Mask::new(4, 0)), 0xf);
+    assert_eq!(bit.get_by_mask(Mask::new(8, 0)), 0xef);
+    assert_eq!(bit.get_by_mask(Mask::new(12, 0)), 0xdef);
+    assert_eq!(bit.get_by_mask(Mask::new(16, 0)), 0xcdef);
+    assert_eq!(bit.get_by_mask(Mask::new(32, 0)), 0x1234_cdef);
+    assert_eq!(bit.get_by_mask(Mask::new(4, 4)), 0xe);
+    assert_eq!(bit.get_by_mask(Mask::new(8, 4)), 0xde);
+    assert_eq!(bit.get_by_mask(Mask::new(12, 4)), 0xcde);
+    assert_eq!(bit.get_by_mask(Mask::new(4, 16)), 0x4);
+    assert_eq!(bit.get_by_mask(Mask::new(8, 16)), 0x34);
+    assert_eq!(bit.get_by_mask(Mask::new(12, 16)), 0x234);
+    assert_eq!(bit.get_by_mask(Mask::new(3, 0)), 0x7);
+    assert_eq!(bit.get_by_mask(Mask::new(3, 4)), 0x6);
+    assert_eq!(bit.get_by_mask(Mask::new(3, 8)), 0x5);
+    assert_eq!(bit.get_by_mask(Mask::new(3, 16)), 0x4);
+    assert_eq!(bit.get_by_mask(Mask::new(3, 20)), 0x3);
+    assert_eq!(bit.get_by_mask(Mask::new(3, 24)), 0x2);
+    assert_eq!(bit.get_by_mask(Mask::new(3, 1)), 0x7);
+    assert_eq!(bit.get_by_mask(Mask::new(3, 5)), 0x7);
+    assert_eq!(bit.get_by_mask(Mask::new(3, 9)), 0x6);
+}
 
-        let val = 0xffff_ffffusize;
-        let bit = Bit::from_usize(val);
-        assert_eq!(bit.get_by_mask(Mask::new(0, 0)), 0x0);
-        assert_eq!(bit.get_by_mask(Mask::new(1, 0)), 0x1);
-        assert_eq!(bit.get_by_mask(Mask::new(16, 0)), 0xffff);
-        assert_eq!(bit.get_by_mask(Mask::new(32, 0)), 0xffff_ffff);
+/// UT test cases for bit get_by_mask function
+///
+/// # Brief  
+/// 1. Create a Bit instance, create a Mask instance.
+/// 2. Call get_by_mask().
+/// 3. Check return value.
+#[cfg(target_pointer_width = "64")]
+#[test]
+fn ut_bit_get_by_mask_bit64() {
+    let val = 0x0usize;
+    let bit = Bit::from_usize(val);
+    assert_eq!(bit.get_by_mask(Mask::new(0, 0)), 0x0);
+    assert_eq!(bit.get_by_mask(Mask::new(1, 0)), 0x0);
+    assert_eq!(bit.get_by_mask(Mask::new(32, 0)), 0x0);
+    assert_eq!(bit.get_by_mask(Mask::new(64, 0)), 0x0);
 
-        let val = 0x1234_cdefusize;
-        let bit = Bit::from_usize(val);
-        assert_eq!(bit.get_by_mask(Mask::new(0, 0)), 0x0);
-        assert_eq!(bit.get_by_mask(Mask::new(4, 0)), 0xf);
-        assert_eq!(bit.get_by_mask(Mask::new(8, 0)), 0xef);
-        assert_eq!(bit.get_by_mask(Mask::new(12, 0)), 0xdef);
-        assert_eq!(bit.get_by_mask(Mask::new(16, 0)), 0xcdef);
-        assert_eq!(bit.get_by_mask(Mask::new(32, 0)), 0x1234_cdef);
-        assert_eq!(bit.get_by_mask(Mask::new(4, 4)), 0xe);
-        assert_eq!(bit.get_by_mask(Mask::new(8, 4)), 0xde);
-        assert_eq!(bit.get_by_mask(Mask::new(12, 4)), 0xcde);
-        assert_eq!(bit.get_by_mask(Mask::new(4, 16)), 0x4);
-        assert_eq!(bit.get_by_mask(Mask::new(8, 16)), 0x34);
-        assert_eq!(bit.get_by_mask(Mask::new(12, 16)), 0x234);
-        assert_eq!(bit.get_by_mask(Mask::new(3, 0)), 0x7);
-        assert_eq!(bit.get_by_mask(Mask::new(3, 4)), 0x6);
-        assert_eq!(bit.get_by_mask(Mask::new(3, 8)), 0x5);
-        assert_eq!(bit.get_by_mask(Mask::new(3, 16)), 0x4);
-        assert_eq!(bit.get_by_mask(Mask::new(3, 20)), 0x3);
-        assert_eq!(bit.get_by_mask(Mask::new(3, 24)), 0x2);
-        assert_eq!(bit.get_by_mask(Mask::new(3, 1)), 0x7);
-        assert_eq!(bit.get_by_mask(Mask::new(3, 5)), 0x7);
-        assert_eq!(bit.get_by_mask(Mask::new(3, 9)), 0x6);
-    }
+    let val = 0xffff_ffff_ffff_ffffusize;
+    let bit = Bit::from_usize(val);
+    assert_eq!(bit.get_by_mask(Mask::new(0, 0)), 0x0);
+    assert_eq!(bit.get_by_mask(Mask::new(1, 0)), 0x1);
+    assert_eq!(bit.get_by_mask(Mask::new(32, 0)), 0xffff_ffff);
+    assert_eq!(bit.get_by_mask(Mask::new(64, 0)), 0xffff_ffff_ffff_ffff);
 
-    fn ut_bit_get_by_mask_bit64() {
-        let val = 0x0usize;
-        let bit = Bit::from_usize(val);
-        assert_eq!(bit.get_by_mask(Mask::new(0, 0)), 0x0);
-        assert_eq!(bit.get_by_mask(Mask::new(1, 0)), 0x0);
-        assert_eq!(bit.get_by_mask(Mask::new(32, 0)), 0x0);
-        assert_eq!(bit.get_by_mask(Mask::new(64, 0)), 0x0);
-
-        let val = 0xffff_ffff_ffff_ffffusize;
-        let bit = Bit::from_usize(val);
-        assert_eq!(bit.get_by_mask(Mask::new(0, 0)), 0x0);
-        assert_eq!(bit.get_by_mask(Mask::new(1, 0)), 0x1);
-        assert_eq!(bit.get_by_mask(Mask::new(32, 0)), 0xffff_ffff);
-        assert_eq!(bit.get_by_mask(Mask::new(64, 0)), 0xffff_ffff_ffff_ffff);
-
-        let val = 0x0123_4567_89ab_cdefusize;
-        let bit = Bit::from_usize(val);
-        assert_eq!(bit.get_by_mask(Mask::new(0, 0)), 0x0);
-        assert_eq!(bit.get_by_mask(Mask::new(4, 0)), 0xf);
-        assert_eq!(bit.get_by_mask(Mask::new(8, 0)), 0xef);
-        assert_eq!(bit.get_by_mask(Mask::new(32, 0)), 0x89ab_cdef);
-        assert_eq!(bit.get_by_mask(Mask::new(64, 0)), 0x0123_4567_89ab_cdef);
-        assert_eq!(bit.get_by_mask(Mask::new(4, 4)), 0xe);
-        assert_eq!(bit.get_by_mask(Mask::new(8, 4)), 0xde);
-        assert_eq!(bit.get_by_mask(Mask::new(12, 4)), 0xcde);
-        assert_eq!(bit.get_by_mask(Mask::new(60, 4)), 0x0012_3456_789a_bcde);
-        assert_eq!(bit.get_by_mask(Mask::new(4, 32)), 0x7);
-        assert_eq!(bit.get_by_mask(Mask::new(8, 32)), 0x67);
-        assert_eq!(bit.get_by_mask(Mask::new(12, 32)), 0x567);
-        assert_eq!(bit.get_by_mask(Mask::new(3, 0)), 0x7);
-        assert_eq!(bit.get_by_mask(Mask::new(3, 4)), 0x6);
-        assert_eq!(bit.get_by_mask(Mask::new(3, 8)), 0x5);
-        assert_eq!(bit.get_by_mask(Mask::new(3, 1)), 0x7);
-        assert_eq!(bit.get_by_mask(Mask::new(3, 5)), 0x7);
-        assert_eq!(bit.get_by_mask(Mask::new(3, 9)), 0x6);
-    }
+    let val = 0x0123_4567_89ab_cdefusize;
+    let bit = Bit::from_usize(val);
+    assert_eq!(bit.get_by_mask(Mask::new(0, 0)), 0x0);
+    assert_eq!(bit.get_by_mask(Mask::new(4, 0)), 0xf);
+    assert_eq!(bit.get_by_mask(Mask::new(8, 0)), 0xef);
+    assert_eq!(bit.get_by_mask(Mask::new(32, 0)), 0x89ab_cdef);
+    assert_eq!(bit.get_by_mask(Mask::new(64, 0)), 0x0123_4567_89ab_cdef);
+    assert_eq!(bit.get_by_mask(Mask::new(4, 4)), 0xe);
+    assert_eq!(bit.get_by_mask(Mask::new(8, 4)), 0xde);
+    assert_eq!(bit.get_by_mask(Mask::new(12, 4)), 0xcde);
+    assert_eq!(bit.get_by_mask(Mask::new(60, 4)), 0x0012_3456_789a_bcde);
+    assert_eq!(bit.get_by_mask(Mask::new(4, 32)), 0x7);
+    assert_eq!(bit.get_by_mask(Mask::new(8, 32)), 0x67);
+    assert_eq!(bit.get_by_mask(Mask::new(12, 32)), 0x567);
+    assert_eq!(bit.get_by_mask(Mask::new(3, 0)), 0x7);
+    assert_eq!(bit.get_by_mask(Mask::new(3, 4)), 0x6);
+    assert_eq!(bit.get_by_mask(Mask::new(3, 8)), 0x5);
+    assert_eq!(bit.get_by_mask(Mask::new(3, 1)), 0x7);
+    assert_eq!(bit.get_by_mask(Mask::new(3, 5)), 0x7);
+    assert_eq!(bit.get_by_mask(Mask::new(3, 9)), 0x6);
 }
