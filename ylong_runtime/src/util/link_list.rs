@@ -21,6 +21,7 @@
 use std::ptr::NonNull;
 
 #[derive(Default)]
+#[repr(C)]
 pub(crate) struct Node<T> {
     prev: Option<NonNull<T>>,
     next: Option<NonNull<T>>,
