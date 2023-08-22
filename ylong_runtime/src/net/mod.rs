@@ -14,7 +14,6 @@
 //! Asynchronous TCP/UDP binding for `ylong_runtime`
 
 pub(crate) use driver::IoHandle;
-pub(crate) use linked_list::{LinkedList, Node};
 pub(crate) use ready::{Ready, ReadyEvent};
 pub(crate) use schedule_io::{ScheduleIO, Tick};
 
@@ -23,7 +22,6 @@ pub(crate) mod sys;
 pub(crate) use async_source::AsyncSource;
 
 pub(crate) mod driver;
-mod linked_list;
 pub(crate) mod ready;
 pub(crate) mod schedule_io;
 
