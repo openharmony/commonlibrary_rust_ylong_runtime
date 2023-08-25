@@ -53,24 +53,18 @@ This capability of asynchronous interfaces is achieved through the `Reactor` and
 ylong_runtime = { git = "https://gitee.com/openharmony-sig/commonlibrary_rust_ylong_runtime.git", features = ["full"]}
 ```
 ### Use gn
-1. add `ylong_runtime_mod` in bundle.json
+1. add `ylong_runtime` in bundle.json
 
 ```
-  "deps": {
-    "components": ["ylong_runtime_mod"]
-  }
+"deps": {
+   "components": ["ylong_runtime"]
+}
 ```
 
-2. add `ylong_runtime_mod:lib` in `BUILD.gn`
+2. add `ylong_runtime:ylong_runtime` in `BUILD.gn`
 
 ```
-external_deps += ["ylong_runtime_mod:lib"]
-```
-
-3. Currently you need to add `inner` when using `ylong_runtime` via gn compilation.
-
-```
-use ylong_runtime_inner
+external_deps = ["ylong_runtime:ylong_runtime"]
 ```
 
 ## Directory

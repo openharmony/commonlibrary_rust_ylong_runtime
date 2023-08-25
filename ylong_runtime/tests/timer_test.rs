@@ -11,6 +11,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#![cfg(all(feature = "time", feature = "sync"))]
+
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;

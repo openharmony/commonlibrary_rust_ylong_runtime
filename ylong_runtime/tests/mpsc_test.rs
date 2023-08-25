@@ -11,11 +11,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#![cfg(all(feature = "time", feature = "sync"))]
+
 use std::time::Duration;
 
 use ylong_runtime::sync::error::{RecvError, RecvTimeoutError, TryRecvError, TrySendError};
 use ylong_runtime::sync::mpsc::{bounded_channel, unbounded_channel};
-use ylong_runtime::task::JoinHandle;
 
 /// SDV test cases for `UnboundedSender`.
 ///
@@ -228,8 +229,11 @@ fn sdv_mpsc_len() {
 /// 2. Send and receive for many times.
 /// 3. Create a bounded mpsc channel with capacity.
 /// 4. Send and receive for many times.
+#[cfg(not(gn_test))]
 #[test]
 fn sdv_multi_send_recv_test() {
+    use ylong_runtime::task::JoinHandle;
+
     let (tx, mut rx) = unbounded_channel();
     let mut tasks: Vec<JoinHandle<()>> = Vec::new();
     for i in 0..1000 {

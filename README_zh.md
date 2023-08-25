@@ -96,19 +96,15 @@ ylong_runtime = { git = "https://gitee.com/openharmony-sig/commonlibrary_rust_yl
 ```
 
 ### 使用gn编译
-1. 在`bundle.json`中添加`ylong_runtime_mod`
+1. 在`bundle.json`中添加`ylong_runtime`
 ```
-  "deps": {
-    "components": ["ylong_runtime_mod"]
-  }
+"deps": {
+  "components": ["ylong_runtime"]
+}
 ```
-2. 在`BUILD.gn`中添加`ylong_runtime_mod:lib`
+2. 在`BUILD.gn`中添加`ylong_runtime:ylong_runtime`
 ```
-external_deps += ["ylong_runtime_mod:lib"]
-```
-3. 目前通过gn编译使用ylong_runtime时需要加上inner
-```
-use ylong_runtime_inner
+external_deps = ["ylong_runtime:ylong_runtime"]
 ```
 
 ## 用户指南
