@@ -14,7 +14,7 @@
 use std::cell::UnsafeCell;
 use std::collections::linked_list::LinkedList;
 use std::mem::MaybeUninit;
-use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
+use std::sync::atomic::Ordering::{AcqRel, Acquire, Release, SeqCst};
 use std::sync::atomic::{AtomicU16, AtomicU32, AtomicUsize};
 use std::sync::{Arc, Mutex};
 use std::{cmp, ptr};
@@ -236,11 +236,34 @@ impl InnerBuffer {
         self.cap - (rear.wrapping_sub(steal_pos))
     }
 
+    fn sync_steal_pos(&self, mut prev: u32) {
+        loop {
+            let (_front_steal, front_real) = unwrap(prev);
+            let next = wrap(front_real, front_real);
+            let res = self
+                .front
+                .compare_exchange(prev, next, AcqRel, Acquire);
+
+            match res {
+                Ok(_) => {
+                    return;
+                }
+                Err(actual) => {
+                    let (actual_steal_pos, actual_real_pos) = unwrap(actual);
+                    if actual_steal_pos == actual_real_pos {
+                        panic!("steal_pos and real_pos should not be the same");
+                    }
+                    prev = actual;
+                }
+            }
+        }
+    }
+
     pub(crate) fn push_back(&self, mut task: Task, global: &GlobalQueue) {
         loop {
             let front = self.front.load(Acquire);
 
-            let (steal_pos, real_pos) = unwrap(front);
+            let (steal_pos, _) = unwrap(front);
             // it's a spmc queue, so the queue could read its own tail non-atomically
             let rear = unsafe { non_atomic_load(&self.rear) };
 
@@ -251,12 +274,12 @@ impl InnerBuffer {
                 unsafe {
                     ptr::write((*ptr).as_mut_ptr(), task);
                 }
-                self.rear.store(rear.wrapping_add(1), Release);
+                self.rear.store(rear.wrapping_add(1), SeqCst);
                 #[cfg(feature = "metrics")]
                 self.metrics.count.fetch_add(1, AcqRel);
                 return;
             } else {
-                match self.push_overflowed(task, global, real_pos) {
+                match self.push_overflowed(task, global, steal_pos) {
                     Ok(_) => return,
                     Err(ret) => task = ret,
                 }
@@ -275,11 +298,11 @@ impl InnerBuffer {
         let count = LOCAL_QUEUE_CAP / 2;
         let prev = wrap(front, front);
         let next = wrap(
-            front.wrapping_add(count as u16),
+            front,
             front.wrapping_add(count as u16),
         );
 
-        match self.front.compare_exchange(prev, next, Release, Relaxed) {
+        match self.front.compare_exchange(prev, next, Release, Acquire) {
             Ok(_) => {}
             Err(_) => return Err(task),
         }
@@ -300,6 +323,8 @@ impl InnerBuffer {
             }
             src_front_steal = src_front_steal.wrapping_add(1);
         }
+
+        self.sync_steal_pos(next);
 
         #[cfg(feature = "metrics")]
         self.metrics
@@ -376,30 +401,11 @@ impl InnerBuffer {
         let task_ptr = self.buffer[src_idx].get();
         let task = unsafe { ptr::read(task_ptr).assume_init() };
         if count != 0 {
-            dst.inner.rear.store(dst_rear, Release);
+            dst.inner.rear.store(dst_rear, SeqCst);
         }
 
-        src_prev_front = src_next_front;
-        loop {
-            let (_src_front_steal, src_front_real) = unwrap(src_prev_front);
-            let src_next_front = wrap(src_front_real, src_front_real);
-            let res = self
-                .front
-                .compare_exchange(src_prev_front, src_next_front, AcqRel, Acquire);
+        self.sync_steal_pos(src_next_front);
 
-            match res {
-                Ok(_) => {
-                    break;
-                }
-                Err(actual) => {
-                    let (actual_steal_pos, actual_real_pos) = unwrap(actual);
-                    if actual_steal_pos == actual_real_pos {
-                        panic!("steal_pos and real_pos should not be the same");
-                    }
-                    src_prev_front = actual;
-                }
-            }
-        }
         Some(task)
     }
 }

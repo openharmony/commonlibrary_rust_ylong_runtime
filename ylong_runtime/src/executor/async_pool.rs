@@ -286,8 +286,13 @@ impl MultiThreadScheduler {
                 match local_task {
                     Some(task) => Some(task),
                     None => {
-                        self.global
-                            .pop_batch(self.num_workers, local_run_queue, LOCAL_QUEUE_CAP)
+                        let limit = local_run_queue.remaining() as usize;
+                        if limit > 1 {
+                            self.global
+                                .pop_batch(self.num_workers, local_run_queue, limit)
+                        } else {
+                            self.global.pop_front()
+                        }
                     }
                 }
             }
