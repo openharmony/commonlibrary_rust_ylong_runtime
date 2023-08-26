@@ -12,17 +12,19 @@
 // limitations under the License.
 
 use std::io;
-use std::mem::{self, size_of};
+use std::mem::{self, size_of, MaybeUninit};
 use std::net::{self, SocketAddr};
 use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
+use std::time::Duration;
 
 use libc::{
-    c_int, c_void, socklen_t, AF_INET, AF_INET6, SOCK_CLOEXEC, SOCK_NONBLOCK, SOCK_STREAM,
-    SOL_SOCKET, SO_REUSEADDR,
+    c_int, c_void, linger, socklen_t, AF_INET, AF_INET6, SOCK_CLOEXEC, SOCK_NONBLOCK, SOCK_STREAM,
+    SOL_SOCKET, SO_LINGER, SO_REUSEADDR,
 };
 
 use super::super::socket_addr::socket_addr_trans;
 use super::{TcpListener, TcpStream};
+use crate::source::Fd;
 
 pub(crate) struct TcpSocket {
     socket: c_int,
@@ -116,5 +118,55 @@ impl FromRawFd for TcpSocket {
 impl Drop for TcpSocket {
     fn drop(&mut self) {
         self.close();
+    }
+}
+
+pub(crate) fn get_sock_linger(fd: Fd) -> io::Result<Option<Duration>> {
+    let mut payload: MaybeUninit<linger> = MaybeUninit::uninit();
+    let mut len = mem::size_of::<linger>() as libc::socklen_t;
+
+    syscall!(getsockopt(
+        fd as c_int,
+        SOL_SOCKET,
+        SO_LINGER,
+        payload.as_mut_ptr().cast(),
+        &mut len,
+    ))
+    .map(|_| {
+        let linger = unsafe { payload.assume_init() };
+        from_linger(linger)
+    })
+}
+
+pub(crate) fn set_sock_linger(fd: Fd, duration: Option<Duration>) -> io::Result<()> {
+    let payload = into_linger(duration);
+    syscall!(setsockopt(
+        fd as c_int,
+        SOL_SOCKET,
+        SO_LINGER,
+        &payload as *const linger as *const c_void,
+        mem::size_of::<linger>() as libc::socklen_t,
+    ))
+    .map(|_| ())
+}
+
+fn from_linger(linger: linger) -> Option<Duration> {
+    if linger.l_onoff == 0 {
+        None
+    } else {
+        Some(Duration::from_secs(linger.l_linger as u64))
+    }
+}
+
+fn into_linger(duration: Option<Duration>) -> linger {
+    match duration {
+        None => linger {
+            l_onoff: 0,
+            l_linger: 0,
+        },
+        Some(dur) => linger {
+            l_onoff: 1,
+            l_linger: dur.as_secs() as _,
+        },
     }
 }

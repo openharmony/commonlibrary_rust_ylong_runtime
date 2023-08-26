@@ -18,6 +18,7 @@ use std::net::{Shutdown, SocketAddr};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
+use std::time::Duration;
 
 use ylong_io::Interest;
 
@@ -352,6 +353,59 @@ impl TcpStream {
         self.source.nodelay()
     }
 
+    /// Sets the value of the linger on this socket by setting `SO_LINGER`
+    /// option.
+    ///
+    /// This value controls how the socket close when a stream has unsent data.
+    /// If SO_LINGER is set, the socket will still open for the duration as
+    /// the system attempts to send pending data. Otherwise, the system may
+    /// close the socket immediately, or wait for a default timeout.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use std::io;
+    ///
+    /// use ylong_runtime::net::TcpStream;
+    ///
+    /// async fn io_func() -> io::Result<()> {
+    ///     let addr = "127.0.0.1:1234";
+    ///     let stream = TcpStream::connect(addr)
+    ///         .await
+    ///         .expect("Couldn't connect to the server...");
+    ///
+    ///     stream.set_linger(None).expect("Sets linger fail.");
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn set_linger(&self, linger: Option<Duration>) -> io::Result<()> {
+        self.source.set_linger(linger)
+    }
+
+    /// Gets the value of the linger on this socket by getting `SO_LINGER`
+    /// option.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use std::io;
+    ///
+    /// use ylong_runtime::net::TcpStream;
+    ///
+    /// async fn io_func() -> io::Result<()> {
+    ///     let addr = "127.0.0.1:1234";
+    ///     let stream = TcpStream::connect(addr)
+    ///         .await
+    ///         .expect("Couldn't connect to the server...");
+    ///
+    ///     println!("{:?}", stream.linger());
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn linger(&self) -> io::Result<Option<Duration>> {
+        self.source.linger()
+    }
+
     /// Sets the value for the `IP_TTL`.
     ///
     /// # Examples
@@ -578,6 +632,7 @@ impl AsRawFd for TcpStream {
 mod test {
     use std::net::Ipv4Addr;
     use std::thread;
+    use std::time::Duration;
 
     use crate::io::AsyncWriteExt;
     use crate::net::{TcpListener, TcpStream};
@@ -614,6 +669,9 @@ mod test {
                     assert_eq!(stream.ttl().unwrap(), 101);
                     stream.set_nodelay(true).unwrap();
                     assert!(stream.nodelay().unwrap());
+                    assert!(stream.linger().unwrap().is_none());
+                    stream.set_linger(Some(Duration::from_secs(1))).unwrap();
+                    assert_eq!(stream.linger().unwrap(), Some(Duration::from_secs(1)));
                     assert!(stream.take_error().unwrap().is_none());
                     break;
                 }
