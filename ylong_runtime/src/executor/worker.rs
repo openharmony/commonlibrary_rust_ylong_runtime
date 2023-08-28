@@ -121,7 +121,7 @@ pub(crate) fn run_worker(
 }
 
 pub(crate) struct Worker {
-    pub(crate) index: u8,
+    pub(crate) index: usize,
     pub(crate) scheduler: Arc<MultiThreadScheduler>,
     pub(crate) inner: RefCell<Box<Inner>>,
     pub(crate) lifo: RefCell<Option<Task>>,
@@ -142,7 +142,7 @@ impl Worker {
 
             // get a task from the queues and execute it
             if let Some(task) = self.get_task(inner) {
-                self.run_task(task, inner);
+                task.run();
                 continue;
             }
             wake_yielded_tasks();
@@ -194,17 +194,6 @@ impl Worker {
         self.scheduler.dequeue(self.index, inner)
     }
 
-    fn run_task(&self, task: Task, inner: &mut Inner) {
-        if inner.is_searching {
-            inner.is_searching = false;
-            if self.scheduler.record.dec_searching_num() {
-                self.scheduler.wake_up_rand_one();
-            }
-        }
-
-        task.run();
-    }
-
     #[inline]
     fn check_cancel(&self, inner: &mut Inner) {
         inner.check_cancel(self)
@@ -218,17 +207,14 @@ impl Worker {
             return;
         }
 
-        let is_searching = inner.is_searching;
-        inner.is_searching = false;
-        self.scheduler.turn_to_sleep(self.index, is_searching);
+        self.scheduler.turn_to_sleep(self.index);
 
         while !inner.is_cancel {
             inner.parker.park();
-            if self.scheduler.is_parked(self.index as usize) {
+            if self.scheduler.is_parked(&self.index) {
                 self.check_cancel(inner);
                 continue;
             }
-            inner.is_searching = true;
             break;
         }
     }
@@ -255,8 +241,6 @@ impl Worker {
 pub(crate) struct Inner {
     /// A counter to define whether schedule global queue or local queue
     pub(crate) count: u32,
-    /// Whether in searching state
-    pub(crate) is_searching: bool,
     /// Whether the workers are canceled
     is_cancel: bool,
     /// local queue
@@ -268,7 +252,6 @@ impl Inner {
     pub(crate) fn new(run_queues: LocalQueue, parker: Parker) -> Self {
         Inner {
             count: 0,
-            is_searching: false,
             is_cancel: false,
             run_queue: run_queues,
             parker,
