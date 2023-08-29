@@ -11,8 +11,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use ylong_runtime::builder::RuntimeBuilder;
-
 async fn test_future(num: usize) -> usize {
     num
 }
@@ -30,13 +28,7 @@ async fn test_async_in_async(i: usize, j: usize) -> (usize, usize) {
 // One Core Test
 #[test]
 fn sdv_one_core_test() {
-    let core_pool_size = 1;
     let num = 1000;
-
-    RuntimeBuilder::new_multi_thread()
-        .worker_num(core_pool_size)
-        .build_global()
-        .unwrap();
 
     let mut handles = Vec::with_capacity(num);
 
@@ -53,13 +45,7 @@ fn sdv_one_core_test() {
 // Two-core test
 #[test]
 fn sdv_two_core_test() {
-    let core_pool_size = 2;
     let num = 1000;
-
-    RuntimeBuilder::new_multi_thread()
-        .worker_num(core_pool_size)
-        .build_global()
-        .unwrap();
 
     let mut handles = Vec::with_capacity(num);
 
@@ -76,13 +62,7 @@ fn sdv_two_core_test() {
 // Three Core Test
 #[test]
 fn sdv_three_core_test() {
-    let core_pool_size = 3;
     let num = 1000;
-
-    RuntimeBuilder::new_multi_thread()
-        .worker_num(core_pool_size)
-        .build_global()
-        .unwrap();
 
     let mut handles = Vec::with_capacity(num);
 
@@ -99,13 +79,7 @@ fn sdv_three_core_test() {
 // Four Core Test
 #[test]
 fn sdv_four_core_test() {
-    let core_pool_size = 4;
     let num = 1000;
-
-    RuntimeBuilder::new_multi_thread()
-        .worker_num(core_pool_size)
-        .build_global()
-        .unwrap();
 
     let mut handles = Vec::with_capacity(num);
 
@@ -122,13 +96,7 @@ fn sdv_four_core_test() {
 // Eight Core Test
 #[test]
 fn sdv_eight_core_test() {
-    let core_pool_size = 8;
     let num = 1000;
-
-    RuntimeBuilder::new_multi_thread()
-        .worker_num(core_pool_size)
-        .build_global()
-        .unwrap();
 
     let mut handles = Vec::with_capacity(num);
 
@@ -145,13 +113,7 @@ fn sdv_eight_core_test() {
 // 64 Core Test, It is also the largest number of cores supported
 #[test]
 fn sdv_max_core_test() {
-    let core_pool_size = 64;
     let num = 1000;
-
-    RuntimeBuilder::new_multi_thread()
-        .worker_num(core_pool_size)
-        .build_global()
-        .unwrap();
 
     let mut handles = Vec::with_capacity(num);
 
@@ -168,13 +130,7 @@ fn sdv_max_core_test() {
 // Having multiple tasks in one `async` block
 #[test]
 fn sdv_multi_future_in_async() {
-    let core_pool_size = 4;
     let num = 1000;
-
-    RuntimeBuilder::new_multi_thread()
-        .worker_num(core_pool_size)
-        .build_global()
-        .unwrap();
 
     let mut handles = Vec::with_capacity(num);
 
@@ -192,13 +148,7 @@ fn sdv_multi_future_in_async() {
 // relationship
 #[test]
 fn sdv_multi_async_in_async() {
-    let core_pool_size = 4;
     let num = 1000;
-
-    RuntimeBuilder::new_multi_thread()
-        .worker_num(core_pool_size)
-        .build_global()
-        .unwrap();
 
     let mut handles = Vec::with_capacity(num);
 
