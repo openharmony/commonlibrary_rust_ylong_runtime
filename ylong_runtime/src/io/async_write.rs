@@ -301,7 +301,7 @@ pub trait AsyncWriteExt: AsyncWrite {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```no run
     /// use std::io;
     ///
     /// use ylong_runtime::fs::File;
