@@ -240,9 +240,7 @@ impl InnerBuffer {
         loop {
             let (_front_steal, front_real) = unwrap(prev);
             let next = wrap(front_real, front_real);
-            let res = self
-                .front
-                .compare_exchange(prev, next, AcqRel, Acquire);
+            let res = self.front.compare_exchange(prev, next, AcqRel, Acquire);
 
             match res {
                 Ok(_) => {
@@ -297,10 +295,7 @@ impl InnerBuffer {
         // get the number of tasks the worker has stolen
         let count = LOCAL_QUEUE_CAP / 2;
         let prev = wrap(front, front);
-        let next = wrap(
-            front,
-            front.wrapping_add(count as u16),
-        );
+        let next = wrap(front, front.wrapping_add(count as u16));
 
         match self.front.compare_exchange(prev, next, Release, Acquire) {
             Ok(_) => {}

@@ -27,7 +27,7 @@ pub struct MultiThreadBuilder {
     pub(crate) common: CommonBuilder,
 
     /// Maximum thread number for core thread pool
-    pub(crate) core_thread_size: Option<u8>,
+    pub(crate) core_thread_size: Option<usize>,
 }
 
 impl MultiThreadBuilder {
@@ -77,7 +77,7 @@ impl MultiThreadBuilder {
     ///
     /// let runtime = RuntimeBuilder::new_multi_thread().worker_num(8);
     /// ```
-    pub fn worker_num(mut self, core_pool_size: u8) -> Self {
+    pub fn worker_num(mut self, core_pool_size: usize) -> Self {
         if core_pool_size < 1 {
             self.core_thread_size = Some(1);
         } else if core_pool_size > 64 {
