@@ -15,6 +15,7 @@ use std::io;
 use std::ops::Deref;
 
 use ylong_io::{Interest, Source};
+use crate::io::poll_ready;
 
 use crate::net::ScheduleIO;
 use crate::util::slab::Ref;
@@ -134,11 +135,7 @@ impl<E: Source> AsyncSource<E> {
             mut f: impl FnMut() -> io::Result<R>,
         ) -> Poll<io::Result<R>> {
             loop {
-                let ready = match self.poll_ready(cx, interest) {
-                    Poll::Ready(Ok(x)) => x,
-                    Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
-                    Poll::Pending => return Poll::Pending,
-                };
+                let ready = poll_ready!(self.poll_ready(cx, interest))?;
 
                 match f() {
                     Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
@@ -169,6 +166,7 @@ impl<E: Source> AsyncSource<E> {
             }
         }
 
+        #[inline]
         pub(crate) fn poll_read_io<R>(
             &self,
             cx: &mut Context<'_>,
@@ -177,6 +175,7 @@ impl<E: Source> AsyncSource<E> {
             self.poll_io(cx, Interest::READABLE, f)
         }
 
+        #[inline]
         pub(crate) fn poll_write_io<R>(
             &self,
             cx: &mut Context<'_>,
@@ -193,7 +192,7 @@ impl<E: Source> AsyncSource<E> {
         where
             &'a E: io::Read + 'a,
         {
-            let ret = self.poll_io(cx, Interest::READABLE, || unsafe {
+            let ret = self.poll_read_io(cx, || unsafe {
                 let slice = &mut *(buf.unfilled_mut() as *mut [MaybeUninit<u8>] as *mut [u8]);
                 self.io.as_ref().unwrap().read(slice)
             });
@@ -216,7 +215,7 @@ impl<E: Source> AsyncSource<E> {
         where
             &'a E: io::Write + 'a,
         {
-            self.poll_io(cx, Interest::WRITABLE, || {
+            self.poll_write_io(cx, || {
                 self.io.as_ref().unwrap().write(buf)
             })
         }
@@ -229,7 +228,7 @@ impl<E: Source> AsyncSource<E> {
         where
             &'a E: io::Write + 'a,
         {
-            self.poll_io(cx, Interest::WRITABLE, || {
+            self.poll_write_io(cx, || {
                 self.io.as_ref().unwrap().write_vectored(bufs)
             })
         }
