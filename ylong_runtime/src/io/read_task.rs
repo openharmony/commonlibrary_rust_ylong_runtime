@@ -222,8 +222,7 @@ where
 /// Returned by [`crate::io::AsyncReadExt::read_exact`]
 pub struct ReadExactTask<'a, R: ?Sized> {
     reader: Option<&'a mut R>,
-    buf: &'a mut [u8],
-    r_len: usize,
+    buf: ReadBuf<'a>,
 }
 
 impl<'a, R: ?Sized> ReadExactTask<'a, R> {
@@ -231,8 +230,7 @@ impl<'a, R: ?Sized> ReadExactTask<'a, R> {
     pub(crate) fn new(reader: &'a mut R, buf: &'a mut [u8]) -> ReadExactTask<'a, R> {
         ReadExactTask {
             reader: Some(reader),
-            buf,
-            r_len: 0,
+            buf: ReadBuf::new(buf),
         }
     }
 }
@@ -244,28 +242,23 @@ where
     type Output = io::Result<()>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let r_len = self.r_len;
         let mut reader = take_reader!(self);
-        let mut read_buf = ReadBuf::new(self.buf);
-        read_buf.set_filled(r_len);
+        let this = self.get_mut();
 
         loop {
-            let remain = read_buf.remaining();
+            let remain = this.buf.remaining();
             if remain == 0 {
                 return Poll::Ready(Ok(()));
             }
-            match Pin::new(&mut reader).poll_read(cx, &mut read_buf) {
+            let _ = match Pin::new(&mut reader).poll_read(cx, &mut this.buf) {
                 Poll::Pending => {
-                    self.r_len = read_buf.filled_len();
-                    self.reader = Some(reader);
+                    this.reader = Some(reader);
                     return Poll::Pending;
                 }
-                // Reach eof before filling the entire buf, return unexpected_eof
-                Poll::Ready(Ok(())) if read_buf.remaining() == remain => {
-                    return Poll::Ready(Err(io::ErrorKind::UnexpectedEof.into()))
-                }
-                Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
-                _ => {}
+                x => x?,
+            };
+            if this.buf.remaining() == remain {
+                return Poll::Ready(Err(io::ErrorKind::UnexpectedEof.into()));
             }
         }
     }
