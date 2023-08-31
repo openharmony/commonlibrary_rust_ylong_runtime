@@ -150,7 +150,7 @@ impl<W: AsyncWrite> AsyncBufWriter<W> {
     ///
     /// # Examples
     ///
-    /// ```no_run
+    /// ```no run
     /// use std::net::SocketAddr;
     ///
     /// use ylong_runtime::io::AsyncBufWriter;
