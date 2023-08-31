@@ -79,7 +79,7 @@ pub(crate) unsafe trait Link {
 }
 
 impl<L: Link + Default> LinkedList<L> {
-    /// Construct a new linked list.
+    /// Constructs a new linked list.
     #[allow(dead_code)]
     pub(crate) fn new() -> LinkedList<L> {
         let head = Box::<L>::default();
@@ -90,7 +90,7 @@ impl<L: Link + Default> LinkedList<L> {
         LinkedList { head: head_ptr }
     }
 
-    /// Insert an element to the front of the list.
+    /// Inserts an element to the front of the list.
     #[allow(dead_code)]
     pub(crate) fn push_front(&mut self, val: NonNull<L>) {
         unsafe {
@@ -106,7 +106,7 @@ impl<L: Link + Default> LinkedList<L> {
         }
     }
 
-    /// Pop an element from the back of the list.
+    /// Pops an element from the back of the list.
     #[allow(dead_code)]
     pub(crate) fn pop_back(&mut self) -> Option<NonNull<L>> {
         unsafe {
@@ -121,7 +121,7 @@ impl<L: Link + Default> LinkedList<L> {
         }
     }
 
-    /// Delete an element in list.
+    /// Deletes an element in list.
     ///
     /// # Safety
     ///
@@ -133,18 +133,34 @@ impl<L: Link + Default> LinkedList<L> {
         Node::remove_node(node)
     }
 
-    /// Check whether the list is empty.
+    /// Checks whether the list is empty.
     #[allow(dead_code)]
     pub(crate) fn is_empty(&self) -> bool {
         unsafe { L::node(self.head).as_ref().next == Some(self.head) }
     }
 
-    /// Empty the list.
+    /// Empties the list.
     #[allow(dead_code)]
     pub(crate) fn clear(&mut self) {
         let node = unsafe { L::node(self.head).as_mut() };
         node.prev = Some(self.head);
         node.next = Some(self.head);
+    }
+
+    /// Traverses the list and execute the closure.
+    pub(crate) fn for_each_mut<F>(&mut self, mut f: F)
+    where
+        F: FnMut(&mut L),
+    {
+        unsafe {
+            let head = L::node(self.head).as_ref();
+            let mut p = head.next;
+            while p != Some(self.head) {
+                let node = p.unwrap();
+                f(&mut *node.as_ptr());
+                p = L::node(node).as_ref().next;
+            }
+        }
     }
 }
 
@@ -312,6 +328,35 @@ mod tests {
             assert!(LinkedList::remove(node2_ptr).is_some());
             assert!(LinkedList::remove(node2_ptr).is_none());
         }
+        assert!(list.is_empty());
+    }
+
+    /// UT test cases for `for_each_mut()`.
+    ///
+    /// # Brief
+    /// 1. Create a linked list.
+    /// 2. Push nodes into the list.
+    /// 3. Check the value in node after traversing the list.
+    #[test]
+    fn ut_link_list_for_each_mut() {
+        let mut list = LinkedList::<Entry>::new();
+        assert!(list.is_empty());
+        let node1 = Entry::new(1);
+        let node1 = node1.get_ptr();
+        let node2 = Entry::new(2);
+        let node2 = node2.get_ptr();
+        let node3 = Entry::new(3);
+        let node3 = node3.get_ptr();
+        list.push_front(node1);
+        list.push_front(node2);
+        list.push_front(node3);
+        list.for_each_mut(|entry| {
+            entry.val += 1;
+        });
+        assert_eq!(2, get_val(list.pop_back().unwrap()));
+        assert_eq!(3, get_val(list.pop_back().unwrap()));
+        assert_eq!(4, get_val(list.pop_back().unwrap()));
+        assert!(list.pop_back().is_none());
         assert!(list.is_empty());
     }
 }
