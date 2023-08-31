@@ -133,9 +133,7 @@ impl RuntimeBuilder {
 pub(crate) fn initialize_async_spawner(
     builder: &MultiThreadBuilder,
 ) -> io::Result<AsyncPoolSpawner> {
-    let async_spawner = AsyncPoolSpawner::new(builder);
-
-    Ok(async_spawner)
+    AsyncPoolSpawner::new(builder)
 }
 
 #[cfg(feature = "ffrt")]
