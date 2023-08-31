@@ -103,12 +103,12 @@ impl Handle {
     }
 
     #[cfg(feature = "metrics")]
-    pub(crate) fn get_register_count(&self) -> usize {
-        self.io.get_register_count()
+    pub(crate) fn get_registered_count(&self) -> u64 {
+        self.io.get_registered_count()
     }
 
     #[cfg(feature = "metrics")]
-    pub(crate) fn get_ready_count(&self) -> usize {
+    pub(crate) fn get_ready_count(&self) -> u64 {
         self.io.get_ready_count()
     }
 }

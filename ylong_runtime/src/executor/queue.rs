@@ -16,6 +16,8 @@ use std::collections::linked_list::LinkedList;
 use std::mem::MaybeUninit;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Release, SeqCst};
 use std::sync::atomic::{AtomicU16, AtomicU32, AtomicUsize};
+#[cfg(feature = "metrics")]
+use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, Mutex};
 use std::{cmp, ptr};
 
@@ -98,17 +100,17 @@ impl LocalQueue {
     }
 
     #[inline]
-    pub(crate) fn count(&self) -> usize {
+    pub(crate) fn count(&self) -> u64 {
         self.inner.count()
     }
 
     #[inline]
-    pub(crate) fn task_from_global_count(&self) -> usize {
+    pub(crate) fn task_from_global_count(&self) -> u64 {
         self.inner.task_from_global_count()
     }
 
     #[inline]
-    pub(crate) fn task_to_global_count(&self) -> usize {
+    pub(crate) fn task_to_global_count(&self) -> u64 {
         self.inner.task_to_global_count()
     }
 }
@@ -127,13 +129,13 @@ pub(crate) struct InnerBuffer {
 #[cfg(feature = "metrics")]
 struct InnerBufferMetrics {
     /// The total number of task which has entered this LocalQueue
-    count: AtomicUsize,
+    count: AtomicU64,
     /// The total number of task which has entered this LocalQueue from
     /// GlobalQueue
-    task_from_global_count: AtomicUsize,
+    task_from_global_count: AtomicU64,
     /// The total number of task which has entered GlobalQueue from this
     /// LocalQueue
-    task_to_global_count: AtomicUsize,
+    task_to_global_count: AtomicU64,
 }
 
 #[cfg(feature = "metrics")]
@@ -146,19 +148,19 @@ impl InnerBuffer {
     }
 
     /// Returns the total number of task which has entered this LocalQueue
-    fn count(&self) -> usize {
+    fn count(&self) -> u64 {
         self.metrics.count.load(Acquire)
     }
 
     /// Returns the total number of task which has entered this LocalQueue from
     /// GlobalQueue
-    fn task_from_global_count(&self) -> usize {
+    fn task_from_global_count(&self) -> u64 {
         self.metrics.task_from_global_count.load(Acquire)
     }
 
     /// Returns the total number of task which has entered GlobalQueue from this
     /// LocalQueue
-    fn task_to_global_count(&self) -> usize {
+    fn task_to_global_count(&self) -> u64 {
         self.metrics.task_to_global_count.load(Acquire)
     }
 }
@@ -177,9 +179,9 @@ impl InnerBuffer {
             buffer: buffer.into(),
             #[cfg(feature = "metrics")]
             metrics: InnerBufferMetrics {
-                count: AtomicUsize::new(0),
-                task_from_global_count: AtomicUsize::new(0),
-                task_to_global_count: AtomicUsize::new(0),
+                count: AtomicU64::new(0),
+                task_from_global_count: AtomicU64::new(0),
+                task_to_global_count: AtomicU64::new(0),
             },
         }
     }
@@ -324,7 +326,7 @@ impl InnerBuffer {
         #[cfg(feature = "metrics")]
         self.metrics
             .task_to_global_count
-            .fetch_add(tmp_buf.len() + 1, AcqRel);
+            .fetch_add(tmp_buf.len() as u64 + 1, AcqRel);
 
         global.push_batch(tmp_buf, task);
 
@@ -416,7 +418,7 @@ pub(crate) struct GlobalQueue {
     len: AtomicUsize,
     /// The total number of tasks which has entered global queue.
     #[cfg(feature = "metrics")]
-    count: AtomicUsize,
+    count: AtomicU64,
     globals: Mutex<LinkedList<Task>>,
 }
 
@@ -425,7 +427,7 @@ impl GlobalQueue {
         GlobalQueue {
             len: AtomicUsize::new(0_usize),
             #[cfg(feature = "metrics")]
-            count: AtomicUsize::new(0_usize),
+            count: AtomicU64::new(0),
             globals: Mutex::new(LinkedList::new()),
         }
     }
@@ -443,7 +445,7 @@ impl GlobalQueue {
         list.push_back(task);
         self.len.fetch_add(len, AcqRel);
         #[cfg(feature = "metrics")]
-        self.count.fetch_add(len, AcqRel);
+        self.count.fetch_add(len as u64, AcqRel);
     }
 
     pub(super) fn pop_batch(
@@ -523,7 +525,7 @@ impl GlobalQueue {
     }
 
     #[cfg(feature = "metrics")]
-    pub(crate) fn get_count(&self) -> usize {
+    pub(crate) fn get_count(&self) -> u64 {
         self.count.load(Acquire)
     }
 }

@@ -30,15 +30,15 @@ pub struct Metrics<'a> {
 /// List of workers state.
 #[derive(Debug)]
 pub struct WorkList {
-    /// The set of index of the idle workers
-    idle: Vec<usize>,
     /// The set of index of the park workers
-    park: Vec<usize>,
+    pub park: Vec<usize>,
     /// The set of index of the active workers
-    active: Vec<usize>,
+    pub active: Vec<usize>,
 }
 
 impl Metrics<'_> {
+    const ACTIVE_STATE: usize = 3;
+
     pub(crate) fn new(runtime: &Runtime) -> Metrics {
         Metrics { runtime }
     }
@@ -61,7 +61,7 @@ impl Metrics<'_> {
         }
     }
 
-    /// Returns searching workers num
+    /// Returns park workers num
     ///
     /// Runtime build by `new_current_thread()` will return None.
     ///
@@ -72,19 +72,19 @@ impl Metrics<'_> {
     ///     .unwrap();
     /// let metrics = runtime.metrics();
     /// println!(
-    ///     "Runtime's searching_workers_num:{:?}",
-    ///     metrics.searching_workers_num()
+    ///     "Runtime's park_workers_num:{:?}",
+    ///     metrics.park_workers_num()
     /// );
     /// ```
-    pub fn searching_workers_num(&self) -> Option<usize> {
+    pub fn park_workers_num(&self) -> Option<usize> {
         match &self.runtime.async_spawner {
             #[cfg(feature = "current_thread_runtime")]
             AsyncHandle::CurrentThread(_) => None,
-            AsyncHandle::MultiThread(spawner) => Some(spawner.exe_mng_info.load_state().1),
+            AsyncHandle::MultiThread(spawner) => Some(Self::workers_state_statistic(spawner).park.len()),
         }
     }
 
-    /// Returns unpark workers num
+    /// Returns active workers num
     ///
     /// Runtime build by `new_current_thread()` will return None.
     ///
@@ -103,30 +103,7 @@ impl Metrics<'_> {
         match &self.runtime.async_spawner {
             #[cfg(feature = "current_thread_runtime")]
             AsyncHandle::CurrentThread(_) => None,
-            AsyncHandle::MultiThread(spawner) => Some(spawner.exe_mng_info.load_state().0),
-        }
-    }
-
-    /// Returns idle workers index list
-    ///
-    /// Runtime build by `new_current_thread()` will return None.
-    ///
-    /// # Example
-    /// ```
-    /// let runtime = ylong_runtime::builder::RuntimeBuilder::new_multi_thread()
-    ///     .build()
-    ///     .unwrap();
-    /// let metrics = runtime.metrics();
-    /// println!(
-    ///     "Runtime's idle_workers_list:{:?}",
-    ///     metrics.idle_workers_list()
-    /// );
-    /// ```
-    pub fn idle_workers_list(&self) -> Option<Vec<usize>> {
-        match &self.runtime.async_spawner {
-            #[cfg(feature = "current_thread_runtime")]
-            AsyncHandle::CurrentThread(_) => None,
-            AsyncHandle::MultiThread(spawner) => Some(Self::park_statistic(spawner).idle),
+            AsyncHandle::MultiThread(spawner) => Some(Self::workers_state_statistic(spawner).active.len()),
         }
     }
 
@@ -149,11 +126,11 @@ impl Metrics<'_> {
         match &self.runtime.async_spawner {
             #[cfg(feature = "current_thread_runtime")]
             AsyncHandle::CurrentThread(_) => None,
-            AsyncHandle::MultiThread(spawner) => Some(Self::park_statistic(spawner).park),
+            AsyncHandle::MultiThread(spawner) => Some(Self::workers_state_statistic(spawner).park),
         }
     }
 
-    /// Returns notified workers index list
+    /// Returns active workers index list
     ///
     /// Runtime build by `new_current_thread()` will return None.
     ///
@@ -172,11 +149,11 @@ impl Metrics<'_> {
         match &self.runtime.async_spawner {
             #[cfg(feature = "current_thread_runtime")]
             AsyncHandle::CurrentThread(_) => None,
-            AsyncHandle::MultiThread(spawner) => Some(Self::park_statistic(spawner).active),
+            AsyncHandle::MultiThread(spawner) => Some(Self::workers_state_statistic(spawner).active),
         }
     }
 
-    /// Returns idle/park/notified workers index list
+    /// Returns park/active workers index list
     ///
     /// Runtime build by `new_current_thread()` will return None.
     ///
@@ -195,25 +172,23 @@ impl Metrics<'_> {
         match &self.runtime.async_spawner {
             #[cfg(feature = "current_thread_runtime")]
             AsyncHandle::CurrentThread(_) => None,
-            AsyncHandle::MultiThread(spawner) => Some(Self::park_statistic(spawner)),
+            AsyncHandle::MultiThread(spawner) => Some(Self::workers_state_statistic(spawner)),
         }
     }
 
-    fn park_statistic(spawner: &AsyncPoolSpawner) -> WorkList {
-        let mut idle = vec![];
+    fn workers_state_statistic(spawner: &AsyncPoolSpawner) -> WorkList {
         let mut park = vec![];
         let mut active = vec![];
 
         let parkers = spawner.exe_mng_info.get_handles().read().unwrap();
         for i in 0..parkers.len() {
             match parkers.get(i).unwrap().get_state() {
-                0 => idle.push(i),
-                3 => active.push(i),
+                Self::ACTIVE_STATE => active.push(i),
                 _ => park.push(i),
             }
         }
 
-        WorkList { idle, park, active }
+        WorkList { park, active }
     }
 
     /// Returns global queue length
@@ -225,11 +200,11 @@ impl Metrics<'_> {
     ///     .unwrap();
     /// let metrics = runtime.metrics();
     /// println!(
-    ///     "Runtime's global_queue_depth:{}",
-    ///     metrics.global_queue_depth()
+    ///     "Runtime's global_queue_length:{}",
+    ///     metrics.global_queue_length()
     /// );
     /// ```
-    pub fn global_queue_depth(&self) -> usize {
+    pub fn global_queue_length(&self) -> usize {
         match &self.runtime.async_spawner {
             #[cfg(feature = "current_thread_runtime")]
             AsyncHandle::CurrentThread(spawner) => spawner.scheduler.inner.lock().unwrap().len(),
@@ -252,7 +227,7 @@ impl Metrics<'_> {
     ///     metrics.global_queue_total_task_count()
     /// );
     /// ```
-    pub fn global_queue_total_task_count(&self) -> usize {
+    pub fn global_queue_total_task_count(&self) -> u64 {
         match &self.runtime.async_spawner {
             #[cfg(feature = "current_thread_runtime")]
             AsyncHandle::CurrentThread(spawner) => spawner
@@ -275,7 +250,7 @@ impl Metrics<'_> {
     /// let metrics = runtime.metrics();
     /// println!("Runtime's worker_task_len:{:?}", metrics.worker_task_len(0));
     /// ```
-    pub fn worker_task_len(&self, index: u8) -> Option<usize> {
+    pub fn worker_task_len(&self, index: usize) -> Option<usize> {
         match &self.runtime.async_spawner {
             #[cfg(feature = "current_thread_runtime")]
             AsyncHandle::CurrentThread(_) => None,
@@ -306,7 +281,7 @@ impl Metrics<'_> {
     ///     metrics.worker_total_task_count(0)
     /// );
     /// ```
-    pub fn worker_total_task_count(&self, index: u8) -> Option<usize> {
+    pub fn worker_total_task_count(&self, index: usize) -> Option<u64> {
         match &self.runtime.async_spawner {
             #[cfg(feature = "current_thread_runtime")]
             AsyncHandle::CurrentThread(_) => None,
@@ -320,7 +295,7 @@ impl Metrics<'_> {
         }
     }
 
-    /// Returns the given worker thread length
+    /// Returns the number of task the given worker thread length has been polled.
     ///
     /// This value will only increment, not decrease.
     /// Runtime build by `new_current_thread()` will return None.
@@ -336,7 +311,7 @@ impl Metrics<'_> {
     ///     metrics.worker_poll_count(0)
     /// );
     /// ```
-    pub fn worker_poll_count(&self, index: u8) -> Option<usize> {
+    pub fn worker_poll_count(&self, index: usize) -> Option<usize> {
         match &self.runtime.async_spawner {
             #[cfg(feature = "current_thread_runtime")]
             AsyncHandle::CurrentThread(_) => None,
@@ -350,7 +325,7 @@ impl Metrics<'_> {
         }
     }
 
-    /// Returns the number of steals.
+    /// Returns the times of steals.
     ///
     /// This value will only increment, not decrease.
     /// Runtime build by `new_current_thread()` will return None.
@@ -361,13 +336,13 @@ impl Metrics<'_> {
     ///     .build()
     ///     .unwrap();
     /// let metrics = runtime.metrics();
-    /// println!("Runtime's steal_count:{:?}", metrics.steal_count());
+    /// println!("Runtime's steal_times:{:?}", metrics.steal_times());
     /// ```
-    pub fn steal_count(&self) -> Option<usize> {
+    pub fn steal_times(&self) -> Option<u64> {
         match &self.runtime.async_spawner {
             #[cfg(feature = "current_thread_runtime")]
             AsyncHandle::CurrentThread(_) => None,
-            AsyncHandle::MultiThread(spawner) => Some(spawner.exe_mng_info.get_steal_count()),
+            AsyncHandle::MultiThread(spawner) => Some(spawner.exe_mng_info.get_steal_times()),
         }
     }
 
@@ -388,7 +363,7 @@ impl Metrics<'_> {
     ///     metrics.worker_get_task_from_global_count(0)
     /// );
     /// ```
-    pub fn worker_get_task_from_global_count(&self, index: u8) -> Option<usize> {
+    pub fn worker_get_task_from_global_count(&self, index: usize) -> Option<u64> {
         match &self.runtime.async_spawner {
             #[cfg(feature = "current_thread_runtime")]
             AsyncHandle::CurrentThread(_) => None,
@@ -419,7 +394,7 @@ impl Metrics<'_> {
     ///     metrics.worker_push_task_to_global_count(0)
     /// );
     /// ```
-    pub fn worker_push_task_to_global_count(&self, index: u8) -> Option<usize> {
+    pub fn worker_push_task_to_global_count(&self, index: usize) -> Option<u64> {
         match &self.runtime.async_spawner {
             #[cfg(feature = "current_thread_runtime")]
             AsyncHandle::CurrentThread(_) => None,
@@ -444,13 +419,13 @@ impl Metrics<'_> {
     ///     .unwrap();
     /// let metrics = runtime.metrics();
     /// println!(
-    ///     "Runtime's fd_register_count:{}",
-    ///     metrics.fd_register_count()
+    ///     "Runtime's fd_registered_count:{}",
+    ///     metrics.fd_registered_count()
     /// );
     /// ```
     #[cfg(feature = "net")]
-    pub fn fd_register_count(&self) -> usize {
-        self.runtime.get_handle().get_register_count()
+    pub fn fd_registered_count(&self) -> u64 {
+        self.runtime.get_handle().get_registered_count()
     }
 
     /// Returns the number of IO events which has been readied in Driver.
@@ -469,7 +444,7 @@ impl Metrics<'_> {
     /// );
     /// ```
     #[cfg(feature = "net")]
-    pub fn io_driver_ready_count(&self) -> usize {
+    pub fn io_driver_ready_count(&self) -> u64 {
         self.runtime.get_handle().get_ready_count()
     }
 }
