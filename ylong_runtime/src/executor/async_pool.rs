@@ -17,7 +17,7 @@ use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::{Acquire, SeqCst};
 use std::sync::{Arc, Condvar, Mutex, RwLock};
 use std::time::Duration;
-use std::{cmp, thread};
+use std::{cmp, io, thread};
 
 use super::driver::{Driver, Handle};
 use super::parker::Parker;
@@ -353,7 +353,7 @@ fn async_thread_proc(
 }
 
 impl AsyncPoolSpawner {
-    pub(crate) fn new(builder: &MultiThreadBuilder) -> Self {
+    pub(crate) fn new(builder: &MultiThreadBuilder) -> io::Result<Self> {
         let (handle, driver) = Driver::initialize();
 
         let thread_num = builder.core_thread_size.unwrap_or_else(get_cpu_core);
@@ -371,11 +371,11 @@ impl AsyncPoolSpawner {
             }),
             exe_mng_info: Arc::new(MultiThreadScheduler::new(thread_num, handle)),
         };
-        spawner.create_async_thread_pool(driver);
-        spawner
+        spawner.create_async_thread_pool(driver)?;
+        Ok(spawner)
     }
 
-    pub(crate) fn create_async_thread_pool(&self, driver: Arc<Mutex<Driver>>) {
+    fn create_async_thread_pool(&self, driver: Arc<Mutex<Driver>>) -> io::Result<()> {
         let mut workers = vec![];
         for index in 0..self.inner.total {
             let local_queue = self.exe_mng_info.create_local_queue(index);
@@ -397,21 +397,24 @@ impl AsyncPoolSpawner {
             self.inner.workers.lock().unwrap().push(worker.clone());
             // set up thread attributes
             let mut builder = thread::Builder::new();
+
             if let Some(worker_name) = self.inner.worker_name.clone() {
                 builder = builder.name(format!("async-{worker_id}-{worker_name}"));
             } else {
                 builder = builder.name(format!("async-{worker_id}"));
             }
+
             if let Some(stack_size) = self.inner.stack_size {
                 builder = builder.stack_size(stack_size);
             }
 
+            let parker = worker.inner.borrow().parker.clone();
+            self.exe_mng_info.handles.write().unwrap().push(parker);
+
             let inner = self.inner.clone();
 
             if self.inner.is_affinity {
-                let parker = worker.inner.borrow().parker.clone();
-
-                let result = builder.spawn(move || {
+                builder.spawn(move || {
                     let cpu_core_num = get_cpu_core();
                     let cpu_id = worker_id % cpu_core_num;
                     set_current_affinity(cpu_id).expect("set_current_affinity() fail!");
@@ -421,32 +424,19 @@ impl AsyncPoolSpawner {
                         #[cfg(any(feature = "net", feature = "time"))]
                         work_arc_handle,
                     );
-                });
-
-                match result {
-                    Ok(_) => {
-                        self.exe_mng_info.handles.write().unwrap().push(parker);
-                    }
-                    Err(e) => panic!("os cannot spawn worker threads: {}", e),
-                }
+                })?;
             } else {
-                let parker = worker.inner.borrow().parker.clone();
-                let result = builder.spawn(move || {
+                builder.spawn(move || {
                     async_thread_proc(
                         inner,
                         worker,
                         #[cfg(any(feature = "net", feature = "time"))]
                         work_arc_handle,
                     );
-                });
-                match result {
-                    Ok(_) => {
-                        self.exe_mng_info.handles.write().unwrap().push(parker);
-                    }
-                    Err(e) => panic!("os cannot spawn worker threads: {}", e),
-                }
+                })?;
             }
         }
+        Ok(())
     }
 
     pub(crate) fn spawn<T>(&self, builder: &TaskBuilder, task: T) -> JoinHandle<T::Output>
@@ -881,7 +871,7 @@ mod test {
     #[test]
     fn ut_async_pool_spawner_new() {
         let thread_pool_builder = RuntimeBuilder::new_multi_thread();
-        let async_pool_spawner = AsyncPoolSpawner::new(&thread_pool_builder);
+        let async_pool_spawner = AsyncPoolSpawner::new(&thread_pool_builder).unwrap();
         assert_eq!(
             async_pool_spawner.inner.total,
             thread_pool_builder
@@ -908,7 +898,7 @@ mod test {
     #[test]
     fn ut_async_pool_spawner_create_async_thread_pool_001() {
         let thread_pool_builder = RuntimeBuilder::new_multi_thread();
-        let _ = AsyncPoolSpawner::new(&thread_pool_builder.is_affinity(false));
+        let _ = AsyncPoolSpawner::new(&thread_pool_builder.is_affinity(false)).unwrap();
     }
 
     /// UT test cases for `UnboundedSender`.
@@ -920,6 +910,6 @@ mod test {
     #[test]
     fn ut_async_pool_spawner_create_async_thread_pool_002() {
         let thread_pool_builder = RuntimeBuilder::new_multi_thread();
-        let _ = AsyncPoolSpawner::new(&thread_pool_builder.is_affinity(true));
+        let _ = AsyncPoolSpawner::new(&thread_pool_builder.is_affinity(true)).unwrap();
     }
 }
