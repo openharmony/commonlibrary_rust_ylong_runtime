@@ -159,7 +159,7 @@ pub trait AsyncReadExt: AsyncRead {
     ///
     /// # Examples
     /// ```no run
-    ///
+    /// 
     /// let mut io = File::open("foo.txt").await?;
     /// let mut buf = String::new();
     /// let n = io.read_to_string(&mut buf).await?;

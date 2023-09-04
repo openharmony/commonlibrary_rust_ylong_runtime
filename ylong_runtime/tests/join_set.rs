@@ -22,7 +22,7 @@ use std::time::Duration;
 
 #[cfg(feature = "time")]
 use ylong_runtime::error::ErrorKind;
-use ylong_runtime::task::{JoinSet, PriorityLevel};
+use ylong_runtime::task::{JoinSet, Qos};
 #[cfg(feature = "time")]
 use ylong_runtime::time::sleep;
 
@@ -245,7 +245,7 @@ fn sdv_join_set_builder() {
         let mut builder = set
             .build_task()
             .name("hello".into())
-            .priority(PriorityLevel::AbsHigh);
+            .qos(Qos::UserInteractive);
         for _ in 0..10 {
             let _ = builder.spawn(async move { 1 });
         }

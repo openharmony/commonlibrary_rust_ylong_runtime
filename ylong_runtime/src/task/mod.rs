@@ -40,20 +40,28 @@ pub(crate) enum VirtualTableType {
     Ffrt,
 }
 
-/// Task priority level, ranges from high to low
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum PriorityLevel {
-    /// Highest priority, execute the task when get the chance.
-    AbsHigh,
-    /// If there are low tasks and high tasks, a higher percentage of execution
-    /// time will be used towards high priority task.
-    High,
-    /// If there are low tasks and high tasks, a lower percentage of execution
-    /// time will be used towards low priority task.
-    Low,
-    /// Only execute the task when there is no other task
-    AbsLow,
+#[cfg(not(feature = "ffrt"))]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+/// Qos levels.
+pub enum Qos {
+    /// Inherits parent's qos level
+    Inherent = -1,
+    /// Lowest qos
+    Background,
+    /// Utility qos
+    Utility,
+    /// Default qos
+    Default,
+    /// User initialiated qos
+    UserInitiated,
+    /// Deadline qos
+    DeadlineRequest,
+    /// Highest qos
+    UserInteractive,
 }
+
+#[cfg(feature = "ffrt")]
+pub use ylong_ffrt::Qos;
 
 #[repr(transparent)]
 #[derive(Clone)]

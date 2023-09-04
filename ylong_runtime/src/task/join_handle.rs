@@ -21,9 +21,6 @@ use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task::{Context, Poll, Waker};
 
-#[cfg(feature = "ffrt")]
-use ylong_ffrt::FfrtTaskHandle;
-
 use crate::error::ScheduleError;
 use crate::task::raw::RawTask;
 use crate::task::state;
@@ -86,11 +83,6 @@ impl<R> JoinHandle<R> {
                 waker.wake_by_ref();
             }
         }
-    }
-
-    #[cfg(feature = "ffrt")]
-    pub(crate) fn set_task_handle(&mut self, handle: FfrtTaskHandle) {
-        self.raw.set_task_handle(handle);
     }
 }
 

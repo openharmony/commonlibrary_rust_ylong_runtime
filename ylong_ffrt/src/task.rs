@@ -23,36 +23,10 @@ type FfrtExecHook = extern "C" fn(*mut c_void) -> FfrtRet;
 
 type RawTaskCtx = *mut c_void;
 
-type RawTaskHandle = *mut c_void;
-
 #[repr(C)]
 pub enum FfrtRet {
     FfrtCoroutinePending,
     FfrtCoroutineReady,
-}
-
-/// The task handle for the real ffrt task.
-/// Users could use the task to finish through the handle.
-pub struct FfrtTaskHandle(RawTaskHandle);
-
-impl FfrtTaskHandle {
-    /// Creates a new ffrt task handle.
-    pub fn new(raw: RawTaskHandle) -> Self {
-        FfrtTaskHandle(raw)
-    }
-
-    /// # Safety
-    pub unsafe fn set_waker_hook(&self, waker: FfrtHook, wake_arg: *mut c_void) {
-        ffrt_wake_by_handle(wake_arg, waker, None, self.0);
-    }
-}
-
-impl Drop for FfrtTaskHandle {
-    fn drop(&mut self) {
-        unsafe {
-            ffrt_task_handle_destroy(self.0);
-        }
-    }
 }
 
 impl Default for FfrtTaskAttr {
@@ -63,16 +37,16 @@ impl Default for FfrtTaskAttr {
 
 impl FfrtTaskAttr {
     /// Creates a default task attribute.
-    pub fn new() -> FfrtTaskAttr {
-        let mut attr = FfrtTaskAttr { storage: [0; 128] };
-        unsafe {
-            let attr_ptr = &mut attr as *mut FfrtTaskAttr;
-            ffrt_task_attr_init(attr_ptr);
-            // set type to stackless coroutine
-            ffrt_task_attr_set_coroutine_type(attr_ptr, CoroutineTypes::Stackless);
-        }
+    pub fn new() -> Self {
+        Self { storage: [0; 128] }
+    }
 
-        attr
+    /// Initializes the task attribute
+    pub fn init(&mut self) {
+        let attr = self as *mut FfrtTaskAttr;
+        unsafe {
+            ffrt_task_attr_init(attr);
+        }
     }
 
     /// Sets the name for the task attribute.
@@ -110,41 +84,15 @@ impl FfrtTaskAttr {
     pub fn get_qos(&self) -> Qos {
         unsafe { ffrt_task_attr_get_qos(self as _) }
     }
-
-    /// Sets the priority level for the task attributes.
-    pub fn set_priority(&mut self, priority: u8) -> &mut Self {
-        unsafe {
-            ffrt_task_attr_set_priority(self as _, priority);
-        }
-        self
-    }
-
-    /// Sets the proiroty level for the task attributes.
-    pub fn get_priority(&self) -> u8 {
-        unsafe { ffrt_task_attr_get_priority(self as _) }
-    }
-
-    /// Sets the coroutine type.
-    pub fn set_coroutine_type(&mut self, coroutine_type: CoroutineTypes) -> &mut Self {
-        unsafe {
-            ffrt_task_attr_set_coroutine_type(self as _, coroutine_type);
-        }
-        self
-    }
-
-    /// Gets the coroutine type.
-    pub fn get_coroutine_type(&self) -> CoroutineTypes {
-        unsafe { ffrt_task_attr_get_coroutine_type(self as _) }
-    }
 }
 
-// impl Drop for FfrtTaskAttr {
-//     fn drop(&mut self) {
-//         unsafe {
-//             ffrt_task_attr_destroy(self as _);
-//         }
-//     }
-// }
+impl Drop for FfrtTaskAttr {
+    fn drop(&mut self) {
+        unsafe {
+            ffrt_task_attr_destroy(self as _);
+        }
+    }
+}
 
 #[link(name = "ffrt")]
 // task.h
@@ -157,18 +105,12 @@ extern "C" {
     fn ffrt_task_attr_destroy(attr: *mut FfrtTaskAttr);
     fn ffrt_task_attr_set_qos(attr: *mut FfrtTaskAttr, qos: Qos);
     fn ffrt_task_attr_get_qos(attr: *const FfrtTaskAttr) -> Qos;
-    fn ffrt_task_attr_set_priority(attr: *mut FfrtTaskAttr, priority: u8);
-    fn ffrt_task_attr_get_priority(attr: *const FfrtTaskAttr) -> u8;
-
-    fn ffrt_task_attr_set_coroutine_type(attr: *mut FfrtTaskAttr, coroutine_type: CoroutineTypes);
-
-    fn ffrt_task_attr_get_coroutine_type(attr: *const FfrtTaskAttr) -> CoroutineTypes;
 
     // submit
     fn ffrt_alloc_auto_free_function_storage_base() -> *const c_void;
 
     /// Submits a task.
-    pub fn ffrt_submit_h_coroutine(
+    pub fn ffrt_submit_coroutine(
         // void* callable
         data: *mut c_void,
         // ffrt_function_tdd exec
@@ -181,25 +123,11 @@ extern "C" {
         out_deps: *const FfrtDeps,
         // const ffrt_task_attr_t* att
         attr: *const FfrtTaskAttr,
-    ) -> RawTaskHandle;
-
-    // release handle
-    fn ffrt_task_handle_destroy(handle: RawTaskHandle);
+    );
 
     /// Gets the current task context.
-    pub fn ffrt_task_get() -> RawTaskCtx;
-
-    // set waker
-    fn ffrt_wake_by_handle(
-        callable: *mut c_void,
-        exec: FfrtHook,
-        destroy: Option<FfrtHook>,
-        handle: RawTaskHandle,
-    );
+    pub fn ffrt_get_current_task() -> RawTaskCtx;
 
     /// Wakes the task
     pub fn ffrt_wake_coroutine(task: RawTaskCtx);
-
-    /// Sets the wake flag for the task.
-    pub fn ffrt_set_wake_flag(flag: bool);
 }

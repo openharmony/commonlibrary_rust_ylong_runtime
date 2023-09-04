@@ -145,7 +145,6 @@ fn sdv_global_block_on() {
 fn sdv_build_global_failed() {
     let _ = ylong_runtime::block_on(ylong_runtime::spawn(async move { 1 }));
     let ret = RuntimeBuilder::new_multi_thread()
-        .worker_num(2)
         .max_blocking_pool_size(1)
         .build_global();
     assert!(ret.is_err());

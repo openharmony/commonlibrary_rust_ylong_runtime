@@ -24,7 +24,7 @@ use crate::util::bit::{Bit, Mask};
 use crate::util::slab::{Address, Ref, Slab};
 
 cfg_ffrt! {
-    use libc::{c_void, c_int, c_uint};
+    use libc::{c_void, c_int, c_uint, c_uchar};
 }
 
 cfg_not_ffrt! {
@@ -298,16 +298,17 @@ impl IoDriver {
 }
 
 #[cfg(feature = "ffrt")]
-extern "C" fn ffrt_dispatch_event(data: *const c_void, ready: c_uint) {
+extern "C" fn ffrt_dispatch_event(data: *const c_void, ready: c_uint, new_tick: c_uchar) {
     const COMPACT_INTERVAL: u8 = 255;
 
     let driver = IoDriver::get_mut_ref();
-    driver.tick = driver.tick.wrapping_add(1);
-    if driver.tick == COMPACT_INTERVAL {
+
+    if new_tick == COMPACT_INTERVAL && driver.tick != new_tick {
         unsafe {
             driver.resources.as_mut().unwrap().compact();
         }
     }
+    driver.tick = new_tick;
 
     let token = Token::from_usize(data as usize);
     let ready = crate::net::ready::from_event_inner(ready as i32);

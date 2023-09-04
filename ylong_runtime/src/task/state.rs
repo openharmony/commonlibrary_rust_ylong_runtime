@@ -50,32 +50,39 @@ pub(crate) fn is_last_ref_count(prev: usize) -> bool {
     ref_count(prev) == 1
 }
 
+#[inline]
 pub(crate) fn is_canceled(cur: usize) -> bool {
     cur & CANCELED == CANCELED
 }
 
+#[inline]
 pub(crate) fn is_care_join_handle(cur: usize) -> bool {
     cur & CARE_JOIN_HANDLE == CARE_JOIN_HANDLE
 }
 
+#[inline]
 pub(crate) fn is_finished(cur: usize) -> bool {
     cur & FINISHED == FINISHED
 }
 
+#[inline]
 pub(crate) fn is_set_waker(cur: usize) -> bool {
     cur & JOIN_WAKER == JOIN_WAKER
 }
 
+#[inline]
 pub(crate) fn is_scheduling(cur: usize) -> bool {
     cur & SCHEDULING == SCHEDULING
 }
 
+#[inline]
 pub(crate) fn is_running(cur: usize) -> bool {
     cur & RUNNING == RUNNING
 }
 
 // A task need to satisfy these state requirements in order to get pushed back
 // to the schedule list.
+#[inline]
 pub(crate) fn need_enqueue(cur: usize) -> bool {
     (cur & SCHEDULING != SCHEDULING) && (cur & RUNNING != RUNNING) && (cur & FINISHED != FINISHED)
 }
@@ -89,14 +96,17 @@ pub(crate) enum StateAction {
 
 pub(crate) struct TaskState(AtomicUsize);
 impl TaskState {
+    #[inline]
     pub(crate) fn new() -> Self {
         TaskState(AtomicUsize::new(INIT))
     }
 
+    #[inline]
     pub(crate) fn dec_ref(&self) -> usize {
         self.0.fetch_sub(REF_ONE, AcqRel)
     }
 
+    #[inline]
     pub(crate) fn inc_ref(&self) {
         self.0.fetch_add(REF_ONE, AcqRel);
     }
@@ -193,6 +203,7 @@ impl TaskState {
     }
 
     /// Turns the task state into scheduling. Returns the old state value.
+    #[inline]
     pub(crate) fn turn_to_scheduling(&self) -> usize {
         self.0.fetch_or(SCHEDULING, AcqRel)
     }
@@ -313,11 +324,13 @@ impl TaskState {
 
     cfg_not_ffrt! {
         /// Turns the task state into canceled. Returns the old state value.
+        #[inline]
         pub(crate) fn set_cancel(&self) -> usize {
             self.0.fetch_or(CANCELED, AcqRel)
         }
 
         /// Turns the task state into running. Returns the old state value.
+        #[inline]
         pub(crate) fn set_running(&self) {
             self.0.fetch_or(RUNNING, AcqRel);
         }

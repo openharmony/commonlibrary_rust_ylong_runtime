@@ -98,7 +98,10 @@ impl Default for Waiter {
 }
 
 unsafe impl Link for Waiter {
-    unsafe fn node(mut ptr: NonNull<Self>) -> NonNull<Node<Self>> where Self: Sized {
+    unsafe fn node(mut ptr: NonNull<Self>) -> NonNull<Node<Self>>
+    where
+        Self: Sized,
+    {
         let node_ptr = addr_of_mut!(ptr.as_mut().node);
         NonNull::new_unchecked(node_ptr)
     }
@@ -358,7 +361,9 @@ impl Future for Readiness<'_> {
                     unsafe {
                         (*waiter.get()).waker = Some(cx.waker().clone());
 
-                        waiters.list.push_front(NonNull::new_unchecked(waiter.get()));
+                        waiters
+                            .list
+                            .push_front(NonNull::new_unchecked(waiter.get()));
                     }
 
                     *state = State::Waiting;
@@ -377,7 +382,7 @@ impl Future for Readiness<'_> {
                         return Poll::Pending;
                     }
                     drop(waiters);
-                },
+                }
                 State::Done => {
                     let status_bit = Bit::from_usize(schedule_io.status.load(Acquire));
                     return Poll::Ready(Ok(ReadyEvent::new(
@@ -395,8 +400,8 @@ unsafe impl Send for Readiness<'_> {}
 
 impl Drop for Readiness<'_> {
     fn drop(&mut self) {
-        // Safety: There is only one queue holding the node, and this is the only way for the node
-        // to dequeue.
+        // Safety: There is only one queue holding the node, and this is the only way
+        // for the node to dequeue.
         unsafe {
             LinkedList::remove(NonNull::new_unchecked(self.waiter.get()));
         }
