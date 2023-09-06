@@ -23,7 +23,7 @@ use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 
 use crate::spawn::spawn_async;
 use crate::task::join_handle::CancelHandle;
-use crate::task::PriorityLevel;
+use crate::task::Qos;
 use crate::{JoinHandle, ScheduleError, TaskBuilder};
 
 /// A collection of tasks get spawned on a Ylong runtime
@@ -376,20 +376,20 @@ impl<'a, R> Builder<'a, R> {
         }
     }
 
-    /// Sets the priority for the tasks that are going to get spawned by this
+    /// Sets the QOS for the tasks that are going to get spawned by this
     /// JoinSet Builder
     ///
     /// # Examples
     /// ```
-    /// use ylong_runtime::task::{JoinSet, PriorityLevel};
+    /// use ylong_runtime::task::{JoinSet, Qos};
     /// ylong_runtime::block_on(async move {
     ///     let mut set = JoinSet::new();
-    ///     let mut builder = set.build_task().priority(PriorityLevel::AbsHigh);
+    ///     let mut builder = set.build_task().qos(Qos::UserInitiated);
     ///     builder.spawn(async move { 1 });
     /// });
     /// ```
-    pub fn priority(self, pri_level: PriorityLevel) -> Self {
-        let builder = self.builder.priority(pri_level);
+    pub fn qos(self, qos: Qos) -> Self {
+        let builder = self.builder.qos(qos);
         Self {
             builder,
             set: self.set,

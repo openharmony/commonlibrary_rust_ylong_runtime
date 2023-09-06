@@ -17,13 +17,13 @@ use std::sync::Weak;
 
 use libc::c_void;
 use ylong_ffrt::FfrtRet::{FfrtCoroutinePending, FfrtCoroutineReady};
-use ylong_ffrt::{ffrt_submit_h_coroutine, FfrtRet, FfrtTaskAttr, FfrtTaskHandle};
+use ylong_ffrt::{ffrt_submit_coroutine, FfrtRet, FfrtTaskAttr};
 
 use crate::executor::PlaceholderScheduler;
 use crate::task::{JoinHandle, Task, VirtualTableType};
 use crate::TaskBuilder;
 
-pub(crate) fn ffrt_submit(t: Task, attr: &FfrtTaskAttr) -> FfrtTaskHandle {
+pub(crate) fn ffrt_submit(t: Task, builder: &TaskBuilder) {
     extern "C" fn exec_future(data: *mut c_void) -> FfrtRet {
         unsafe {
             match (*(data as *mut Task)).0.run() {
@@ -39,19 +39,29 @@ pub(crate) fn ffrt_submit(t: Task, attr: &FfrtTaskAttr) -> FfrtTaskHandle {
         }
     }
 
+    let mut attr = FfrtTaskAttr::new();
+    attr.init();
+
+    if let Some(qos) = builder.qos {
+        attr.set_qos(qos);
+    }
+
+    if let Some(name) = &builder.name {
+        attr.set_name(name);
+    }
+
     let t: Box<Task> = Box::new(t);
     let data = Box::into_raw(t) as *mut c_void;
-    let handle = unsafe {
-        ffrt_submit_h_coroutine(
+    unsafe {
+        ffrt_submit_coroutine(
             data,
             exec_future,
             exec_drop,
             null(),
             null(),
-            attr as *const FfrtTaskAttr,
+            &attr as *const FfrtTaskAttr,
         )
     };
-    FfrtTaskHandle::new(handle)
 }
 
 pub fn spawn<F>(task: F, builder: &TaskBuilder) -> JoinHandle<F::Output>
@@ -60,11 +70,8 @@ where
     F::Output: Send + 'static,
 {
     let scheduler: Weak<PlaceholderScheduler> = Weak::new();
-    let (task, mut join_handle) =
-        Task::create_task(builder, scheduler, task, VirtualTableType::Ffrt);
-    let attr = FfrtTaskAttr::new();
+    let (task, join_handle) = Task::create_task(builder, scheduler, task, VirtualTableType::Ffrt);
 
-    let handle = ffrt_submit(task, &attr);
-    join_handle.set_task_handle(handle);
+    ffrt_submit(task, builder);
     join_handle
 }

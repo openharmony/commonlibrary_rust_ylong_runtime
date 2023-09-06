@@ -26,7 +26,6 @@ use crate::task::{TaskBuilder, VirtualTableType};
 use crate::ScheduleError;
 
 cfg_ffrt! {
-    use ylong_ffrt::FfrtTaskHandle;
     use crate::ffrt::ffrt_task::FfrtTaskCtx;
 }
 
@@ -53,16 +52,7 @@ pub(crate) struct TaskVirtualTable {
 #[repr(C)]
 pub(crate) struct Header {
     pub(crate) state: TaskState,
-    #[cfg(feature = "ffrt")]
-    pub(crate) task_handle: Option<FfrtTaskHandle>,
     pub(crate) vtable: &'static TaskVirtualTable,
-}
-
-#[cfg(feature = "ffrt")]
-impl Header {
-    fn set_task_handle(&mut self, handle: FfrtTaskHandle) {
-        self.task_handle.replace(handle);
-    }
 }
 
 #[derive(PartialEq, Eq, Hash)]
@@ -111,17 +101,6 @@ impl RawTask {
         unsafe {
             (vir_table.drop_join_handle)(self.ptr);
         }
-    }
-}
-
-#[cfg(feature = "ffrt")]
-impl RawTask {
-    fn header_mut(&mut self) -> &mut Header {
-        unsafe { self.ptr.as_mut() }
-    }
-
-    pub(crate) fn set_task_handle(&mut self, handle: FfrtTaskHandle) {
-        self.header_mut().set_task_handle(handle);
     }
 }
 
@@ -380,16 +359,6 @@ cfg_ffrt! {
         }
     }
 
-    unsafe fn ffrt_set_waker<T, S>(ptr: NonNull<Header>, cur_state: usize, waker: *const ()) -> bool
-    where
-        T: Future,
-        S: Schedule,
-    {
-        let waker = &*(waker as *const Waker);
-        let task_handle = TaskHandle::<T, S>::from_raw(ptr);
-        task_handle.ffrt_set_waker(cur_state, waker)
-    }
-
     unsafe fn ffrt_cancel<T, S>(ptr: NonNull<Header>)
     where
         T: Future,
@@ -410,7 +379,7 @@ cfg_ffrt! {
             get_result: get_result::<T, S>,
             drop_join_handle: drop_join_handle::<T, S>,
             drop_ref: drop_ref::<T, S>,
-            set_waker: ffrt_set_waker::<T, S>,
+            set_waker: set_waker::<T, S>,
             cancel: ffrt_cancel::<T, S>,
         }
     }
@@ -423,7 +392,7 @@ where
 {
     /// Creates non-stackful task info.
     // TODO: builder information currently is not used yet. Might use in the future
-    // (e.g. priority),   so keep it now.
+    // (e.g. qos),   so keep it now.
     pub(crate) fn new(
         _builder: &TaskBuilder,
         scheduler: Weak<S>,
@@ -438,8 +407,6 @@ where
         // Create the common header
         let header = Header {
             state: TaskState::new(),
-            #[cfg(feature = "ffrt")]
-            task_handle: None,
             vtable,
         };
         // Create task private info

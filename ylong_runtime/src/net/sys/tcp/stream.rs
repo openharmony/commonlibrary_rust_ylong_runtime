@@ -591,7 +591,7 @@ mod test {
     fn ut_tcp_stream_basic() {
         fn test_tcp_server() {
             crate::block_on(async {
-                let addr = "127.0.0.1:8081";
+                let addr = "127.0.0.1:9092";
                 let listener = TcpListener::bind(addr).await.unwrap();
                 listener.accept().await.unwrap();
             })
@@ -599,7 +599,7 @@ mod test {
         thread::spawn(test_tcp_server);
 
         crate::block_on(async {
-            let addr = "127.0.0.1:8081";
+            let addr = "127.0.0.1:9092";
             loop {
                 if let Ok(stream) = TcpStream::connect(addr).await {
                     assert_eq!(stream.peer_addr().unwrap(), addr.parse().unwrap());
@@ -629,7 +629,7 @@ mod test {
     fn ut_tcp_stream_peek() {
         fn test_tcp_server() {
             crate::block_on(async {
-                let addr = "127.0.0.1:8082";
+                let addr = "127.0.0.1:9093";
                 let listener = TcpListener::bind(addr).await.unwrap();
                 let (mut stream, _) = listener.accept().await.unwrap();
                 stream.write(b"hello").await.unwrap();
@@ -638,7 +638,7 @@ mod test {
         thread::spawn(test_tcp_server);
 
         crate::block_on(async {
-            let addr = "127.0.0.1:8082";
+            let addr = "127.0.0.1:9093";
             loop {
                 if let Ok(stream) = TcpStream::connect(addr).await {
                     let mut buf = [0; 100];

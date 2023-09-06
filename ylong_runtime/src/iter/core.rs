@@ -25,7 +25,6 @@ cfg_ffrt! {
     use crate::task::{Task, VirtualTableType};
     use crate::util::num_cpus::get_cpu_num;
     use std::sync::Weak;
-    use ylong_ffrt::FfrtTaskAttr;
 }
 
 pub(crate) async fn core<P, C>(par_iter: P, consumer: C) -> Result<C::Output, ScheduleError>
@@ -203,10 +202,8 @@ where
         recur_ffrt(task_builder, par_iter, consumer, min_split_len, split_time),
         VirtualTableType::Ffrt,
     );
-    let mut join_handle = JoinHandle::new(raw_task);
+    let join_handle = JoinHandle::new(raw_task);
     let task = Task(raw_task);
-    let attr = FfrtTaskAttr::new();
-    let handle = ffrt_submit(task, &attr);
-    join_handle.set_task_handle(handle);
+    ffrt_submit(task, task_builder);
     join_handle
 }

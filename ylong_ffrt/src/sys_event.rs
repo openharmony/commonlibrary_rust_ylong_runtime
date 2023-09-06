@@ -11,13 +11,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use libc::{c_int, c_uint, c_void};
+use libc::{c_int, c_uchar, c_uint, c_void};
 
 // Unstable interface, rust encapsulation temporarily not provided
 
 type FfrtSysEventHandleT = *mut c_void;
 type DestroyFunc = extern "C" fn(*mut c_void);
-type FfrtFdCallBack = extern "C" fn(*const c_void, c_uint);
+type FfrtFdCallBack = extern "C" fn(*const c_void, c_uint, c_uchar);
 
 #[link(name = "ffrt")]
 // sys_event.h

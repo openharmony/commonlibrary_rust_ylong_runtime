@@ -15,25 +15,20 @@
 //! [`TaskBuilder`] inherit all attributes of this builder.
 //!
 //! A task has following attributes:
-//! - priority
+//! - qos
 //! - task name
 
 use std::future::Future;
 
 use crate::spawn::{spawn_async, spawn_blocking};
-use crate::task::PriorityLevel;
+use crate::task::Qos;
 use crate::JoinHandle;
 
 /// Tasks attribute
 #[derive(Clone)]
 pub struct TaskBuilder {
     pub(crate) name: Option<String>,
-    /// Task priority: ABS_LOW/HIGH/LOW/ABS_LOW
-    pub(crate) pri: Option<PriorityLevel>,
-    /// Task statistics switch
-    pub(crate) is_stat: bool,
-    /// Which way of the list the task needs to be inserted
-    pub(crate) is_insert_front: bool,
+    pub(crate) qos: Option<Qos>,
 }
 
 impl Default for TaskBuilder {
@@ -47,9 +42,7 @@ impl TaskBuilder {
     pub fn new() -> Self {
         TaskBuilder {
             name: None,
-            pri: None,
-            is_stat: false,
-            is_insert_front: false,
+            qos: None,
         }
     }
 
@@ -59,21 +52,9 @@ impl TaskBuilder {
         self
     }
 
-    /// Sets the priority of the task
-    pub fn priority(mut self, pri_level: PriorityLevel) -> Self {
-        self.pri = Some(pri_level);
-        self
-    }
-
-    /// Sets whether to turn on task statistics
-    pub fn stat(mut self, is_stat: bool) -> Self {
-        self.is_stat = is_stat;
-        self
-    }
-
-    /// Specifies which way of the list to insert the task
-    pub fn insert_front(mut self, is_insert_front: bool) -> Self {
-        self.is_insert_front = is_insert_front;
+    /// Sets the qos of the task
+    pub fn qos(mut self, qos: Qos) -> Self {
+        self.qos = Some(qos);
         self
     }
 
@@ -101,15 +82,13 @@ impl TaskBuilder {
 
 #[cfg(test)]
 mod test {
-    use crate::task::{PriorityLevel, TaskBuilder};
+    use crate::task::{Qos, TaskBuilder};
 
     #[test]
     fn ut_task() {
         ut_builder_new();
         ut_builder_name();
         ut_builder_pri();
-        ut_builder_insert_front();
-        ut_builder_stat();
     }
 
     /// UT test cases for Builder::new
@@ -123,9 +102,7 @@ mod test {
     fn ut_builder_new() {
         let builder = TaskBuilder::new();
         assert_eq!(builder.name, None);
-        assert!(builder.pri.is_none());
-        assert!(!builder.is_stat);
-        assert!(!builder.is_insert_front);
+        assert!(builder.qos.is_none());
     }
 
     /// UT test cases for Builder::name
@@ -142,62 +119,30 @@ mod test {
     /// UT test cases for Builder::name
     ///
     /// # Brief
-    /// 1. pri set to AbsHigh, check return value
-    /// 2. pri set to High, check return value
-    /// 3. pri set to Low, check return value
-    /// 4. pri set to AbsLow, check return value
-    /// 5. pri set to Butt, check return value
+    /// 1. pri set to Background, check return value
+    /// 2. pri set to Utility, check return value
+    /// 3. pri set to UserInteractive, check return value
+    /// 4. pri set to UserInitiated, check return value
+    /// 5. pri set to Default, check return value
     fn ut_builder_pri() {
         let builder = TaskBuilder::new();
-        let pri = PriorityLevel::AbsHigh;
-        assert_eq!(builder.priority(pri).pri.unwrap(), pri);
+        let pri = Qos::Background;
+        assert_eq!(builder.qos(pri).qos.unwrap(), pri);
 
         let builder = TaskBuilder::new();
-        let pri = PriorityLevel::High;
-        assert_eq!(builder.priority(pri).pri.unwrap(), pri);
+        let pri = Qos::Utility;
+        assert_eq!(builder.qos(pri).qos.unwrap(), pri);
 
         let builder = TaskBuilder::new();
-        let pri = PriorityLevel::Low;
-        assert_eq!(builder.priority(pri).pri.unwrap(), pri);
+        let pri = Qos::UserInteractive;
+        assert_eq!(builder.qos(pri).qos.unwrap(), pri);
 
         let builder = TaskBuilder::new();
-        let pri = PriorityLevel::AbsLow;
-        assert_eq!(builder.priority(pri).pri.unwrap(), pri);
-    }
-
-    /// UT test cases for Builder::stat
-    ///
-    /// # Brief
-    /// 1. is_stat set to true, check return value
-    /// 2. is_stat set to false, check return value
-    fn ut_builder_stat() {
-        let builder = TaskBuilder::new();
-        let is_stat = true;
-        assert_eq!(builder.stat(is_stat).is_stat, is_stat);
+        let pri = Qos::UserInitiated;
+        assert_eq!(builder.qos(pri).qos.unwrap(), pri);
 
         let builder = TaskBuilder::new();
-        let is_stat = false;
-        assert_eq!(builder.stat(is_stat).is_stat, is_stat);
-    }
-
-    /// UT test cases for Builder::insert_front
-    ///
-    /// # Brief
-    /// 1. is_insert_front set to true, check return value
-    /// 2. is_insert_front set to false, check return value
-    fn ut_builder_insert_front() {
-        let builder = TaskBuilder::new();
-        let is_insert_front = true;
-        assert_eq!(
-            builder.insert_front(is_insert_front).is_insert_front,
-            is_insert_front
-        );
-
-        let builder = TaskBuilder::new();
-        let is_insert_front = false;
-        assert_eq!(
-            builder.insert_front(is_insert_front).is_insert_front,
-            is_insert_front
-        );
+        let pri = Qos::Default;
+        assert_eq!(builder.qos(pri).qos.unwrap(), pri);
     }
 }
