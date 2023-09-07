@@ -12,6 +12,12 @@
 // limitations under the License.
 
 use std::sync::{Arc, Mutex};
+
+cfg_event!(
+    use std::io;
+    use crate::executor::worker::{get_current_handle};
+);
+
 cfg_time! {
     use std::fmt::Error;
     use std::ptr::NonNull;
@@ -19,7 +25,6 @@ cfg_time! {
     use std::time::Instant;
 }
 cfg_net! {
-    use std::io;
     use crate::util::slab::Ref;
     use crate::net::{IoDriver, IoHandle};
     use std::time::Duration;
@@ -85,6 +90,13 @@ impl Handle {
     pub(crate) fn wake(&self) {
         #[cfg(feature = "net")]
         self.io.waker.wake().expect("ylong_io wake failed");
+    }
+
+    #[cfg(any(feature = "net", feature = "time"))]
+    pub(crate) fn get_handle() -> io::Result<Arc<Handle>> {
+        let context = get_current_handle()
+            .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "get_current_ctx() fail"))?;
+        Ok(context._handle.clone())
     }
 }
 

@@ -77,6 +77,9 @@ impl TcpStream {
     /// all connections fail, it returns the error of the last connection.
     /// This behavior is consistent with std.
     ///
+    /// # Panic
+    /// Calling this method outside of a Ylong Runtime could cause panic.
+    ///
     /// # Example
     /// ```rust
     /// use std::io;

@@ -38,6 +38,16 @@ macro_rules! cfg_ffrt {
     }
 }
 
+#[cfg(not(feature = "ffrt"))]
+macro_rules! cfg_event {
+    ($($item:item)*) => {
+        $(
+            #[cfg(any(feature = "net", feature = "time"))]
+            $item
+        )*
+    }
+}
+
 macro_rules! cfg_not_ffrt {
     ($($item:item)*) => {
         $(

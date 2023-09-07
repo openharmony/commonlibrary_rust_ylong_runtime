@@ -529,7 +529,7 @@ impl GlobalQueue {
 }
 
 #[cfg(feature = "multi_instance_runtime")]
-#[cfg(all(test))]
+#[cfg(test)]
 mod test {
     use std::future::Future;
     use std::pin::Pin;

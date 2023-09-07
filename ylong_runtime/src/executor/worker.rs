@@ -18,7 +18,6 @@ use std::task::Waker;
 
 /// worker struct info and method
 use crate::executor::async_pool::MultiThreadScheduler;
-#[cfg(any(feature = "net", feature = "time"))]
 use crate::executor::driver::Handle;
 use crate::executor::parker::Parker;
 use crate::executor::queue::LocalQueue;
@@ -26,44 +25,41 @@ use crate::task::yield_now::wake_yielded_tasks;
 use crate::task::Task;
 
 thread_local! {
-    pub(crate) static CURRENT_WORKER : Cell<* const ()> = Cell::new(ptr::null());
+    pub(crate) static CURRENT_WORKER: Cell<* const ()> = Cell::new(ptr::null());
+    pub(crate) static CURRENT_HANDLE: Cell<* const ()> = Cell::new(ptr::null());
 }
 
-pub(crate) enum WorkerContext {
-    Multi(MultiWorkerContext),
-    #[cfg(any(feature = "net", feature = "time"))]
-    Curr(CurrentWorkerContext),
-}
-
-#[cfg(any(feature = "net", feature = "time"))]
-macro_rules! get_multi_worker_context {
-    ($e:expr) => {
-        match $e {
-            crate::executor::worker::WorkerContext::Multi(ctx) => ctx,
-            crate::executor::worker::WorkerContext::Curr(_) => unreachable!(),
-        }
-    };
-}
-
-#[cfg(not(any(feature = "net", feature = "time")))]
-macro_rules! get_multi_worker_context {
-    ($e:expr) => {{
-        let crate::executor::worker::WorkerContext::Multi(ctx) = $e;
-        ctx
-    }};
-}
-
-pub(crate) use get_multi_worker_context;
-
-pub(crate) struct MultiWorkerContext {
+pub(crate) struct WorkerContext {
     pub(crate) worker: Arc<Worker>,
-    #[cfg(any(feature = "net", feature = "time"))]
-    pub(crate) handle: Arc<Handle>,
 }
 
-#[cfg(any(feature = "net", feature = "time"))]
-pub(crate) struct CurrentWorkerContext {
-    pub(crate) handle: Arc<Handle>,
+impl WorkerContext {
+    fn run(&mut self) {
+        let worker_ref = &self.worker;
+        worker_ref.run(self);
+    }
+
+    fn release(&mut self) {
+        self.worker.release();
+    }
+}
+
+pub(crate) struct WorkerHandle {
+    pub(crate) _handle: Arc<Handle>,
+}
+
+/// Gets the handle of the current thread
+#[cfg(all(not(feature = "ffrt"), any(feature = "net", feature = "time")))]
+#[inline]
+pub(crate) fn get_current_handle() -> Option<&'static WorkerHandle> {
+    CURRENT_HANDLE.with(|ctx| {
+        let val = ctx.get();
+        if val.is_null() {
+            None
+        } else {
+            Some(unsafe { &*(val as *const _ as *const WorkerHandle) })
+        }
+    })
 }
 
 /// Gets the worker context of the current thread
@@ -79,45 +75,37 @@ pub(crate) fn get_current_ctx() -> Option<&'static WorkerContext> {
     })
 }
 
-impl MultiWorkerContext {
-    fn run(&mut self) {
-        let worker_ref = &self.worker;
-        worker_ref.run();
-    }
-
-    fn release(&mut self) {
-        self.worker.release();
-    }
-}
-
 /// Runs the worker thread
-pub(crate) fn run_worker(
-    worker: Arc<Worker>,
-    #[cfg(any(feature = "net", feature = "time"))] handle: Arc<Handle>,
-) {
-    let cur_context = WorkerContext::Multi(MultiWorkerContext {
-        worker,
-        #[cfg(any(feature = "net", feature = "time"))]
-        handle,
-    });
+pub(crate) fn run_worker(worker: Arc<Worker>, handle: Arc<Handle>) {
+    let mut cur_context = WorkerContext { worker };
 
-    struct Reset(*const ());
+    let cur_handle = WorkerHandle { _handle: handle };
+
+    struct Reset(*const (), *const ());
 
     impl Drop for Reset {
         fn drop(&mut self) {
-            CURRENT_WORKER.with(|ctx| ctx.set(self.0))
+            CURRENT_WORKER.with(|ctx| ctx.set(self.0));
+            CURRENT_HANDLE.with(|handle| handle.set(self.1));
         }
     }
     // store the worker to tls
     let _guard = CURRENT_WORKER.with(|cur| {
-        let prev = cur.get();
+        let prev_ctx = cur.get();
         cur.set(&cur_context as *const _ as *const ());
-        Reset(prev)
+
+        let handle = CURRENT_HANDLE.with(|handle| {
+            let prev_handle = handle.get();
+            handle.set(&cur_handle as *const _ as *const ());
+            prev_handle
+        });
+
+        Reset(prev_ctx, handle)
     });
 
-    let mut cur_context = get_multi_worker_context!(cur_context);
     cur_context.run();
     cur_context.release();
+    drop(cur_handle);
 }
 
 pub(crate) struct Worker {
@@ -132,7 +120,7 @@ unsafe impl Send for Worker {}
 unsafe impl Sync for Worker {}
 
 impl Worker {
-    fn run(&self) {
+    fn run(&self, worker_ctx: &WorkerContext) {
         let mut inner = self.inner.borrow_mut();
         let inner = inner.as_mut();
 
@@ -141,23 +129,23 @@ impl Worker {
             inner.periodic_check(self);
 
             // get a task from the queues and execute it
-            if let Some(task) = self.get_task(inner) {
+            if let Some(task) = self.get_task(inner, worker_ctx) {
                 task.run();
                 continue;
             }
-            wake_yielded_tasks();
+            wake_yielded_tasks(worker_ctx);
             // if there is no task, park the worker
-            self.park_timeout(inner);
+            self.park_timeout(inner, worker_ctx);
 
             self.check_cancel(inner);
         }
-        self.pre_shutdown(inner);
+        self.pre_shutdown(inner, worker_ctx);
     }
 
-    fn pre_shutdown(&self, inner: &mut Inner) {
+    fn pre_shutdown(&self, inner: &mut Inner, worker_ctx: &WorkerContext) {
         // drop all tasks in the local queue
         loop {
-            if let Some(task) = self.get_task(inner) {
+            if let Some(task) = self.get_task(inner, worker_ctx) {
                 task.shutdown();
                 continue;
             }
@@ -180,13 +168,9 @@ impl Worker {
         }
     }
 
-    fn get_task(&self, inner: &mut Inner) -> Option<Task> {
-        // We're under worker environment, so it's safe to unwrap
-        let ctx =
-            get_multi_worker_context!(get_current_ctx().expect("worker get_current_ctx() fail"));
-
+    fn get_task(&self, inner: &mut Inner, worker_ctx: &WorkerContext) -> Option<Task> {
         // schedule lifo task first
-        let mut lifo_slot = ctx.worker.lifo.borrow_mut();
+        let mut lifo_slot = worker_ctx.worker.lifo.borrow_mut();
         if let Some(task) = lifo_slot.take() {
             return Some(task);
         }
@@ -199,11 +183,9 @@ impl Worker {
         inner.check_cancel(self)
     }
 
-    fn park_timeout(&self, inner: &mut Inner) {
-        let ctx = get_multi_worker_context!(get_current_ctx().unwrap());
-
+    fn park_timeout(&self, inner: &mut Inner, worker_ctx: &WorkerContext) {
         // still has works to do, go back to work
-        if ctx.worker.lifo.borrow().is_some() || !inner.run_queue.is_empty() {
+        if worker_ctx.worker.lifo.borrow().is_some() || !inner.run_queue.is_empty() {
             return;
         }
 

@@ -16,8 +16,10 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-#[cfg(not(feature = "ffrt"))]
-use crate::executor::worker;
+cfg_not_ffrt!(
+    use crate::executor::worker;
+    use crate::executor::worker::WorkerContext;
+);
 
 /// Yields the current task and wakes it for a reschedule.
 /// # Examples
@@ -51,14 +53,8 @@ impl Future for YieldTask {
             // waking the waker in a worker context will put the task in the
             // lifo slot, we don't want that.
             if let Some(ctx) = ctx {
-                match ctx {
-                    worker::WorkerContext::Multi(ctx) => {
-                        let mut yielded = ctx.worker.yielded.borrow_mut();
-                        yielded.push(cx.waker().clone());
-                    }
-                    #[cfg(any(feature = "net", feature = "time"))]
-                    worker::WorkerContext::Curr(_) => cx.waker().wake_by_ref(),
-                }
+                let mut yielded = ctx.worker.yielded.borrow_mut();
+                yielded.push(cx.waker().clone());
             } else {
                 cx.waker().wake_by_ref();
             }
@@ -81,10 +77,8 @@ impl Future for YieldTask {
 }
 
 #[cfg(not(feature = "ffrt"))]
-pub(crate) fn wake_yielded_tasks() {
-    let ctx = worker::get_current_ctx().expect("not in a worker ctx");
-    let ctx = worker::get_multi_worker_context!(ctx);
-    let mut yielded = ctx.worker.yielded.borrow_mut();
+pub(crate) fn wake_yielded_tasks(worker_ctx: &WorkerContext) {
+    let mut yielded = worker_ctx.worker.yielded.borrow_mut();
     if yielded.is_empty() {
         return;
     }
@@ -124,6 +118,24 @@ mod test {
         let ret = crate::block_on(handle).unwrap();
         assert_eq!(ret, 1000);
         let ret = crate::block_on(handle2).unwrap();
+        assert_eq!(ret, 1000);
+    }
+
+    /// UT test cases for calling yield inside block_on.
+    ///
+    /// # Brief
+    /// 1. Blocks on an async function that adds a number to 1000
+    /// 2. Checks if the returned value is correct
+    #[test]
+    fn ut_yield_block_on() {
+        let ret = crate::block_on(async move {
+            let mut i = 0;
+            for _ in 0..1000 {
+                i += 1;
+                yield_now().await;
+            }
+            i
+        });
         assert_eq!(ret, 1000);
     }
 }

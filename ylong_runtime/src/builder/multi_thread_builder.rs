@@ -209,7 +209,7 @@ mod ffrt_test {
         let num = builder.thread_num_by_qos.get(&UserInteractive).unwrap();
         assert_eq!(*num, 20);
 
-        let ret = MultiThreadBuilder::new().max_worker_num_by_qos(Default, 8);
+        let builder = MultiThreadBuilder::new().max_worker_num_by_qos(Default, 8);
         let num = builder.thread_num_by_qos.get(&Default).unwrap();
         assert_eq!(*num, 8);
     }
