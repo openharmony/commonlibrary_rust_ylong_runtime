@@ -20,13 +20,16 @@ use crate::io::poll_ready;
 use crate::net::ScheduleIO;
 use crate::util::slab::Ref;
 
+cfg_not_ffrt!(
+    use std::sync::Arc;
+    use crate::executor::driver::Handle;
+);
+
 cfg_net!(
     use std::task::{Context, Poll};
     use std::mem::MaybeUninit;
     use crate::io::ReadBuf;
     use crate::net::ReadyEvent;
-    #[cfg(not(feature = "ffrt"))]
-    use crate::executor::worker::{get_current_ctx, WorkerContext};
     use std::io::{Read, Write};
 );
 
@@ -39,6 +42,10 @@ pub(crate) struct AsyncSource<E: Source> {
     /// Entry list of the runtime's reactor, `AsyncSource` object will be
     /// registered into it when created.
     pub(crate) entry: Ref<ScheduleIO>,
+
+    #[cfg(not(feature = "ffrt"))]
+    /// Handle to the IO Driver, used for deregistration
+    pub(crate) handle: Arc<Handle>,
 }
 
 impl<E: Source> AsyncSource<E> {
@@ -55,20 +62,14 @@ impl<E: Source> AsyncSource<E> {
     /// returned.
     #[cfg(not(feature = "ffrt"))]
     pub fn new(mut io: E, interest: Option<Interest>) -> io::Result<AsyncSource<E>> {
-        let inner = {
-            let context = get_current_ctx()
-                .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "get_current_ctx() fail"))?;
-            match context {
-                WorkerContext::Multi(ctx) => &ctx.handle,
-                WorkerContext::Curr(ctx) => &ctx.handle,
-            }
-        };
+        let inner = Handle::get_handle()?;
 
         let interest = interest.unwrap_or_else(|| Interest::WRITABLE.add(Interest::READABLE));
         let entry = inner.io_register(&mut io, interest)?;
         Ok(AsyncSource {
             io: Some(io),
             entry,
+            handle: inner,
         })
     }
 
@@ -248,14 +249,7 @@ impl<E: Source> Deref for AsyncSource<E> {
 impl<E: Source> Drop for AsyncSource<E> {
     fn drop(&mut self) {
         if let Some(mut io) = self.io.take() {
-            let inner = {
-                let context = get_current_ctx().expect("AsyncSource drop get_current_ctx() fail");
-                match context {
-                    WorkerContext::Multi(ctx) => &ctx.handle,
-                    WorkerContext::Curr(ctx) => &ctx.handle,
-                }
-            };
-            let _ = inner.io_deregister(&mut io);
+            let _ = self.handle.io_deregister(&mut io);
         }
     }
 }

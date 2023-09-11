@@ -53,6 +53,9 @@ impl TcpListener {
     /// all connections fail, it returns the error of the last connection.
     /// This behavior is consistent with std.
     ///
+    /// # Panic
+    /// Calling this method outside of a Ylong Runtime could cause panic.
+    ///
     /// # Example
     /// ```rust
     /// use std::io;
@@ -77,6 +80,8 @@ impl TcpListener {
     /// When connection gets established, the corresponding [`TcpStream`] and
     /// the remote peer's address will be returned.
     ///
+    /// # Panic
+    /// Calling this method outside of a Ylong Runtime could cause panic.
     ///
     /// # Example
     /// ```rust

@@ -97,6 +97,9 @@ impl UdpSocket {
     /// all connections fail, it returns the error of the last connection.
     /// This behavior is consistent with std.
     ///
+    /// # Panic
+    /// Calling this method outside of a Ylong Runtime could cause panic.
+    ///
     /// # Examples
     ///
     /// ```rust
@@ -136,6 +139,9 @@ impl UdpSocket {
     /// connect them in sequence until one of the addrs returns success. If
     /// all connections fail, it returns the error of the last connection.
     /// This behavior is consistent with std.
+    ///
+    /// # Panic
+    /// Calling this method outside of a Ylong Runtime could cause panic.
     ///
     /// # Examples
     ///

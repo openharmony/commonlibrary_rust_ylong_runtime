@@ -43,7 +43,6 @@ cfg_not_ffrt! {
     mod sleeper;
     pub(crate) mod worker;
     pub(crate) mod driver;
-    #[cfg(any(feature = "net", feature = "time"))]
     use crate::executor::driver::Handle;
     use crate::builder::initialize_async_spawner;
     use crate::executor::async_pool::AsyncPoolSpawner;
@@ -85,7 +84,7 @@ pub struct Runtime {
     pub(crate) async_spawner: AsyncHandle,
 }
 
-#[cfg(all(not(feature = "ffrt"), any(feature = "net", feature = "time")))]
+#[cfg(not(feature = "ffrt"))]
 impl Runtime {
     pub(crate) fn get_handle(&self) -> std::sync::Arc<Handle> {
         match &self.async_spawner {
@@ -277,16 +276,15 @@ impl Runtime {
     {
         // Registers handle to the current thread when block_on().
         // so that async_source can get the handle and register it.
-        #[cfg(all(not(feature = "ffrt"), any(feature = "net", feature = "time")))]
-        let cur_context = worker::WorkerContext::Curr(worker::CurrentWorkerContext {
-            handle: self.get_handle(),
-        });
-        #[cfg(all(not(feature = "ffrt"), any(feature = "net", feature = "time")))]
-        worker::CURRENT_WORKER.with(|ctx| {
+        #[cfg(not(feature = "ffrt"))]
+        let cur_context = worker::WorkerHandle {
+            _handle: self.get_handle(),
+        };
+        #[cfg(not(feature = "ffrt"))]
+        worker::CURRENT_HANDLE.with(|ctx| {
             ctx.set(&cur_context as *const _ as *const ());
         });
 
-        #[warn(clippy::let_and_return)]
         let ret = match &self.async_spawner {
             #[cfg(feature = "current_thread_runtime")]
             AsyncHandle::CurrentThread(current_thread) => current_thread.block_on(task),
@@ -298,8 +296,8 @@ impl Runtime {
 
         // Sets the current thread variable to null,
         // otherwise the worker's CURRENT_WORKER can not be set under MultiThread.
-        #[cfg(all(not(feature = "ffrt"), any(feature = "net", feature = "time")))]
-        worker::CURRENT_WORKER.with(|ctx| {
+        #[cfg(not(feature = "ffrt"))]
+        worker::CURRENT_HANDLE.with(|ctx| {
             ctx.set(std::ptr::null());
         });
 

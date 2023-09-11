@@ -23,7 +23,7 @@ use super::driver::{Driver, Handle};
 use super::parker::Parker;
 use super::queue::{GlobalQueue, LocalQueue, LOCAL_QUEUE_CAP};
 use super::sleeper::Sleeper;
-use super::worker::{get_current_ctx, run_worker, Worker, WorkerContext};
+use super::worker::{get_current_ctx, run_worker, Worker};
 use super::{worker, Schedule};
 use crate::builder::multi_thread_builder::MultiThreadBuilder;
 use crate::builder::CallbackHook;
@@ -154,14 +154,14 @@ impl MultiThreadScheduler {
         let cur_worker = get_current_ctx();
 
         // WorkerContext::Curr will never enter here.
-        if let Some(WorkerContext::Multi(cur_worker)) = cur_worker {
-            if !std::ptr::eq(&self.global, &cur_worker.worker.scheduler.global) {
+        if let Some(worker_ctx) = cur_worker {
+            if !std::ptr::eq(&self.global, &worker_ctx.worker.scheduler.global) {
                 self.global.push_back(task);
                 return true;
             }
 
             if lifo {
-                let mut lifo_slot = cur_worker.worker.lifo.borrow_mut();
+                let mut lifo_slot = worker_ctx.worker.lifo.borrow_mut();
                 let prev_task = lifo_slot.take();
                 if let Some(prev) = prev_task {
                     // there is some task in lifo slot, therefore we put the prev task
@@ -175,7 +175,7 @@ impl MultiThreadScheduler {
                 }
             }
 
-            let local_run_queue = self.locals.get(cur_worker.worker.index).unwrap();
+            let local_run_queue = self.locals.get(worker_ctx.worker.index).unwrap();
             local_run_queue.push_back(task, &self.global);
             return true;
         }
@@ -328,20 +328,12 @@ fn get_cpu_core() -> usize {
     cmp::max(1, get_cpu_num() as usize)
 }
 
-fn async_thread_proc(
-    inner: Arc<Inner>,
-    worker: Arc<Worker>,
-    #[cfg(any(feature = "net", feature = "time"))] handle: Arc<Handle>,
-) {
+fn async_thread_proc(inner: Arc<Inner>, worker: Arc<Worker>, handle: Arc<Handle>) {
     if let Some(f) = inner.after_start.clone() {
         f();
     }
 
-    run_worker(
-        worker,
-        #[cfg(any(feature = "net", feature = "time"))]
-        handle,
-    );
+    run_worker(worker, handle);
     let (lock, cvar) = &*(inner.shutdown_handle.clone());
     let mut finished = lock.lock().unwrap();
     *finished += 1;
@@ -395,7 +387,6 @@ impl AsyncPoolSpawner {
         }
 
         for (worker_id, worker) in workers.drain(..).enumerate() {
-            #[cfg(any(feature = "net", feature = "time"))]
             let work_arc_handle = self.exe_mng_info.handle.clone();
             #[cfg(feature = "metrics")]
             self.inner.workers.lock().unwrap().push(worker.clone());
@@ -422,21 +413,11 @@ impl AsyncPoolSpawner {
                     let cpu_core_num = get_cpu_core();
                     let cpu_id = worker_id % cpu_core_num;
                     set_current_affinity(cpu_id).expect("set_current_affinity() fail!");
-                    async_thread_proc(
-                        inner,
-                        worker,
-                        #[cfg(any(feature = "net", feature = "time"))]
-                        work_arc_handle,
-                    );
+                    async_thread_proc(inner, worker, work_arc_handle);
                 })?;
             } else {
                 builder.spawn(move || {
-                    async_thread_proc(
-                        inner,
-                        worker,
-                        #[cfg(any(feature = "net", feature = "time"))]
-                        work_arc_handle,
-                    );
+                    async_thread_proc(inner, worker, work_arc_handle);
                 })?;
             }
         }
@@ -558,7 +539,7 @@ impl AsyncPoolSpawner {
     }
 }
 
-#[cfg(all(test))]
+#[cfg(test)]
 mod test {
     use std::future::Future;
     use std::pin::Pin;
