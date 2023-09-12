@@ -57,7 +57,7 @@ impl<T> Block<T> {
     fn try_insert(&self, ptr: *mut Block<T>) -> Result<(), *mut Block<T>> {
         match self
             .next
-            .compare_exchange_weak(ptr::null_mut(), ptr, AcqRel, Acquire)
+            .compare_exchange(ptr::null_mut(), ptr, AcqRel, Acquire)
         {
             Ok(_) => Ok(()),
             Err(new_ptr) => Err(new_ptr),
@@ -124,6 +124,7 @@ impl<T> Queue<T> {
     pub(crate) fn send(&self, value: T) -> Result<(), SendError<T>> {
         let mut tail = self.tail.index.load(Acquire);
         let mut block_ptr = self.tail.block.load(Acquire);
+        let mut new_block = None;
         loop {
             if tail & CLOSED == CLOSED {
                 return Err(SendError(value));
@@ -135,10 +136,8 @@ impl<T> Queue<T> {
                 continue;
             }
             let block = unsafe { &*block_ptr };
-            if index + 1 == CAPACITY && block.next.load(Acquire).is_null() {
-                let new_block = Box::new(Block::<T>::new());
-                let new_block_ptr = Box::into_raw(new_block);
-                block.insert(new_block_ptr);
+            if index + 1 == CAPACITY && new_block.is_none() {
+                new_block = Some(Box::new(Block::<T>::new()));
             }
             match self.tail.index.compare_exchange_weak(
                 tail,
@@ -148,6 +147,8 @@ impl<T> Queue<T> {
             ) {
                 Ok(_) => {
                     if index + 1 == CAPACITY {
+                        let new_block_ptr = Box::into_raw(new_block.unwrap());
+                        block.insert(new_block_ptr);
                         let next_block = block.next.load(Acquire);
                         self.tail.block.store(next_block, Release);
                         self.tail.index.fetch_add(1 << INDEX_SHIFT, Release);
