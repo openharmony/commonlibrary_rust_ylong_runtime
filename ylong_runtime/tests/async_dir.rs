@@ -11,8 +11,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![cfg(not(gn_test))]
 #![cfg(feature = "fs")]
+
 
 use ylong_runtime::fs::{create_dir, create_dir_all, read_dir, remove_dir, remove_dir_all, File};
 
@@ -26,10 +26,14 @@ use ylong_runtime::fs::{create_dir, create_dir_all, read_dir, remove_dir, remove
 #[test]
 fn sdv_async_dir() {
     let handle = ylong_runtime::spawn(async move {
-        let _ = create_dir("./tests/dir_test").await;
-        File::create("./tests/dir_test/test1.txt").await.unwrap();
-        File::create("./tests/dir_test/test2.txt").await.unwrap();
-        let mut dir = read_dir("./tests/dir_test").await.unwrap();
+        let _ = create_dir("dir_test").await;
+        File::create("dir_test/test1.txt")
+            .await
+            .unwrap();
+        File::create("dir_test/test2.txt")
+            .await
+            .unwrap();
+        let mut dir = read_dir("dir_test").await.unwrap();
         let entry = dir.next().await.unwrap().unwrap();
         assert!(!entry.file_type().await.unwrap().is_dir());
         assert!(entry.file_type().await.unwrap().is_file());
@@ -40,7 +44,7 @@ fn sdv_async_dir() {
         assert!(!entry.metadata().await.unwrap().permissions().readonly());
         assert!(entry.file_name().into_string().unwrap().contains("test"));
         assert!(dir.next().await.unwrap().is_none());
-        assert!(remove_dir_all("./tests/dir_test").await.is_ok());
+        assert!(remove_dir_all("dir_test").await.is_ok());
     });
     ylong_runtime::block_on(handle).unwrap();
 }
@@ -61,19 +65,19 @@ fn sdv_async_dir() {
 #[test]
 fn sdv_async_dir_create_remove() {
     let handle = ylong_runtime::spawn(async move {
-        assert!(create_dir("./tests/dir_test1").await.is_ok());
-        assert!(create_dir("./tests/dir_test1").await.is_err());
-        assert!(create_dir("./tests/dir_test2/dir_test_child")
+        assert!(create_dir("dir_test1").await.is_ok());
+        assert!(create_dir("dir_test1").await.is_err());
+        assert!(create_dir("dir_test2/dir_test_child")
             .await
             .is_err());
-        assert!(create_dir_all("./tests/dir_test2/dir_test_child")
+        assert!(create_dir_all("dir_test2/dir_test_child")
             .await
             .is_ok());
-        assert!(remove_dir("./tests/dir_test1").await.is_ok());
-        assert!(remove_dir("./tests/dir_test1").await.is_err());
-        assert!(remove_dir("./tests/async_dir").await.is_err());
-        assert!(remove_dir("./tests/dir_test2").await.is_err());
-        assert!(remove_dir_all("./tests/dir_test2").await.is_ok());
+        assert!(remove_dir("dir_test1").await.is_ok());
+        assert!(remove_dir("dir_test1").await.is_err());
+        assert!(remove_dir("async_dir").await.is_err());
+        assert!(remove_dir("dir_test2").await.is_err());
+        assert!(remove_dir_all("dir_test2").await.is_ok());
     });
     ylong_runtime::block_on(handle).unwrap();
 }

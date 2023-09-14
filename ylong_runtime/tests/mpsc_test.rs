@@ -229,7 +229,6 @@ fn sdv_mpsc_len() {
 /// 2. Send and receive for many times.
 /// 3. Create a bounded mpsc channel with capacity.
 /// 4. Send and receive for many times.
-#[cfg(not(gn_test))]
 #[test]
 fn sdv_multi_send_recv_test() {
     use ylong_runtime::task::JoinHandle;
