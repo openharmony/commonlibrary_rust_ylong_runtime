@@ -4,10 +4,8 @@ version = "1.0.0"
 edition = "2021"
 description = "FFRT adapter"
 license = "Apache-2.0"
-repository = "https://gitee.com/openharmony-sig/commonlibrary_rust_ylong_runtime"
+repository = "https://gitee.com/openharmony/commonlibrary_rust_ylong_runtime"
 keywords = ["ylong", "ffrt"]
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 libc = "0.2.134"
