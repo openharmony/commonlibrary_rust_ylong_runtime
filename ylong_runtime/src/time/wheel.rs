@@ -18,7 +18,7 @@ use std::ptr::NonNull;
 use std::time::Duration;
 
 use crate::time::Clock;
-use crate::util::link_list::LinkedList;
+use crate::util::linked_list::LinkedList;
 
 // In a slots, the number of slot.
 const SLOTS_NUM: usize = 64;
@@ -148,7 +148,7 @@ impl Wheel {
         // Caller has unique access to the linked list and the node is not in any other
         // linked list.
         unsafe {
-            LinkedList::remove(clock_entry);
+            self.trigger.remove(clock_entry);
         }
     }
 
@@ -265,7 +265,7 @@ impl Level {
         // Caller has unique access to the linked list and the node is not in any other
         // linked list.
         unsafe {
-            LinkedList::remove(clock_entry);
+            self.slots[slot].remove(clock_entry);
         }
 
         if self.slots[slot].is_empty() {

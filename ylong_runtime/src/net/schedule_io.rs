@@ -27,7 +27,7 @@ use ylong_io::Interest;
 use crate::futures::poll_fn;
 use crate::net::{Ready, ReadyEvent};
 use crate::util::bit::{Bit, Mask};
-use crate::util::link_list::{Link, LinkedList, Node};
+use crate::util::linked_list::{Link, LinkedList, Node};
 use crate::util::slab::Entry;
 
 const GENERATION: Mask = Mask::new(7, 24);
@@ -400,10 +400,13 @@ unsafe impl Send for Readiness<'_> {}
 
 impl Drop for Readiness<'_> {
     fn drop(&mut self) {
+        let mut waiters = self.schedule_io.waiters.lock().unwrap();
         // Safety: There is only one queue holding the node, and this is the only way
         // for the node to dequeue.
         unsafe {
-            LinkedList::remove(NonNull::new_unchecked(self.waiter.get()));
+            waiters
+                .list
+                .remove(NonNull::new_unchecked(self.waiter.get()));
         }
     }
 }

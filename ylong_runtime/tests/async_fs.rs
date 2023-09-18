@@ -13,8 +13,8 @@
 
 #![cfg(feature = "fs")]
 
+use std::fs;
 use std::io::SeekFrom;
-use std::{fs};
 
 use ylong_runtime::fs::{File, OpenOptions};
 use ylong_runtime::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
