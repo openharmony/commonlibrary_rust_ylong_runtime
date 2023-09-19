@@ -11,6 +11,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#![cfg(feature = "net")]
+
 use std::{io, thread};
 
 use ylong_runtime::net::UdpSocket;
@@ -235,9 +237,7 @@ fn sdv_udp_try_recv_from() {
     ylong_runtime::block_on(handle).expect("block_on failed");
 }
 
-fn sdv_udp_try_send() {
-    let sender_addr = "127.0.0.1:8093";
-    let receiver_addr = "127.0.0.1:8094";
+fn sdv_udp_try_send(sender_addr: String, receiver_addr: String) {
     let handle = ylong_runtime::spawn(async move {
         let sender = match UdpSocket::bind(sender_addr).await {
             Ok(socket) => socket,
@@ -294,7 +294,9 @@ fn sdv_udp_try_recv() {
                 panic!("Connect Socket Failed {}", e);
             }
         };
-        thread::spawn(sdv_udp_try_send);
+        thread::spawn(|| {
+            sdv_udp_try_send("127.0.0.1:8093".to_string(), "127.0.0.1:8094".to_string())
+        });
         connected_receiver.readable().await.unwrap();
         let mut recv_buf = [0_u8; 12];
         let len = connected_receiver.try_recv(&mut recv_buf[..]).unwrap();
@@ -302,4 +304,44 @@ fn sdv_udp_try_recv() {
         assert_eq!(&recv_buf[..len], b"Hello");
     });
     ylong_runtime::block_on(handle).expect("block_on failed");
+}
+
+/// SDV test cases for blocking on try_send and try_recv
+///
+/// # Brief
+/// 1. Create sender and receiver threads, bind their new UdpSockets and connect
+///    to each other.
+/// 2. Sender waits for writable events and attempts to send message in sender
+///    thread.
+/// 3. Receiver waits for readable events and attempts to receive message in
+///    receiver thread. Calls block_on directly ion it.
+/// 4. Check if the test results are correct.
+#[test]
+#[cfg(not(feature = "ffrt"))]
+fn sdv_block_on_udp_try_recv() {
+    let sender_addr = "127.0.0.1:8110";
+    let receiver_addr = "127.0.0.1:8111";
+    ylong_runtime::block_on(async move {
+        let receiver = match UdpSocket::bind(receiver_addr).await {
+            Ok(socket) => socket,
+            Err(e) => {
+                panic!("Bind Socket Failed {}", e);
+            }
+        };
+
+        let connected_receiver = match receiver.connect(sender_addr).await {
+            Ok(socket) => socket,
+            Err(e) => {
+                panic!("Connect Socket Failed {}", e);
+            }
+        };
+        thread::spawn(|| {
+            sdv_udp_try_send("127.0.0.1:8110".to_string(), "127.0.0.1:8111".to_string())
+        });
+        connected_receiver.readable().await.unwrap();
+        let mut recv_buf = [0_u8; 12];
+        let len = connected_receiver.try_recv(&mut recv_buf[..]).unwrap();
+
+        assert_eq!(&recv_buf[..len], b"Hello");
+    });
 }

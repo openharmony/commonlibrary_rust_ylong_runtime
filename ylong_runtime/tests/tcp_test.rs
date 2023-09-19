@@ -11,6 +11,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#![cfg(feature = "net")]
+
 use std::thread;
 
 use ylong_runtime::io::{AsyncReadExt, AsyncWriteExt};
@@ -130,4 +132,48 @@ fn sdv_tcp_multi_runtime() {
     });
     runtime.block_on(server).unwrap();
     runtime.block_on(client).unwrap();
+}
+
+/// SDV case for dropping TcpStream outside of worker context
+///
+/// # Breif
+/// 1. Starts 2 tasks via `spawn` that simulates a connection between client and
+///    server
+/// 2. Returns the streams to the main thread which is outside of the worker
+///    context
+/// 3. Drops the streams and it should not cause Panic
+#[test]
+#[cfg(not(feature = "ffrt"))]
+fn sdv_tcp_drop_out_context() {
+    let handle1 = ylong_runtime::spawn(async move {
+        let tcp = TcpListener::bind("127.0.0.1:8200").await.unwrap();
+        let (mut stream, _) = tcp.accept().await.unwrap();
+        let mut buf = [0; 10];
+        stream.read_exact(&mut buf).await.unwrap();
+        assert_eq!(buf, [3; 10]);
+
+        let buf = [2; 10];
+        stream.write_all(&buf).await.unwrap();
+        stream
+    });
+
+    let client = ylong_runtime::block_on(async move {
+        let mut tcp = TcpStream::connect("127.0.0.1:8200").await;
+        while tcp.is_err() {
+            tcp = TcpStream::connect("127.0.0.1:8200").await;
+        }
+        let mut tcp = tcp.unwrap();
+        let buf = [3; 10];
+        tcp.write_all(&buf).await.unwrap();
+
+        let mut buf = [0; 10];
+        tcp.read_exact(&mut buf).await.unwrap();
+        assert_eq!(buf, [2; 10]);
+        tcp
+    });
+
+    let server = ylong_runtime::block_on(handle1).unwrap();
+
+    drop(server);
+    drop(client);
 }

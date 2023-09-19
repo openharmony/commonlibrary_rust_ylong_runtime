@@ -42,7 +42,7 @@ pub fn ylong_runtime() -> Runtime {
 }
 
 #[cfg(feature = "multi_instance_runtime")]
-pub fn ylong_runtime_set_threads(threads_count: u8) -> Runtime {
+pub fn ylong_runtime_set_threads(threads_count: usize) -> Runtime {
     RuntimeBuilder::new_multi_thread()
         .worker_num(threads_count)
         .build()

@@ -120,9 +120,7 @@ impl RuntimeBuilder {
     /// ```
     /// use ylong_runtime::builder::RuntimeBuilder;
     ///
-    /// let runtime = RuntimeBuilder::new_multi_thread()
-    ///     .worker_num(8)
-    ///     .max_blocking_pool_size(4);
+    /// let runtime = RuntimeBuilder::new_multi_thread().max_blocking_pool_size(4);
     /// ```
     pub fn new_multi_thread() -> MultiThreadBuilder {
         MultiThreadBuilder::new()
@@ -133,9 +131,7 @@ impl RuntimeBuilder {
 pub(crate) fn initialize_async_spawner(
     builder: &MultiThreadBuilder,
 ) -> io::Result<AsyncPoolSpawner> {
-    let async_spawner = AsyncPoolSpawner::new(builder);
-
-    Ok(async_spawner)
+    AsyncPoolSpawner::new(builder)
 }
 
 #[cfg(feature = "ffrt")]
@@ -189,15 +185,17 @@ mod test {
     fn ut_thread_pool_builder_new() {
         let thread_pool_builder = RuntimeBuilder::new_multi_thread();
         assert_eq!(thread_pool_builder.common.worker_name, None);
-        assert_eq!(thread_pool_builder.core_thread_size, None);
         assert_eq!(thread_pool_builder.common.blocking_permanent_thread_num, 0);
         assert_eq!(thread_pool_builder.common.max_blocking_pool_size, Some(50));
         assert_eq!(thread_pool_builder.common.keep_alive_time, None);
         #[cfg(not(feature = "ffrt"))]
-        assert_eq!(
-            thread_pool_builder.common.schedule_algo,
-            ScheduleAlgo::FifoBound
-        );
+        {
+            assert_eq!(thread_pool_builder.core_thread_size, None);
+            assert_eq!(
+                thread_pool_builder.common.schedule_algo,
+                ScheduleAlgo::FifoBound
+            );
+        }
         assert_eq!(thread_pool_builder.common.stack_size, None);
     }
 
@@ -220,6 +218,7 @@ mod test {
     /// 3. core_pool_size set to 0, Check if the return value is Some(1)
     /// 4. core_pool_size set to 65, Check if the return value is Some(64)
     #[test]
+    #[cfg(not(feature = "ffrt"))]
     fn ut_thread_pool_builder_core_pool_size() {
         let thread_pool_builder = RuntimeBuilder::new_multi_thread().worker_num(1);
         assert_eq!(thread_pool_builder.core_thread_size, Some(1));
@@ -417,11 +416,9 @@ mod ylong_executor_test {
     }
 
     /// UT test cases for RuntimeBuilder::schedule_algo()
-    ///         
+    ///
     /// # Brief
     /// 1. schedule_algo set to FifoBound, check if it is the modified value
-    /// 2. schedule_algo set to FifoUnbound, check if it is the modified value
-    /// 3. schedule_algo set to Priority, check if it is the modified value
     #[cfg(not(feature = "ffrt"))]
     #[test]
     fn ut_thread_pool_builder_schedule_algo_test() {

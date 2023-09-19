@@ -80,7 +80,7 @@ impl Metrics<'_> {
         match &self.runtime.async_spawner {
             #[cfg(feature = "current_thread_runtime")]
             AsyncHandle::CurrentThread(_) => None,
-            AsyncHandle::MultiThread(spawner) => Some(spawner.exe_mng_info.record.load_state().1),
+            AsyncHandle::MultiThread(spawner) => Some(spawner.exe_mng_info.load_state().1),
         }
     }
 
@@ -103,7 +103,7 @@ impl Metrics<'_> {
         match &self.runtime.async_spawner {
             #[cfg(feature = "current_thread_runtime")]
             AsyncHandle::CurrentThread(_) => None,
-            AsyncHandle::MultiThread(spawner) => Some(spawner.exe_mng_info.record.load_state().0),
+            AsyncHandle::MultiThread(spawner) => Some(spawner.exe_mng_info.load_state().0),
         }
     }
 

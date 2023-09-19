@@ -13,27 +13,20 @@
 
 //! A FFI crate for FFRT runtime.
 
-mod condition_variable;
 mod config;
 mod deadline;
-mod mutex;
-mod sleep;
 mod sys_event;
 mod task;
-mod thread;
 
-pub use condition_variable::*;
 pub use config::*;
 pub use deadline::*;
 use libc::{c_int, c_void};
-pub use mutex::*;
-pub use sleep::*;
 pub use sys_event::*;
 pub use task::*;
-pub use thread::*;
-pub use {ffrt_set_wake_flag, ffrt_submit_h_coroutine, ffrt_task_get};
+pub use {ffrt_get_current_task, ffrt_submit_coroutine};
 
 #[repr(C)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 /// Qos levels.
 pub enum Qos {
     /// Inherits parent's qos level
@@ -50,15 +43,6 @@ pub enum Qos {
     DeadlineRequest,
     /// Highest qos
     UserInteractive,
-}
-
-#[repr(C)]
-/// Coroutine types.
-pub enum CoroutineTypes {
-    /// Stackless coroutine
-    Stackless = 0,
-    /// Stackful coroutine
-    StackFul,
 }
 
 #[repr(C)]

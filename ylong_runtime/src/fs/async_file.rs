@@ -187,7 +187,7 @@ impl File {
     /// This can be used to handle errors that would otherwise only be caught
     /// when the `File` is closed. Dropping a file will ignore errors in
     /// synchronizing this in-memory data.
-
+    ///
     /// # Examples
     ///
     /// ```no_run
@@ -241,6 +241,63 @@ impl File {
         async_op(move || file.sync_data()).await
     }
 
+    /// Truncates or extends the underlying file, updating the size of this file
+    /// to become size. If the size is less than the current file's size,
+    /// then the file will be shrunk. If it is greater than the current file's
+    /// size, then the file will be extended to size and have all of the
+    /// intermediate data filled in with 0s. The file's cursor isn't
+    /// changed. In particular, if the cursor was at the end and the file is
+    /// shrunk using this operation, the cursor will now be past the end.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the file is not opened for
+    /// writing.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use ylong_runtime::fs::File;
+    ///
+    /// async fn set_len() -> std::io::Result<()> {
+    ///     let mut f = File::create("foo.txt").await?;
+    ///     f.set_len(10).await?;
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
+    pub async fn set_len(&self, size: u64) -> io::Result<()> {
+        let mut file = self.inner.lock().await;
+        if let Err(e) = poll_fn(|cx| Pin::new(&mut *file).poll_flush(cx)).await {
+            file.write_err = Some(e.kind());
+        }
+
+        let mut buf = match file.state {
+            FileState::Idle(ref mut buf) => buf.take().unwrap(),
+            _ => unreachable!(),
+        };
+
+        let arc_file = self.file.clone();
+
+        let (buf, res) = spawn_blocking(&TaskBuilder::new(), move || {
+            let res = if buf.remaining() == 0 {
+                (&*arc_file)
+                    .seek(SeekFrom::Current(buf.drop_unread()))
+                    .and_then(|_| arc_file.set_len(size))
+            } else {
+                arc_file.set_len(size)
+            }
+            .map(|_| 0);
+
+            (buf, res)
+        })
+        .await?;
+
+        file.state = FileState::Idle(Some(buf));
+
+        res.map(|u| file.idx = u)
+    }
+
     /// Queries metadata about the underlying file asynchronously.
     ///
     /// # Examples
@@ -257,6 +314,27 @@ impl File {
     pub async fn metadata(&self) -> io::Result<Metadata> {
         let file = self.file.clone();
         async_op(move || file.metadata()).await
+    }
+
+    /// Creates a new File instance that shares the same underlying file handle
+    /// as the existing File instance. Reads, writes, and seeks will affect both
+    /// File instances simultaneously.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use ylong_runtime::fs::File;
+    ///
+    /// async fn try_clone() -> std::io::Result<()> {
+    ///     let mut f = File::open("foo.txt").await?;
+    ///     let file_copy = f.try_clone().await?;
+    ///     Ok(())
+    /// }
+    /// ```
+    pub async fn try_clone(&self) -> io::Result<File> {
+        let file = self.file.clone();
+        let file = async_op(move || file.try_clone()).await?;
+        Ok(Self::new(file))
     }
 }
 
@@ -449,5 +527,53 @@ impl FileInner {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::fs::{remove_file, File};
+
+    /// UT test for `set_len`
+    ///
+    /// # Brief
+    ///
+    /// 1. Creates a new file.
+    /// 2. Removes the file with `set_len()`, check result is Ok(()).
+    /// 3. Deletes the file.
+    #[test]
+    fn ut_fs_file_set_len() {
+        crate::block_on(async {
+            let file_path = "file11.txt";
+
+            let file = File::create(file_path).await.unwrap();
+            let res = file.set_len(10).await;
+            assert!(res.is_ok());
+
+            let res = remove_file(file_path).await;
+            assert!(res.is_ok());
+        });
+    }
+
+    /// UT test for `try_clone`
+    ///
+    /// # Brief
+    ///
+    /// 1. Creates a new file.
+    /// 2. Creates a new File instance with `try_clone()`, check result is
+    ///    Ok(()).
+    /// 3. Deletes the file.
+    #[test]
+    fn ut_fs_file_try_clone() {
+        crate::block_on(async {
+            let file_path = "file12.txt";
+
+            let file = File::create(file_path).await.unwrap();
+            let res = file.try_clone().await;
+            assert!(res.is_ok());
+
+            let res = remove_file(file_path).await;
+            assert!(res.is_ok());
+        });
     }
 }

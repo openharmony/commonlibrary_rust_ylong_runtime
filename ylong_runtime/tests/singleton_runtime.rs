@@ -11,14 +11,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod helpers;
-use helpers::*;
 use ylong_runtime::builder::RuntimeBuilder;
 use ylong_runtime::task::TaskBuilder;
 #[cfg(feature = "time")]
 use ylong_runtime::time;
 const SPAWN_NUM: usize = 100;
 const THREAD_NUM: usize = 10;
+
+async fn test_future(num: usize) -> usize {
+    num
+}
+
+async fn test_multi_future_in_async(i: usize, j: usize) -> (usize, usize) {
+    let result_one = test_future(i).await;
+    let result_two = test_future(j).await;
+
+    (result_one, result_two)
+}
+
+async fn test_async_in_async(i: usize, j: usize) -> (usize, usize) {
+    test_multi_future_in_async(i, j).await
+}
 
 /// SDV test cases for concurrently spawning tasks on the singleton runtime,
 /// through runtime instance.
@@ -132,7 +145,6 @@ fn sdv_global_block_on() {
 fn sdv_build_global_failed() {
     let _ = ylong_runtime::block_on(ylong_runtime::spawn(async move { 1 }));
     let ret = RuntimeBuilder::new_multi_thread()
-        .worker_num(2)
         .max_blocking_pool_size(1)
         .build_global();
     assert!(ret.is_err());

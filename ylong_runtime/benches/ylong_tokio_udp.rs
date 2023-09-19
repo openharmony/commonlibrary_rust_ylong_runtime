@@ -23,6 +23,8 @@ pub mod task_helpers;
 mod udp_bench {
     extern crate test;
 
+    use std::net::SocketAddr;
+
     use test::Bencher;
     use tokio::net::UdpSocket as tokioUdpSocket;
     use ylong_runtime::net::UdpSocket;
@@ -83,10 +85,12 @@ mod udp_bench {
         b.iter(|| {
             let mut handlers = Vec::new();
             for i in 0..10 {
-                let sender_addr = (basic_addr.to_owned() + &*(port + 2 * i).to_string())
+                let sender_addr: SocketAddr = (basic_addr.to_owned()
+                    + &*(port + 2 * i).to_string())
                     .parse()
                     .unwrap();
-                let receiver_addr = (basic_addr.to_owned() + &*(port + 2 * i + 1).to_string())
+                let receiver_addr: SocketAddr = (basic_addr.to_owned()
+                    + &*(port + 2 * i + 1).to_string())
                     .parse()
                     .unwrap();
                 handlers.push(ylong_runtime::spawn(async move {
@@ -167,10 +171,12 @@ mod udp_bench {
         b.iter(|| {
             let mut handlers = Vec::new();
             for i in 0..10 {
-                let sender_addr = (basic_addr.to_owned() + &*(port + 2 * i).to_string())
+                let sender_addr: SocketAddr = (basic_addr.to_owned()
+                    + &*(port + 2 * i).to_string())
                     .parse()
                     .unwrap();
-                let receiver_addr = (basic_addr.to_owned() + &*(port + 2 * i + 1).to_string())
+                let receiver_addr: SocketAddr = (basic_addr.to_owned()
+                    + &*(port + 2 * i + 1).to_string())
                     .parse()
                     .unwrap();
                 handlers.push(ylong_runtime::spawn(async move {

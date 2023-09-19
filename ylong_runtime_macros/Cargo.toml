@@ -4,14 +4,8 @@ version = "1.0.0"
 edition = "2021"
 description = "Ylong_runtime Procedure Macro"
 license = "Apache-2.0"
-repository = "https://gitee.com/openharmony-sig/commonlibrary_rust_ylong_runtime"
+repository = "https://gitee.com/openharmony/commonlibrary_rust_ylong_runtime"
 keywords = ["Ylong", "Runtime", "Procedure", "Macro"]
 
 [lib]
 proc-macro = true
-
-[dependencies]
-syn = { version = "1.0.104", features = ["full", "extra-traits"] }
-quote = "1.0.23"
-proc-macro2 = "1.0.53"
-

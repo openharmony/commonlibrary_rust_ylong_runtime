@@ -159,12 +159,46 @@ pub trait AsyncReadExt: AsyncRead {
     ///
     /// # Examples
     /// ```no run
+    /// 
     /// let mut io = File::open("foo.txt").await?;
     /// let mut buf = String::new();
     /// let n = io.read_to_string(&mut buf).await?;
     /// ```
     fn read_to_string<'a>(&'a mut self, dst: &'a mut String) -> ReadToStringTask<'a, Self> {
         ReadToStringTask::new(self, dst)
+    }
+
+    /// Creates a "by reference" adaptor for this instance of `AsyncRead`.
+    ///
+    /// The returned adapter also implements `AsyncRead` and will simply borrow
+    /// this current reader.
+    ///
+    /// # Examples
+    ///
+    /// ```no run
+    /// use std::io;
+    ///
+    /// use ylong_runtime::fs::File;
+    /// use ylong_runtime::io::AsyncReadExt;
+    ///
+    /// async fn async_io() -> io::Result<()> {
+    ///     let mut f = File::open("foo.txt").await?;
+    ///     let mut other_buffer = Vec::new();
+    ///
+    ///     {
+    ///         let reference = f.by_ref();
+    ///     } // drop our &mut reference so we can use f again
+    ///
+    ///     // original file still usable, read the rest
+    ///     f.read_to_end(&mut other_buffer).await?;
+    ///     Ok(())
+    /// }
+    /// ```
+    fn by_ref(&mut self) -> &mut Self
+    where
+        Self: Sized,
+    {
+        self
     }
 }
 

@@ -45,6 +45,108 @@ impl TcpStream {
         }
     }
 
+    /// Returns the socket address of the local half of this TCP connection.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use std::net::{IpAddr, Ipv4Addr};
+    ///
+    /// use ylong_io::TcpStream;
+    ///
+    /// let addr = "127.0.0.1:1234".parse().unwrap();
+    /// let stream = TcpStream::connect(addr).expect("Couldn't connect to the server...");
+    /// assert_eq!(
+    ///     stream.local_addr().unwrap().ip(),
+    ///     IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))
+    /// );
+    /// ```
+    pub fn local_addr(&self) -> io::Result<SocketAddr> {
+        self.inner.local_addr()
+    }
+
+    /// Returns the socket address of the remote half of this TCP connection.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+    ///
+    /// use ylong_io::TcpStream;
+    ///
+    /// let addr = "127.0.0.1:1234".parse().unwrap();
+    /// let stream = TcpStream::connect(addr).expect("Couldn't connect to the server...");
+    /// assert_eq!(
+    ///     stream.peer_addr().unwrap(),
+    ///     SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 1234))
+    /// );
+    /// ```
+    pub fn peer_addr(&self) -> io::Result<SocketAddr> {
+        self.inner.peer_addr()
+    }
+
+    /// Sets the value of the `TCP_NODELAY`.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ylong_io::TcpStream;
+    ///
+    /// let addr = "127.0.0.1:1234".parse().unwrap();
+    /// let stream = TcpStream::connect(addr).expect("Couldn't connect to the server...");
+    /// stream.set_nodelay(true).expect("set_nodelay call failed");
+    /// ```
+    pub fn set_nodelay(&self, nodelay: bool) -> io::Result<()> {
+        self.inner.set_nodelay(nodelay)
+    }
+
+    /// Gets the value of the `TCP_NODELAY`.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ylong_io::TcpStream;
+    ///
+    /// let addr = "127.0.0.1:1234".parse().unwrap();
+    /// let stream = TcpStream::connect(addr).expect("Couldn't connect to the server...");
+    /// stream.set_nodelay(true).expect("set_nodelay call failed");
+    /// assert_eq!(stream.nodelay().unwrap_or(false), true);
+    /// ```
+    pub fn nodelay(&self) -> io::Result<bool> {
+        self.inner.nodelay()
+    }
+
+    /// Sets the value for the `IP_TTL`.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ylong_io::TcpStream;
+    ///
+    /// let addr = "127.0.0.1:1234".parse().unwrap();
+    /// let stream = TcpStream::connect(addr).expect("Couldn't connect to the server...");
+    /// stream.set_ttl(100).expect("set_ttl call failed");
+    /// ```
+    pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
+        self.inner.set_ttl(ttl)
+    }
+
+    /// Gets the value of the `IP_TTL`.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ylong_io::TcpStream;
+    ///
+    /// let addr = "127.0.0.1:1234".parse().unwrap();
+    /// let stream = TcpStream::connect(addr).expect("Couldn't connect to the server...");
+    /// stream.set_ttl(100).expect("set_ttl call failed");
+    /// assert_eq!(stream.ttl().unwrap_or(0), 100);
+    /// ```
+    pub fn ttl(&self) -> io::Result<u32> {
+        self.inner.ttl()
+    }
+
     /// Gets the value of the `SO_ERROR` option on this socket.
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
         self.inner.take_error()
@@ -53,6 +155,26 @@ impl TcpStream {
     /// Shuts down the read, write, or both halves of this connection.
     pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
         self.inner.shutdown(how)
+    }
+
+    /// Same as std::net::TcpStream::peek().
+    ///
+    /// Receives data on the socket from the remote address to which it is
+    /// connected, without removing that data from the queue. On success,
+    /// returns the number of bytes peeked.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ylong_io::TcpStream;
+    ///
+    /// let addr = "127.0.0.1:1234".parse().unwrap();
+    /// let stream = TcpStream::connect(addr).expect("Couldn't connect to the server...");
+    /// let mut buf = [0; 10];
+    /// let len = stream.peek(&mut buf).expect("peek failed");
+    /// ```
+    pub fn peek(&self, buf: &mut [u8]) -> io::Result<usize> {
+        self.inner.peek(buf)
     }
 }
 

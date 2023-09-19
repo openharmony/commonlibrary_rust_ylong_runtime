@@ -13,20 +13,20 @@
 
 use std::cell::RefCell;
 use std::future::Future;
+use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::{Acquire, SeqCst};
-use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::{Arc, Condvar, Mutex, RwLock};
 use std::time::Duration;
-use std::{cmp, thread};
+use std::{cmp, io, thread};
 
+use super::driver::{Driver, Handle};
+use super::parker::Parker;
+use super::queue::{GlobalQueue, LocalQueue, LOCAL_QUEUE_CAP};
+use super::sleeper::Sleeper;
+use super::worker::{get_current_ctx, run_worker, Worker};
+use super::{worker, Schedule};
 use crate::builder::multi_thread_builder::MultiThreadBuilder;
 use crate::builder::CallbackHook;
-use crate::executor::parker::Parker;
-use crate::executor::driver::{Driver, Handle};
-use crate::executor::queue::{GlobalQueue, LocalQueue, LOCAL_QUEUE_CAP};
-use crate::executor::sleeper::Sleepers;
-use crate::executor::worker::{get_current_ctx, run_worker, Worker, WorkerContext};
-use crate::executor::{worker, Schedule};
 use crate::task::{Task, TaskBuilder, VirtualTableType};
 use crate::util::core_affinity::set_current_affinity;
 use crate::util::fastrand::fast_random;
@@ -39,74 +39,19 @@ pub(crate) const GLOBAL_POLL_INTERVAL: u8 = 61;
 pub(crate) struct MultiThreadScheduler {
     /// Async pool shutdown state
     is_cancel: AtomicBool,
-    /// Sleeping workers info
-    sleepers: Sleepers,
     /// Number of total workers
     pub(crate) num_workers: usize,
     /// Join Handles for all threads in the executor
     handles: RwLock<Vec<Parker>>,
-    /// records the number of stealing workers and the number of working
-    /// workers.
-    pub(crate) record: Record,
+    /// Used for idle and wakeup logic.
+    sleeper: Sleeper,
     /// The global queue of the executor
     global: GlobalQueue,
     /// A set of all the local queues in the executor
     locals: Vec<LocalQueue>,
     pub(crate) handle: Arc<Handle>,
     #[cfg(feature = "metrics")]
-    steal_count: AtomicUsize,
-}
-
-const ACTIVE_WORKER_SHIFT: usize = 16;
-const SEARCHING_MASK: usize = (1 << ACTIVE_WORKER_SHIFT) - 1;
-const ACTIVE_MASK: usize = !SEARCHING_MASK;
-
-//        32 bits          16 bits       16 bits
-// |-------------------| working num | searching num|
-pub(crate) struct Record(AtomicUsize);
-
-impl Record {
-    pub(crate) fn new(num_unpark: usize) -> Self {
-        Self(AtomicUsize::new(num_unpark << ACTIVE_WORKER_SHIFT))
-    }
-
-    // Return true if it is the last searching thread
-    pub(crate) fn dec_searching_num(&self) -> bool {
-        let ret = self.0.fetch_sub(1, SeqCst);
-        (ret & SEARCHING_MASK) == 1
-    }
-
-    pub(crate) fn inc_searching_num(&self) {
-        self.0.fetch_add(1, SeqCst);
-    }
-
-    pub(crate) fn inc_active_num(&self, to_searching: bool) {
-        let mut inc = 1 << ACTIVE_WORKER_SHIFT;
-        if to_searching {
-            inc += 1;
-        }
-        self.0.fetch_add(inc, SeqCst);
-    }
-
-    pub(crate) fn dec_active_num(&self, is_searching: bool) -> bool {
-        let mut dec = 1 << ACTIVE_WORKER_SHIFT;
-        if is_searching {
-            dec += 1;
-        }
-
-        let ret = self.0.fetch_sub(dec, SeqCst);
-        let unpark_num = ((ret & ACTIVE_MASK) >> ACTIVE_WORKER_SHIFT) - 1;
-        unpark_num == 0
-    }
-
-    pub(crate) fn load_state(&self) -> (usize, usize) {
-        let union_num = self.0.load(SeqCst);
-
-        let searching_num = union_num & SEARCHING_MASK;
-        let unpark_num = (union_num & ACTIVE_MASK) >> ACTIVE_WORKER_SHIFT;
-
-        (unpark_num, searching_num)
-    }
+    steal_count: std::sync::atomic::AtomicUsize,
 }
 
 impl Schedule for MultiThreadScheduler {
@@ -119,10 +64,7 @@ impl Schedule for MultiThreadScheduler {
 }
 
 impl MultiThreadScheduler {
-    pub(crate) fn new(
-        thread_num: usize,
-        handle: Arc<Handle>,
-    ) -> Self {
+    pub(crate) fn new(thread_num: usize, handle: Arc<Handle>) -> Self {
         let mut locals = Vec::new();
         for _ in 0..thread_num {
             locals.push(LocalQueue::new());
@@ -130,15 +72,14 @@ impl MultiThreadScheduler {
 
         Self {
             is_cancel: AtomicBool::new(false),
-            sleepers: Sleepers::new(thread_num),
             num_workers: thread_num,
             handles: RwLock::new(Vec::new()),
-            record: Record::new(thread_num),
+            sleeper: Sleeper::new(thread_num),
             global: GlobalQueue::new(),
             locals,
             handle,
             #[cfg(feature = "metrics")]
-            steal_count: AtomicUsize::new(0),
+            steal_count: std::sync::atomic::AtomicUsize::new(0),
         }
     }
 
@@ -158,49 +99,36 @@ impl MultiThreadScheduler {
     fn wake_up_all(&self) {
         let join_handle = self.handles.read().unwrap();
         for item in join_handle.iter() {
-            item.unpark(
-                self.handle.clone()
-            );
+            item.unpark(self.handle.clone());
         }
     }
 
     #[inline]
-    pub(crate) fn is_parked(&self, worker_id: usize) -> bool {
-        self.sleepers.is_parked(worker_id)
+    pub(crate) fn is_parked(&self, worker_index: &usize) -> bool {
+        self.sleeper.is_parked(worker_index)
     }
 
     pub(crate) fn wake_up_rand_one(&self) {
-        let (num_unpark, num_searching) = self.record.load_state();
-
-        if num_unpark >= self.num_workers || num_searching > 0 {
-            return;
-        }
-        if let Some(index) = self.sleepers.pop() {
-            self.record.inc_active_num(true);
-
-            self.handles.read().unwrap().get(index).unwrap().unpark(self.handle.clone());
+        if let Some(index) = self.sleeper.pop_worker() {
+            self.handles
+                .read()
+                .unwrap()
+                .get(index)
+                .unwrap()
+                .unpark(self.handle.clone());
         }
     }
 
-    #[inline]
-    pub(crate) fn wake_up_if_one_task_left(&self) {
-        if !self.has_no_work() {
-            self.wake_up_rand_one()
+    pub(crate) fn turn_to_sleep(&self, worker_index: usize) {
+        // If it's the last thread going to sleep, check if there are any tasks
+        // left. If yes, wakes up a thread.
+        if self.sleeper.push_worker(worker_index) && !self.has_no_work() {
+            self.wake_up_rand_one();
         }
     }
 
-    pub(crate) fn turn_to_sleep(&self, index: u8, is_searching: bool) {
-        // If it's the last thread going to sleep, check if there are any tasks left.
-        // If yes, wakes up a thread.
-        self.sleepers.push(index as usize);
-
-        if self.record.dec_active_num(is_searching) {
-            self.wake_up_if_one_task_left();
-        }
-    }
-
-    pub(crate) fn create_local_queue(&self, index: u8) -> LocalQueue {
-        let local_run_queue = self.locals.get(index as usize).unwrap();
+    pub(crate) fn create_local_queue(&self, index: usize) -> LocalQueue {
+        let local_run_queue = self.locals.get(index).unwrap();
         LocalQueue {
             inner: local_run_queue.inner.clone(),
         }
@@ -226,14 +154,14 @@ impl MultiThreadScheduler {
         let cur_worker = get_current_ctx();
 
         // WorkerContext::Curr will never enter here.
-        if let Some(WorkerContext::Multi(cur_worker)) = cur_worker {
-            if !std::ptr::eq(&self.global, &cur_worker.worker.scheduler.global) {
+        if let Some(worker_ctx) = cur_worker {
+            if !std::ptr::eq(&self.global, &worker_ctx.worker.scheduler.global) {
                 self.global.push_back(task);
                 return true;
             }
 
             if lifo {
-                let mut lifo_slot = cur_worker.worker.lifo.borrow_mut();
+                let mut lifo_slot = worker_ctx.worker.lifo.borrow_mut();
                 let prev_task = lifo_slot.take();
                 if let Some(prev) = prev_task {
                     // there is some task in lifo slot, therefore we put the prev task
@@ -247,7 +175,7 @@ impl MultiThreadScheduler {
                 }
             }
 
-            let local_run_queue = self.locals.get(cur_worker.worker.index as usize).unwrap();
+            let local_run_queue = self.locals.get(worker_ctx.worker.index).unwrap();
             local_run_queue.push_back(task, &self.global);
             return true;
         }
@@ -258,7 +186,7 @@ impl MultiThreadScheduler {
         true
     }
 
-    pub(crate) fn dequeue(&self, index: u8, worker_inner: &mut worker::Inner) -> Option<Task> {
+    pub(crate) fn dequeue(&self, index: usize, worker_inner: &mut worker::Inner) -> Option<Task> {
         let local_run_queue = &worker_inner.run_queue;
         let count = worker_inner.count;
 
@@ -286,8 +214,13 @@ impl MultiThreadScheduler {
                 match local_task {
                     Some(task) => Some(task),
                     None => {
-                        self.global
-                            .pop_batch(self.num_workers, local_run_queue, LOCAL_QUEUE_CAP)
+                        let limit = local_run_queue.remaining() as usize;
+                        if limit > 1 {
+                            self.global
+                                .pop_batch(self.num_workers, local_run_queue, limit)
+                        } else {
+                            self.global.pop_front()
+                        }
                     }
                 }
             }
@@ -301,24 +234,19 @@ impl MultiThreadScheduler {
         // tasks from another worker's local queue.
         // The number of stealing worker should be less than half of the total worker
         // number.
-        if !worker_inner.is_searching {
-            let (_, num_searching) = self.record.load_state();
-            if num_searching * 2 < self.num_workers {
-                // increment searching worker number
-                self.record.inc_searching_num();
-                worker_inner.is_searching = true;
-            } else {
-                return None;
-            }
+
+        if !self.sleeper.try_inc_searching_num() {
+            return None;
         }
 
+        // start to searching.
         let num = self.locals.len();
         let start = (fast_random() >> 56) as usize;
 
         for i in 0..num {
             let i = (start + i) % num;
             // skip the current worker's local queue
-            if i == index as usize {
+            if i == index {
                 continue;
             }
             let target = self.locals.get(i).unwrap();
@@ -326,11 +254,22 @@ impl MultiThreadScheduler {
                 #[cfg(feature = "metrics")]
                 self.steal_count
                     .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+
+                if self.sleeper.dec_searching_num() {
+                    self.wake_up_rand_one()
+                };
                 return Some(task);
             }
         }
         // if there is no task to steal, we check global queue for one last time
-        self.global.pop_front()
+        let task_from_global = self.global.pop_front();
+
+        // end searching
+        // regardless of whether a task can be stolen from the global queue,
+        // wake_up_rand_one is not called.
+        self.sleeper.dec_searching_num();
+
+        task_from_global
     }
 
     pub(crate) fn get_global(&self) -> &GlobalQueue {
@@ -344,6 +283,10 @@ impl MultiThreadScheduler {
 
         pub(crate) fn get_steal_count(&self) -> usize {
             self.steal_count.load(Acquire)
+        }
+
+        pub(crate) fn load_state(&self) -> (usize, usize) {
+            self.sleeper.load_state()
         }
     );
 }
@@ -363,11 +306,11 @@ impl Drop for AsyncPoolSpawner {
 
 pub(crate) struct Inner {
     /// Number of total threads
-    pub(crate) total: u8,
+    pub(crate) total: usize,
     /// Core-affinity setting of the threads
     is_affinity: bool,
     /// Handle for shutting down the pool
-    shutdown_handle: Arc<(Mutex<u8>, Condvar)>,
+    shutdown_handle: Arc<(Mutex<usize>, Condvar)>,
     /// A callback func to be called after thread starts
     after_start: Option<CallbackHook>,
     /// A callback func to be called before thread stops
@@ -381,21 +324,16 @@ pub(crate) struct Inner {
     workers: Mutex<Vec<Arc<Worker>>>,
 }
 
-fn get_cpu_core() -> u8 {
-    cmp::max(1, get_cpu_num() as u8)
+fn get_cpu_core() -> usize {
+    cmp::max(1, get_cpu_num() as usize)
 }
 
-fn async_thread_proc(
-    inner: Arc<Inner>,
-    worker: Arc<Worker>,
-    #[cfg(any(feature = "net", feature = "time"))]
-    handle: Arc<Handle>
-) {
+fn async_thread_proc(inner: Arc<Inner>, worker: Arc<Worker>, handle: Arc<Handle>) {
     if let Some(f) = inner.after_start.clone() {
         f();
     }
 
-    run_worker(worker, #[cfg(any(feature = "net", feature = "time"))]handle);
+    run_worker(worker, handle);
     let (lock, cvar) = &*(inner.shutdown_handle.clone());
     let mut finished = lock.lock().unwrap();
     *finished += 1;
@@ -411,7 +349,7 @@ fn async_thread_proc(
 }
 
 impl AsyncPoolSpawner {
-    pub(crate) fn new(builder: &MultiThreadBuilder) -> Self {
+    pub(crate) fn new(builder: &MultiThreadBuilder) -> io::Result<Self> {
         let (handle, driver) = Driver::initialize();
 
         let thread_num = builder.core_thread_size.unwrap_or_else(get_cpu_core);
@@ -419,42 +357,26 @@ impl AsyncPoolSpawner {
             inner: Arc::new(Inner {
                 total: thread_num,
                 is_affinity: builder.common.is_affinity,
-                shutdown_handle: Arc::new((Mutex::new(0u8), Condvar::new())),
+                shutdown_handle: Arc::new((Mutex::new(0), Condvar::new())),
                 after_start: builder.common.after_start.clone(),
                 before_stop: builder.common.before_stop.clone(),
                 worker_name: builder.common.worker_name.clone(),
                 stack_size: builder.common.stack_size,
                 #[cfg(feature = "metrics")]
-                workers: Mutex::new(Vec::with_capacity(thread_num.into())),
+                workers: Mutex::new(Vec::with_capacity(thread_num)),
             }),
-            exe_mng_info: Arc::new(
-                MultiThreadScheduler::new(
-                    thread_num as usize,
-                    handle
-                )
-            ),
+            exe_mng_info: Arc::new(MultiThreadScheduler::new(thread_num, handle)),
         };
-        spawner.create_async_thread_pool(
-            driver
-        );
-        spawner
+        spawner.create_async_thread_pool(driver)?;
+        Ok(spawner)
     }
 
-    pub(crate) fn create_async_thread_pool(
-        &self,
-        driver: Arc<Mutex<Driver>>
-    ) {
+    fn create_async_thread_pool(&self, driver: Arc<Mutex<Driver>>) -> io::Result<()> {
         let mut workers = vec![];
         for index in 0..self.inner.total {
             let local_queue = self.exe_mng_info.create_local_queue(index);
-            let local_run_queue = Box::new(
-                worker::Inner::new(
-                    local_queue, 
-                    Parker::new(
-                            driver.clone()
-                    )
-                )
-            );
+            let local_run_queue =
+                Box::new(worker::Inner::new(local_queue, Parker::new(driver.clone())));
             workers.push(Arc::new(Worker {
                 index,
                 scheduler: self.exe_mng_info.clone(),
@@ -465,62 +387,41 @@ impl AsyncPoolSpawner {
         }
 
         for (worker_id, worker) in workers.drain(..).enumerate() {
-            #[cfg(any(feature = "net", feature = "time"))]
             let work_arc_handle = self.exe_mng_info.handle.clone();
             #[cfg(feature = "metrics")]
             self.inner.workers.lock().unwrap().push(worker.clone());
             // set up thread attributes
             let mut builder = thread::Builder::new();
+
             if let Some(worker_name) = self.inner.worker_name.clone() {
                 builder = builder.name(format!("async-{worker_id}-{worker_name}"));
             } else {
                 builder = builder.name(format!("async-{worker_id}"));
             }
+
             if let Some(stack_size) = self.inner.stack_size {
                 builder = builder.stack_size(stack_size);
             }
 
+            let parker = worker.inner.borrow().parker.clone();
+            self.exe_mng_info.handles.write().unwrap().push(parker);
+
             let inner = self.inner.clone();
 
             if self.inner.is_affinity {
-                let parker = worker.inner.borrow().parker.clone();
-
-                let result = builder.spawn(move || {
-                    let cpu_core_num = get_cpu_core() as usize;
+                builder.spawn(move || {
+                    let cpu_core_num = get_cpu_core();
                     let cpu_id = worker_id % cpu_core_num;
                     set_current_affinity(cpu_id).expect("set_current_affinity() fail!");
-                    async_thread_proc(
-                        inner,
-                        worker,
-                        #[cfg(any(feature = "net", feature = "time"))]
-                        work_arc_handle
-                    );
-                });
-
-                match result {
-                    Ok(_) => {
-                        self.exe_mng_info.handles.write().unwrap().push(parker);
-                    }
-                    Err(e) => panic!("os cannot spawn worker threads: {}", e),
-                }
+                    async_thread_proc(inner, worker, work_arc_handle);
+                })?;
             } else {
-                let parker = worker.inner.borrow().parker.clone();
-                let result = builder.spawn(move || {
-                    async_thread_proc(
-                        inner,
-                        worker,
-                        #[cfg(any(feature = "net", feature = "time"))]
-                        work_arc_handle
-                    );
-                });
-                match result {
-                    Ok(_) => {
-                        self.exe_mng_info.handles.write().unwrap().push(parker);
-                    }
-                    Err(e) => panic!("os cannot spawn worker threads: {}", e),
-                }
+                builder.spawn(move || {
+                    async_thread_proc(inner, worker, work_arc_handle);
+                })?;
             }
         }
+        Ok(())
     }
 
     pub(crate) fn spawn<T>(&self, builder: &TaskBuilder, task: T) -> JoinHandle<T::Output>
@@ -630,7 +531,7 @@ impl AsyncPoolSpawner {
         let vec = self.inner.workers.lock().unwrap();
         for i in 0..vec.len() {
             let worker = vec.get(i).expect("worker index out of range");
-            if worker.index == index {
+            if worker.index == index.into() {
                 return Ok(worker.clone());
             }
         }
@@ -638,7 +539,7 @@ impl AsyncPoolSpawner {
     }
 }
 
-#[cfg(all(test))]
+#[cfg(test)]
 mod test {
     use std::future::Future;
     use std::pin::Pin;
@@ -647,10 +548,10 @@ mod test {
     use std::sync::{Arc, Mutex};
     use std::task::{Context, Poll};
     use std::thread::spawn;
-    use crate::executor::driver::Driver;
 
     use crate::builder::RuntimeBuilder;
     use crate::executor::async_pool::{get_cpu_core, AsyncPoolSpawner, MultiThreadScheduler};
+    use crate::executor::driver::Driver;
     use crate::executor::parker::Parker;
     use crate::task::{Task, TaskBuilder, VirtualTableType};
 
@@ -691,17 +592,11 @@ mod test {
     #[test]
     fn ut_executor_mng_info_new_001() {
         let (arc_handle, _) = Driver::initialize();
-        let executor_mng_info = MultiThreadScheduler::new(
-            1,
-            arc_handle.clone()
-        );
+        let executor_mng_info = MultiThreadScheduler::new(1, arc_handle.clone());
         assert!(!executor_mng_info.is_cancel.load(Acquire));
         assert_eq!(executor_mng_info.handles.read().unwrap().capacity(), 0);
 
-        let executor_mng_info = MultiThreadScheduler::new(
-            64,
-            arc_handle
-        );
+        let executor_mng_info = MultiThreadScheduler::new(64, arc_handle);
         assert!(!executor_mng_info.is_cancel.load(Acquire));
         assert_eq!(executor_mng_info.handles.read().unwrap().capacity(), 0);
     }
@@ -714,17 +609,11 @@ mod test {
     #[test]
     fn ut_executor_mng_info_create_local_queues() {
         let (arc_handle, _) = Driver::initialize();
-        let executor_mng_info = MultiThreadScheduler::new(
-            1,
-            arc_handle.clone()
-        );
+        let executor_mng_info = MultiThreadScheduler::new(1, arc_handle.clone());
         let local_run_queue_info = executor_mng_info.create_local_queue(0);
         assert!(local_run_queue_info.is_empty());
 
-        let executor_mng_info = MultiThreadScheduler::new(
-            64,
-            arc_handle
-        );
+        let executor_mng_info = MultiThreadScheduler::new(64, arc_handle);
         let local_run_queue_info = executor_mng_info.create_local_queue(63);
         assert!(local_run_queue_info.is_empty());
     }
@@ -737,20 +626,10 @@ mod test {
     #[test]
     fn ut_executor_mng_info_enqueue() {
         let (arc_handle, _) = Driver::initialize();
-        let executor_mng_info = MultiThreadScheduler::new(
-            1,
-            arc_handle.clone()
-        );
+        let executor_mng_info = MultiThreadScheduler::new(1, arc_handle.clone());
 
         let builder = TaskBuilder::new();
-        let exe_scheduler = Arc::downgrade(
-            &Arc::new(
-                MultiThreadScheduler::new(
-                    1,
-                    arc_handle
-                )
-            )
-        );
+        let exe_scheduler = Arc::downgrade(&Arc::new(MultiThreadScheduler::new(1, arc_handle)));
         let (task, _) = Task::create_task(
             &builder,
             exe_scheduler,
@@ -770,10 +649,7 @@ mod test {
     #[test]
     fn ut_executor_mng_info_is_cancel() {
         let (arc_handle, _) = Driver::initialize();
-        let executor_mng_info = MultiThreadScheduler::new(
-            1,
-            arc_handle
-        );
+        let executor_mng_info = MultiThreadScheduler::new(1, arc_handle);
         executor_mng_info.is_cancel.store(false, Release);
         assert!(!executor_mng_info.is_cancel());
         executor_mng_info.is_cancel.store(true, Release);
@@ -787,10 +663,7 @@ mod test {
     #[test]
     fn ut_executor_mng_info_set_cancel() {
         let (arc_handle, _) = Driver::initialize();
-        let executor_mng_info = MultiThreadScheduler::new(
-            1,
-            arc_handle
-        );
+        let executor_mng_info = MultiThreadScheduler::new(1, arc_handle);
         assert!(!executor_mng_info.is_cancel.load(Acquire));
         executor_mng_info.set_cancel();
         assert!(executor_mng_info.is_cancel.load(Acquire));
@@ -803,19 +676,14 @@ mod test {
     #[test]
     fn ut_executor_mng_info_cancel() {
         let (arc_handle, arc_driver) = Driver::initialize();
-        let executor_mng_info = MultiThreadScheduler::new(
-            1,
-            arc_handle
-        );
+        let executor_mng_info = MultiThreadScheduler::new(1, arc_handle);
 
         let flag = Arc::new(Mutex::new(0));
         let (tx, rx) = channel();
 
         let (flag_clone, tx) = (flag.clone(), tx);
 
-        let mut parker = Parker::new(
-            arc_driver
-        );
+        let mut parker = Parker::new(arc_driver);
         let parker_cpy = parker.clone();
         let _ = spawn(move || {
             parker.park();
@@ -837,19 +705,14 @@ mod test {
     #[test]
     fn ut_executor_mng_info_wake_up_all() {
         let (arc_handle, arc_driver) = Driver::initialize();
-        let executor_mng_info = MultiThreadScheduler::new(
-            1,
-            arc_handle
-        );
+        let executor_mng_info = MultiThreadScheduler::new(1, arc_handle);
 
         let flag = Arc::new(Mutex::new(0));
         let (tx, rx) = channel();
 
         let (flag_clone, tx) = (flag.clone(), tx);
 
-        let mut parker = Parker::new(
-            arc_driver
-        );
+        let mut parker = Parker::new(arc_driver);
         let parker_cpy = parker.clone();
 
         let _ = spawn(move || {
@@ -873,20 +736,15 @@ mod test {
     #[test]
     fn ut_executor_mng_info_wake_up_rand_one() {
         let (arc_handle, arc_driver) = Driver::initialize();
-        let executor_mng_info = MultiThreadScheduler::new(
-            1,
-            arc_handle
-        );
-        executor_mng_info.turn_to_sleep(0, false);
+        let executor_mng_info = MultiThreadScheduler::new(1, arc_handle);
+        executor_mng_info.turn_to_sleep(0);
 
         let flag = Arc::new(Mutex::new(0));
         let (tx, rx) = channel();
 
         let (flag_clone, tx) = (flag.clone(), tx);
 
-        let mut parker = Parker::new(
-            arc_driver
-        );
+        let mut parker = Parker::new(arc_driver);
         let parker_cpy = parker.clone();
 
         let _ = spawn(move || {
@@ -910,21 +768,16 @@ mod test {
     #[test]
     fn ut_executor_mng_info_wake_up_if_one_task_left() {
         let (arc_handle, arc_driver) = Driver::initialize();
-        let executor_mng_info = MultiThreadScheduler::new(
-            1,
-            arc_handle.clone()
-        );
+        let executor_mng_info = MultiThreadScheduler::new(1, arc_handle.clone());
 
-        executor_mng_info.turn_to_sleep(0, false);
+        executor_mng_info.turn_to_sleep(0);
 
         let flag = Arc::new(Mutex::new(0));
         let (tx, rx) = channel();
 
         let (flag_clone, tx) = (flag.clone(), tx);
 
-        let mut parker = Parker::new(
-            arc_driver
-        );
+        let mut parker = Parker::new(arc_driver);
         let parker_cpy = parker.clone();
 
         let _ = spawn(move || {
@@ -936,14 +789,7 @@ mod test {
         executor_mng_info.handles.write().unwrap().push(parker_cpy);
 
         let builder = TaskBuilder::new();
-        let exe_scheduler = Arc::downgrade(
-            &Arc::new(
-                MultiThreadScheduler::new(
-                    1,
-                    arc_handle
-                )
-            )
-        );
+        let exe_scheduler = Arc::downgrade(&Arc::new(MultiThreadScheduler::new(1, arc_handle)));
         let (task, _) = Task::create_task(
             &builder,
             exe_scheduler,
@@ -953,7 +799,10 @@ mod test {
 
         executor_mng_info.enqueue(task, true);
 
-        executor_mng_info.wake_up_if_one_task_left();
+        if !executor_mng_info.has_no_work() {
+            executor_mng_info.wake_up_rand_one();
+        }
+
         rx.recv().unwrap();
         assert_eq!(*flag.lock().unwrap(), 1);
     }
@@ -967,19 +816,14 @@ mod test {
     #[test]
     fn ut_from_woken_to_sleep() {
         let (arc_handle, arc_driver) = Driver::initialize();
-        let executor_mng_info = MultiThreadScheduler::new(
-            1,
-            arc_handle.clone()
-        );
+        let executor_mng_info = MultiThreadScheduler::new(1, arc_handle.clone());
 
         let flag = Arc::new(Mutex::new(0));
         let (tx, rx) = channel();
 
         let (flag_clone, tx) = (flag.clone(), tx);
 
-        let mut parker = Parker::new(
-            arc_driver
-        );
+        let mut parker = Parker::new(arc_driver);
         let parker_cpy = parker.clone();
 
         let _ = spawn(move || {
@@ -991,14 +835,7 @@ mod test {
         executor_mng_info.handles.write().unwrap().push(parker_cpy);
 
         let builder = TaskBuilder::new();
-        let exe_scheduler = Arc::downgrade(
-            &Arc::new(
-                MultiThreadScheduler::new(
-                    1,
-                    arc_handle
-                )
-            )
-        );
+        let exe_scheduler = Arc::downgrade(&Arc::new(MultiThreadScheduler::new(1, arc_handle)));
         let (task, _) = Task::create_task(
             &builder,
             exe_scheduler,
@@ -1007,7 +844,7 @@ mod test {
         );
 
         executor_mng_info.enqueue(task, true);
-        executor_mng_info.turn_to_sleep(0, false);
+        executor_mng_info.turn_to_sleep(0);
         rx.recv().unwrap();
         assert_eq!(*flag.lock().unwrap(), 1);
     }
@@ -1019,7 +856,7 @@ mod test {
     #[test]
     fn ut_async_pool_spawner_new() {
         let thread_pool_builder = RuntimeBuilder::new_multi_thread();
-        let async_pool_spawner = AsyncPoolSpawner::new(&thread_pool_builder);
+        let async_pool_spawner = AsyncPoolSpawner::new(&thread_pool_builder).unwrap();
         assert_eq!(
             async_pool_spawner.inner.total,
             thread_pool_builder
@@ -1046,7 +883,7 @@ mod test {
     #[test]
     fn ut_async_pool_spawner_create_async_thread_pool_001() {
         let thread_pool_builder = RuntimeBuilder::new_multi_thread();
-        let _ = AsyncPoolSpawner::new(&thread_pool_builder.is_affinity(false));
+        let _ = AsyncPoolSpawner::new(&thread_pool_builder.is_affinity(false)).unwrap();
     }
 
     /// UT test cases for `UnboundedSender`.
@@ -1058,6 +895,6 @@ mod test {
     #[test]
     fn ut_async_pool_spawner_create_async_thread_pool_002() {
         let thread_pool_builder = RuntimeBuilder::new_multi_thread();
-        let _ = AsyncPoolSpawner::new(&thread_pool_builder.is_affinity(true));
+        let _ = AsyncPoolSpawner::new(&thread_pool_builder.is_affinity(true)).unwrap();
     }
 }

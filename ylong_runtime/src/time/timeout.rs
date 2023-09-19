@@ -22,6 +22,13 @@ use crate::time::sleep::Sleep;
 
 /// Requires a future to be completed by a set deadline.
 ///
+/// # Panic
+/// Calling this method outside of a Ylong Runtime could cause panic, for
+/// example, outside of an async closure that is passed to ylong_runtime::spawn
+/// or ylong_runtime::block_on. The async wrapping is necessary since it makes
+/// the function become lazy in order to get successfully executed on the
+/// runtime.
+///
 /// # Examples
 ///
 /// ```
@@ -29,9 +36,10 @@ use crate::time::sleep::Sleep;
 ///
 /// use ylong_runtime::time::timeout;
 ///
-/// let handle = ylong_runtime::spawn(timeout(Duration::from_secs(1), async { 1 }));
-/// let result = ylong_runtime::block_on(handle).unwrap().unwrap();
-/// assert_eq!(result, 1);
+/// let handle =
+///     ylong_runtime::spawn(async move { timeout(Duration::from_secs(1), async { 1 }).await });
+/// let result = ylong_runtime::block_on(handle).unwrap();
+/// assert_eq!(result, Ok(1));
 /// ```
 pub fn timeout<F>(duration: Duration, future: F) -> Timeout<F>
 where

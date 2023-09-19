@@ -121,7 +121,7 @@ macro_rules! std_async_write {
                         if !buf_inner.is_empty() {
                             return Poll::Ready(Err(io::Error::new(
                                 io::ErrorKind::AlreadyExists,
-                                "inner Buf must be empty before poll!"
+                                "inner Buf must be empty before poll!",
                             )));
                         }
 

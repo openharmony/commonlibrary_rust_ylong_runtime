@@ -113,6 +113,6 @@ mod test {
     #[test]
     fn ut_core_affinity_other_thread() {
         let cpus: Vec<usize> = crate::util::core_affinity::get_other_thread_affinity(0);
-        assert!(cpus.len() > 0);
+        assert!(!cpus.is_empty());
     }
 }

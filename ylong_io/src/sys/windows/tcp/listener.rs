@@ -74,6 +74,71 @@ impl TcpListener {
             .try_io(|inner| inner.accept(), &self.inner)
             .map(|(stream, addr)| (TcpStream::from_std(stream), addr))
     }
+
+    /// Returns the local socket address of this listener.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ylong_io::TcpListener;
+    ///
+    /// let addr = "127.0.0.1:1234".parse().unwrap();
+    /// let mut server = TcpListener::bind(addr).unwrap();
+    /// let ret = server.local_addr().unwrap();
+    /// ```
+    pub fn local_addr(&self) -> io::Result<SocketAddr> {
+        self.inner.local_addr()
+    }
+
+    /// Gets the value of the IP_TTL option for this socket.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ylong_io::TcpListener;
+    ///
+    /// let addr = "127.0.0.1:1234".parse().unwrap();
+    /// let mut server = TcpListener::bind(addr).unwrap();
+    /// let ret = server.ttl().unwrap();
+    /// ```
+    pub fn ttl(&self) -> io::Result<u32> {
+        self.inner.ttl()
+    }
+
+    /// Sets the value for the IP_TTL option on this socket.
+    /// This value sets the time-to-live field that is used in every packet sent
+    /// from this socket.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ylong_io::TcpListener;
+    ///
+    /// let addr = "127.0.0.1:1234".parse().unwrap();
+    /// let mut server = TcpListener::bind(addr).unwrap();
+    /// let ret = server.set_ttl(100).unwrap();
+    /// ```
+    pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
+        self.inner.set_ttl(ttl)
+    }
+
+    /// Gets the value of the SO_ERROR option on this socket.
+    /// This will retrieve the stored error in the underlying socket, clearing
+    /// the field in the process. This can be useful for checking errors between
+    /// calls.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ylong_io::TcpListener;
+    ///
+    /// let addr = "127.0.0.1:1234".parse().unwrap();
+    /// let mut server = TcpListener::bind(addr).unwrap();
+    /// let ret = server.take_error().unwrap();
+    /// ```
+    pub fn take_error(&self) -> io::Result<Option<io::Error>> {
+        self.inner.take_error()
+    }
 }
 
 impl Source for TcpListener {

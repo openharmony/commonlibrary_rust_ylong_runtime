@@ -16,16 +16,20 @@ use std::ops::Deref;
 
 use ylong_io::{Interest, Source};
 
+use crate::io::poll_ready;
 use crate::net::ScheduleIO;
 use crate::util::slab::Ref;
+
+cfg_not_ffrt!(
+    use std::sync::Arc;
+    use crate::executor::driver::Handle;
+);
 
 cfg_net!(
     use std::task::{Context, Poll};
     use std::mem::MaybeUninit;
     use crate::io::ReadBuf;
     use crate::net::ReadyEvent;
-    #[cfg(not(feature = "ffrt"))]
-    use crate::executor::worker::{get_current_ctx, WorkerContext};
     use std::io::{Read, Write};
 );
 
@@ -38,6 +42,10 @@ pub(crate) struct AsyncSource<E: Source> {
     /// Entry list of the runtime's reactor, `AsyncSource` object will be
     /// registered into it when created.
     pub(crate) entry: Ref<ScheduleIO>,
+
+    #[cfg(not(feature = "ffrt"))]
+    /// Handle to the IO Driver, used for deregistration
+    pub(crate) handle: Arc<Handle>,
 }
 
 impl<E: Source> AsyncSource<E> {
@@ -54,20 +62,14 @@ impl<E: Source> AsyncSource<E> {
     /// returned.
     #[cfg(not(feature = "ffrt"))]
     pub fn new(mut io: E, interest: Option<Interest>) -> io::Result<AsyncSource<E>> {
-        let inner = {
-            let context = get_current_ctx()
-                .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "get_current_ctx() fail"))?;
-            match context {
-                WorkerContext::Multi(ctx) => &ctx.handle,
-                WorkerContext::Curr(ctx) => &ctx.handle,
-            }
-        };
+        let inner = Handle::get_handle()?;
 
         let interest = interest.unwrap_or_else(|| Interest::WRITABLE.add(Interest::READABLE));
         let entry = inner.io_register(&mut io, interest)?;
         Ok(AsyncSource {
             io: Some(io),
             entry,
+            handle: inner,
         })
     }
 
@@ -134,11 +136,7 @@ impl<E: Source> AsyncSource<E> {
             mut f: impl FnMut() -> io::Result<R>,
         ) -> Poll<io::Result<R>> {
             loop {
-                let ready = match self.poll_ready(cx, interest) {
-                    Poll::Ready(Ok(x)) => x,
-                    Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
-                    Poll::Pending => return Poll::Pending,
-                };
+                let ready = poll_ready!(self.poll_ready(cx, interest))?;
 
                 match f() {
                     Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
@@ -169,6 +167,7 @@ impl<E: Source> AsyncSource<E> {
             }
         }
 
+        #[inline]
         pub(crate) fn poll_read_io<R>(
             &self,
             cx: &mut Context<'_>,
@@ -177,6 +176,7 @@ impl<E: Source> AsyncSource<E> {
             self.poll_io(cx, Interest::READABLE, f)
         }
 
+        #[inline]
         pub(crate) fn poll_write_io<R>(
             &self,
             cx: &mut Context<'_>,
@@ -193,7 +193,7 @@ impl<E: Source> AsyncSource<E> {
         where
             &'a E: io::Read + 'a,
         {
-            let ret = self.poll_io(cx, Interest::READABLE, || unsafe {
+            let ret = self.poll_read_io(cx, || unsafe {
                 let slice = &mut *(buf.unfilled_mut() as *mut [MaybeUninit<u8>] as *mut [u8]);
                 self.io.as_ref().unwrap().read(slice)
             });
@@ -216,7 +216,7 @@ impl<E: Source> AsyncSource<E> {
         where
             &'a E: io::Write + 'a,
         {
-            self.poll_io(cx, Interest::WRITABLE, || {
+            self.poll_write_io(cx, || {
                 self.io.as_ref().unwrap().write(buf)
             })
         }
@@ -229,7 +229,7 @@ impl<E: Source> AsyncSource<E> {
         where
             &'a E: io::Write + 'a,
         {
-            self.poll_io(cx, Interest::WRITABLE, || {
+            self.poll_write_io(cx, || {
                 self.io.as_ref().unwrap().write_vectored(bufs)
             })
         }
@@ -249,14 +249,7 @@ impl<E: Source> Deref for AsyncSource<E> {
 impl<E: Source> Drop for AsyncSource<E> {
     fn drop(&mut self) {
         if let Some(mut io) = self.io.take() {
-            let inner = {
-                let context = get_current_ctx().expect("AsyncSource drop get_current_ctx() fail");
-                match context {
-                    WorkerContext::Multi(ctx) => &ctx.handle,
-                    WorkerContext::Curr(ctx) => &ctx.handle,
-                }
-            };
-            let _ = inner.io_deregister(&mut io);
+            let _ = self.handle.io_deregister(&mut io);
         }
     }
 }

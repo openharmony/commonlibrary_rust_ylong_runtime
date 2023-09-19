@@ -24,7 +24,7 @@ use crate::util::bit::{Bit, Mask};
 use crate::util::slab::{Address, Ref, Slab};
 
 cfg_ffrt! {
-    use libc::{c_void, c_int, c_uint};
+    use libc::{c_void, c_int, c_uint, c_uchar};
 }
 
 cfg_not_ffrt! {
@@ -92,7 +92,9 @@ impl IoHandle {
 
 #[cfg(not(feature = "ffrt"))]
 impl IoHandle {
-    fn new(inner: Arc<Inner>, waker: ylong_io::Waker) -> Self { IoHandle { inner, waker } }
+    fn new(inner: Arc<Inner>, waker: ylong_io::Waker) -> Self {
+        IoHandle { inner, waker }
+    }
 
     #[cfg(feature = "metrics")]
     pub(crate) fn get_register_count(&self) -> usize {
@@ -184,33 +186,33 @@ impl IoDriver {
 #[cfg(not(feature = "ffrt"))]
 impl IoDriver {
     pub(crate) fn initialize() -> (IoHandle, IoDriver) {
-            let poll = Poll::new().unwrap();
-            let waker = ylong_io::Waker::new(&poll, WAKE_TOKEN)
-                .expect("ylong_io waker construction failed");
-            let arc_poll = Arc::new(poll);
-            let events = Events::with_capacity(EVENTS_MAX_CAPACITY);
-            let slab = Slab::new();
-            let allocator = slab.handle();
-            let inner = Arc::new(Inner {
-                resources: Mutex::new(None),
-                allocator,
-                registry: arc_poll.clone(),
-                #[cfg(feature = "metrics")]
-                metrics: InnerMetrics {
-                    register_count: AtomicUsize::new(0),
-                    ready_count: AtomicUsize::new(0),
-                },
-            });
+        let poll = Poll::new().unwrap();
+        let waker =
+            ylong_io::Waker::new(&poll, WAKE_TOKEN).expect("ylong_io waker construction failed");
+        let arc_poll = Arc::new(poll);
+        let events = Events::with_capacity(EVENTS_MAX_CAPACITY);
+        let slab = Slab::new();
+        let allocator = slab.handle();
+        let inner = Arc::new(Inner {
+            resources: Mutex::new(None),
+            allocator,
+            registry: arc_poll.clone(),
+            #[cfg(feature = "metrics")]
+            metrics: InnerMetrics {
+                register_count: AtomicUsize::new(0),
+                ready_count: AtomicUsize::new(0),
+            },
+        });
 
-            let driver = IoDriver {
-                resources: Some(slab),
-                events: Some(events),
-                tick: DRIVER_TICK_INIT,
-                poll: arc_poll,
-                #[cfg(feature = "metrics")]
-                io_handle_inner: inner.clone(),
-            };
-            
+        let driver = IoDriver {
+            resources: Some(slab),
+            events: Some(events),
+            tick: DRIVER_TICK_INIT,
+            poll: arc_poll,
+            #[cfg(feature = "metrics")]
+            io_handle_inner: inner.clone(),
+        };
+
         (IoHandle::new(inner, waker), driver)
     }
 
@@ -296,16 +298,17 @@ impl IoDriver {
 }
 
 #[cfg(feature = "ffrt")]
-extern "C" fn ffrt_dispatch_event(data: *const c_void, ready: c_uint) {
+extern "C" fn ffrt_dispatch_event(data: *const c_void, ready: c_uint, new_tick: c_uchar) {
     const COMPACT_INTERVAL: u8 = 255;
 
     let driver = IoDriver::get_mut_ref();
-    driver.tick = driver.tick.wrapping_add(1);
-    if driver.tick == COMPACT_INTERVAL {
+
+    if new_tick == COMPACT_INTERVAL && driver.tick != new_tick {
         unsafe {
             driver.resources.as_mut().unwrap().compact();
         }
     }
+    driver.tick = new_tick;
 
     let token = Token::from_usize(data as usize);
     let ready = crate::net::ready::from_event_inner(ready as i32);

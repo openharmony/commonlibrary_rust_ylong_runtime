@@ -11,6 +11,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::io::ErrorKind;
+
 use ylong_io::UdpSocket;
 
 /// SDV test cases for `send()` and `recv()`.
@@ -62,7 +64,13 @@ fn test_send_recv() {
     }
 
     let mut recv_buf = [0_u8; 12];
-    let len = connected_receiver.recv(&mut recv_buf[..]).unwrap();
+    let len = loop {
+        match connected_receiver.recv(&mut recv_buf[..]) {
+            Ok(n) => break n,
+            Err(e) if e.kind() == ErrorKind::WouldBlock => {}
+            Err(e) => panic!("{:?}", e),
+        }
+    };
 
     assert_eq!(&recv_buf[..len], b"Hello");
 }
@@ -103,7 +111,13 @@ fn test_send_to_recv_from() {
     }
 
     let mut recv_buf = [0_u8; 12];
-    let (len, addr) = receiver.recv_from(&mut recv_buf[..]).unwrap();
+    let (len, addr) = loop {
+        match receiver.recv_from(&mut recv_buf[..]) {
+            Ok(res) => break res,
+            Err(e) if e.kind() == ErrorKind::WouldBlock => {}
+            Err(e) => panic!("{:?}", e),
+        }
+    };
     assert_eq!(&recv_buf[..len], b"Hello");
     assert_eq!(addr, sender_addr);
 }

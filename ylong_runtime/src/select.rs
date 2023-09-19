@@ -232,7 +232,7 @@ macro_rules! select {
                                         $bind => {
                                             // Change the random_number, ensure when return ready, this branch is executed first.
                                             random_number = branch;
-                                            return Ready(ylong_runtime_macros::tuple_form!(($count) with Out::Fail except Out::Finish(out) at ($($_i)*)))
+                                            return Ready($crate::tuple_form!(($count) with Out::Fail except Out::Finish(out) at ($($_i)*)))
                                         },
                                         // If the match fails, this branch set false, and wait for the next branch to complete.
                                         // When user input is not match type, this patterns is unreachable.
@@ -255,16 +255,16 @@ macro_rules! select {
                 if anyone_pending {
                     Pending
                 } else {
-                    Ready(ylong_runtime_macros::tuple_form!(($count) with Out::Fail except Out::Fail at ($($_n)*)))
+                    Ready($crate::tuple_form!(($count) with Out::Fail except Out::Fail at ($($_n)*)))
                 }
             }).await
         };
 
         match output {
             $(
-                ylong_runtime_macros::tuple_form!(($count) with Out::Fail except Out::Finish($bind) at ($($_i)*)) => $handle,
+                $crate::tuple_form!(($count) with Out::Fail except Out::Finish($bind) at ($($_i)*)) => $handle,
             )*
-            ylong_runtime_macros::tuple_form!(($count) with Out::Fail except Out::Fail at ($($_n)*)) => $else,
+            $crate::tuple_form!(($count) with Out::Fail except Out::Fail at ($($_n)*)) => $else,
             // If there is only one branch and the user match for that branch returns `_`,
             // there will be an unreachable pattern alert.
             #[allow(unreachable_patterns)]

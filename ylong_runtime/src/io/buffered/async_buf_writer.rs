@@ -145,6 +145,31 @@ impl<W: AsyncWrite> AsyncBufWriter<W> {
         &self.buf
     }
 
+    /// Returns the number of bytes the internal buffer can hold without
+    /// flushing.
+    ///
+    /// # Examples
+    ///
+    /// ```no run
+    /// use std::net::SocketAddr;
+    ///
+    /// use ylong_runtime::io::AsyncBufWriter;
+    /// use ylong_runtime::net::TcpStream;
+    ///
+    /// async fn async_io() -> std::io::Result<()> {
+    ///     let addr: SocketAddr = "127.0.0.1:8081".parse().unwrap();
+    ///     let buf_writer = AsyncBufWriter::new(TcpStream::connect(addr).await.unwrap());
+    ///     // Checks the capacity of the inner buffer
+    ///     let capacity = buf_writer.capacity();
+    ///     // Calculates how many bytes can be written without flushing
+    ///     let without_flush = capacity - buf_writer.buffer().len();
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn capacity(&self) -> usize {
+        self.buf.capacity()
+    }
+
     fn flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         let this = unsafe { self.get_unchecked_mut() };
         let len = this.buf.len();

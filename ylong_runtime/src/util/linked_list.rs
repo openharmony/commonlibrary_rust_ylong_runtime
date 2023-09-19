@@ -21,13 +21,13 @@
 use std::ptr::NonNull;
 
 #[derive(Default)]
+#[repr(C)]
 pub(crate) struct Node<T> {
     prev: Option<NonNull<T>>,
     next: Option<NonNull<T>>,
 }
 
 impl<T> Node<T> {
-    #[allow(dead_code)]
     pub(crate) fn new() -> Node<T> {
         Node {
             prev: None,
@@ -78,8 +78,7 @@ pub(crate) unsafe trait Link {
 }
 
 impl<L: Link + Default> LinkedList<L> {
-    /// Construct a new linked list.
-    #[allow(dead_code)]
+    /// Constructs a new linked list.
     pub(crate) fn new() -> LinkedList<L> {
         let head = Box::<L>::default();
         let head_ptr = unsafe { NonNull::new_unchecked(Box::into_raw(head)) };
@@ -89,8 +88,7 @@ impl<L: Link + Default> LinkedList<L> {
         LinkedList { head: head_ptr }
     }
 
-    /// Insert an element to the front of the list.
-    #[allow(dead_code)]
+    /// Inserts an element to the front of the list.
     pub(crate) fn push_front(&mut self, val: NonNull<L>) {
         unsafe {
             let head = L::node(self.head).as_mut();
@@ -105,8 +103,8 @@ impl<L: Link + Default> LinkedList<L> {
         }
     }
 
-    /// Pop an element from the back of the list.
-    #[allow(dead_code)]
+    /// Pops an element from the back of the list.
+    #[cfg(feature = "time")]
     pub(crate) fn pop_back(&mut self) -> Option<NonNull<L>> {
         unsafe {
             let head = L::node(self.head).as_mut();
@@ -120,30 +118,38 @@ impl<L: Link + Default> LinkedList<L> {
         }
     }
 
-    /// Delete an element in list.
+    /// Deletes an element in list.
     ///
     /// # Safety
     ///
-    /// This method can be safely used when the node is in a linked list that
-    /// the caller has unique access to or the node is not in any linked
-    /// list.
-    #[allow(dead_code)]
-    pub(crate) unsafe fn remove(node: NonNull<L>) -> Option<NonNull<L>> {
+    /// This method can be safely used when the node is in a guarded linked list
+    /// that the caller has unique access to or the node is not in any
+    /// linked list.
+    pub(crate) unsafe fn remove(&mut self, node: NonNull<L>) -> Option<NonNull<L>> {
         Node::remove_node(node)
     }
 
-    /// Check whether the list is empty.
-    #[allow(dead_code)]
+    /// Checks whether the list is empty.
+    #[cfg(feature = "time")]
     pub(crate) fn is_empty(&self) -> bool {
         unsafe { L::node(self.head).as_ref().next == Some(self.head) }
     }
 
-    /// Empty the list.
-    #[allow(dead_code)]
-    pub(crate) fn clear(&mut self) {
-        let node = unsafe { L::node(self.head).as_mut() };
-        node.prev = Some(self.head);
-        node.next = Some(self.head);
+    /// Traverses the list and execute the closure.
+    #[cfg(feature = "net")]
+    pub(crate) fn for_each_mut<F>(&mut self, mut f: F)
+    where
+        F: FnMut(&mut L),
+    {
+        unsafe {
+            let head = L::node(self.head).as_ref();
+            let mut p = head.next;
+            while p != Some(self.head) {
+                let node = p.unwrap();
+                f(&mut *node.as_ptr());
+                p = L::node(node).as_ref().next;
+            }
+        }
     }
 }
 
@@ -163,7 +169,7 @@ impl<L: Link + Default> Drop for LinkedList<L> {
 mod tests {
     use std::ptr::{addr_of_mut, NonNull};
 
-    use crate::util::link_list::{Link, LinkedList, Node};
+    use crate::util::linked_list::{Link, LinkedList, Node};
 
     #[derive(Default)]
     struct Entry {
@@ -207,21 +213,13 @@ mod tests {
     /// list.
     /// 3. Check if the list is empty before and after clear the list.
     #[test]
-    fn ut_link_list_is_empty_and_clear() {
+    fn ut_link_list_is_empty() {
         let mut list = LinkedList::<Entry>::new();
         assert!(list.is_empty());
         let node1 = Entry::new(1);
         let node1 = node1.get_ptr();
-        let node2 = Entry::new(2);
-        let node2 = node2.get_ptr();
-        let node3 = Entry::new(3);
-        let node3 = node3.get_ptr();
         list.push_front(node1);
         assert!(!list.is_empty());
-        list.push_front(node2);
-        list.push_front(node3);
-        list.clear();
-        assert!(list.is_empty());
     }
 
     /// UT test cases for `push_front()` and `pop_back()`.
@@ -274,43 +272,72 @@ mod tests {
         list.push_front(node2_ptr);
         list.push_front(node3_ptr);
         unsafe {
-            assert!(LinkedList::remove(node1_ptr).is_some());
-            assert!(LinkedList::remove(node1_ptr).is_none());
+            assert!(list.remove(node1_ptr).is_some());
+            assert!(list.remove(node1_ptr).is_none());
             assert_eq!(Some(node2_ptr), node3.node.next);
             assert_eq!(Some(node3_ptr), node2.node.prev);
-            assert!(LinkedList::remove(node2_ptr).is_some());
-            assert!(LinkedList::remove(node2_ptr).is_none());
-            assert!(LinkedList::remove(node3_ptr).is_some());
-            assert!(LinkedList::remove(node3_ptr).is_none());
+            assert!(list.remove(node2_ptr).is_some());
+            assert!(list.remove(node2_ptr).is_none());
+            assert!(list.remove(node3_ptr).is_some());
+            assert!(list.remove(node3_ptr).is_none());
         }
 
         list.push_front(node1_ptr);
         list.push_front(node2_ptr);
         list.push_front(node3_ptr);
         unsafe {
-            assert!(LinkedList::remove(node2_ptr).is_some());
-            assert!(LinkedList::remove(node2_ptr).is_none());
+            assert!(list.remove(node2_ptr).is_some());
+            assert!(list.remove(node2_ptr).is_none());
             assert_eq!(Some(node1_ptr), node3.node.next);
             assert_eq!(Some(node3_ptr), node1.node.prev);
-            assert!(LinkedList::remove(node1_ptr).is_some());
-            assert!(LinkedList::remove(node1_ptr).is_none());
-            assert!(LinkedList::remove(node3_ptr).is_some());
-            assert!(LinkedList::remove(node3_ptr).is_none());
+            assert!(list.remove(node1_ptr).is_some());
+            assert!(list.remove(node1_ptr).is_none());
+            assert!(list.remove(node3_ptr).is_some());
+            assert!(list.remove(node3_ptr).is_none());
         }
 
         list.push_front(node1_ptr);
         list.push_front(node2_ptr);
         list.push_front(node3_ptr);
         unsafe {
-            assert!(LinkedList::remove(node3_ptr).is_some());
-            assert!(LinkedList::remove(node3_ptr).is_none());
+            assert!(list.remove(node3_ptr).is_some());
+            assert!(list.remove(node3_ptr).is_none());
             assert_eq!(Some(node1_ptr), node2.node.next);
             assert_eq!(Some(node2_ptr), node1.node.prev);
-            assert!(LinkedList::remove(node1_ptr).is_some());
-            assert!(LinkedList::remove(node1_ptr).is_none());
-            assert!(LinkedList::remove(node2_ptr).is_some());
-            assert!(LinkedList::remove(node2_ptr).is_none());
+            assert!(list.remove(node1_ptr).is_some());
+            assert!(list.remove(node1_ptr).is_none());
+            assert!(list.remove(node2_ptr).is_some());
+            assert!(list.remove(node2_ptr).is_none());
         }
+        assert!(list.is_empty());
+    }
+
+    /// UT test cases for `for_each_mut()`.
+    ///
+    /// # Brief
+    /// 1. Create a linked list.
+    /// 2. Push nodes into the list.
+    /// 3. Check the value in node after traversing the list.
+    #[test]
+    fn ut_link_list_for_each_mut() {
+        let mut list = LinkedList::<Entry>::new();
+        assert!(list.is_empty());
+        let node1 = Entry::new(1);
+        let node1 = node1.get_ptr();
+        let node2 = Entry::new(2);
+        let node2 = node2.get_ptr();
+        let node3 = Entry::new(3);
+        let node3 = node3.get_ptr();
+        list.push_front(node1);
+        list.push_front(node2);
+        list.push_front(node3);
+        list.for_each_mut(|entry| {
+            entry.val += 1;
+        });
+        assert_eq!(2, get_val(list.pop_back().unwrap()));
+        assert_eq!(3, get_val(list.pop_back().unwrap()));
+        assert_eq!(4, get_val(list.pop_back().unwrap()));
+        assert!(list.pop_back().is_none());
         assert!(list.is_empty());
     }
 }

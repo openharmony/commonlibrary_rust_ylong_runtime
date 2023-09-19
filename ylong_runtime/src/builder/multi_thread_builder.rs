@@ -14,6 +14,12 @@
 use std::io;
 use std::sync::Mutex;
 
+cfg_ffrt!(
+    use ylong_ffrt::{ffrt_set_cpu_worker_max_num, Qos};
+    use std::collections::HashMap;
+    use libc::c_uint;
+);
+
 use crate::builder::common_builder::impl_common;
 use crate::builder::CommonBuilder;
 #[cfg(feature = "multi_instance_runtime")]
@@ -26,15 +32,23 @@ pub(crate) static GLOBAL_BUILDER: Mutex<Option<MultiThreadBuilder>> = Mutex::new
 pub struct MultiThreadBuilder {
     pub(crate) common: CommonBuilder,
 
+    #[cfg(not(feature = "ffrt"))]
     /// Maximum thread number for core thread pool
-    pub(crate) core_thread_size: Option<u8>,
+    pub(crate) core_thread_size: Option<usize>,
+
+    #[cfg(feature = "ffrt")]
+    /// Thread number for each qos
+    pub(crate) thread_num_by_qos: HashMap<Qos, u32>,
 }
 
 impl MultiThreadBuilder {
     pub(crate) fn new() -> Self {
         MultiThreadBuilder {
             common: CommonBuilder::new(),
+            #[cfg(not(feature = "ffrt"))]
             core_thread_size: None,
+            #[cfg(feature = "ffrt")]
+            thread_num_by_qos: HashMap::new(),
         }
     }
 
@@ -45,15 +59,51 @@ impl MultiThreadBuilder {
     /// before, then it will return an `AlreadyExists` error.
     pub fn build_global(self) -> io::Result<()> {
         let mut builder = GLOBAL_BUILDER.lock().unwrap();
-        match *builder {
-            None => *builder = Some(self),
-            Some(_) => return Err(io::ErrorKind::AlreadyExists.into()),
+        if builder.is_some() {
+            return Err(io::ErrorKind::AlreadyExists.into());
         }
+
+        #[cfg(feature = "ffrt")]
+        {
+            for (qos, worker_num) in self.thread_num_by_qos.iter() {
+                unsafe {
+                    ffrt_set_cpu_worker_max_num(*qos, worker_num.clone() as c_uint);
+                }
+            }
+        }
+
+        *builder = Some(self);
         Ok(())
     }
+}
 
+#[cfg(feature = "ffrt")]
+impl MultiThreadBuilder {
+    /// Sets the maximum worker number for a specific qos group.
+    ///
+    /// If a worker number has already been set for a qos, calling the method
+    /// with the same qos will overwrite the old value.
+    ///
+    /// # Error
+    /// The accepted worker number range for each qos is [1, 20]. If 0 is passed
+    /// in, then the maximum worker number will be set to 1. If a number
+    /// greater than 20 is passed in, then the maximum worker number will be
+    /// set to 20.
+    pub fn max_worker_num_by_qos(mut self, qos: Qos, num: u32) -> Self {
+        let worker = match num {
+            0 => 1,
+            n if n > 20 => 20,
+            n => n,
+        };
+        self.thread_num_by_qos.insert(qos, worker);
+        self
+    }
+}
+
+#[cfg(not(feature = "ffrt"))]
+impl MultiThreadBuilder {
     /// Initializes the runtime and returns its instance.
-    #[cfg(all(feature = "multi_instance_runtime", not(feature = "ffrt")))]
+    #[cfg(feature = "multi_instance_runtime")]
     pub fn build(&mut self) -> io::Result<Runtime> {
         use crate::builder::initialize_async_spawner;
         let async_spawner = initialize_async_spawner(self)?;
@@ -77,7 +127,7 @@ impl MultiThreadBuilder {
     ///
     /// let runtime = RuntimeBuilder::new_multi_thread().worker_num(8);
     /// ```
-    pub fn worker_num(mut self, core_pool_size: u8) -> Self {
+    pub fn worker_num(mut self, core_pool_size: usize) -> Self {
         if core_pool_size < 1 {
             self.core_thread_size = Some(1);
         } else if core_pool_size > 64 {
@@ -127,5 +177,40 @@ mod test {
             .max_blocking_pool_size(3)
             .build_global();
         assert!(ret.is_err());
+    }
+}
+
+#[cfg(feature = "ffrt")]
+#[cfg(test)]
+mod ffrt_test {
+    use ylong_ffrt::Qos::{Default, UserInteractive};
+
+    use crate::builder::MultiThreadBuilder;
+
+    /// UT test cases for max_worker_num_by_qos
+    /// runtime.
+    ///
+    /// # Brief
+    /// 1. Sets UserInteractive qos group to have 0 maximum worker number.
+    /// 2. Checks if the actual value is 1
+    /// 3. Sets UserInteractive qos group to have 21 maximum worker number.
+    /// 4. Checks if the actual value is 20
+    /// 5. Set Default qos group to have 8 maximum worker number.
+    /// 6. Checks if the actual value is 8.
+    /// 7. Calls build_global on the builder, check if the return value is Ok
+    #[test]
+    fn ut_set_max_worker() {
+        let builder = MultiThreadBuilder::new();
+        let builder = builder.max_worker_num_by_qos(UserInteractive, 0);
+        let num = builder.thread_num_by_qos.get(&UserInteractive).unwrap();
+        assert_eq!(*num, 1);
+
+        let builder = builder.max_worker_num_by_qos(UserInteractive, 21);
+        let num = builder.thread_num_by_qos.get(&UserInteractive).unwrap();
+        assert_eq!(*num, 20);
+
+        let builder = MultiThreadBuilder::new().max_worker_num_by_qos(Default, 8);
+        let num = builder.thread_num_by_qos.get(&Default).unwrap();
+        assert_eq!(*num, 8);
     }
 }

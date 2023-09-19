@@ -11,6 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::cmp;
 use std::convert::TryInto;
 use std::future::Future;
 use std::pin::Pin;
@@ -18,8 +19,11 @@ use std::ptr::NonNull;
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
 
-#[cfg(not(feature = "ffrt"))]
-use crate::executor::worker::{get_current_ctx, WorkerContext};
+cfg_not_ffrt!(
+    use std::sync::Arc;
+    use crate::executor::driver::Handle;
+);
+
 use crate::time::Clock;
 #[cfg(feature = "ffrt")]
 use crate::time::TimeDriver;
@@ -27,26 +31,25 @@ use crate::time::TimeDriver;
 const TEN_YEARS: Duration = Duration::from_secs(86400 * 365 * 10);
 
 /// Waits until 'instant' has reached.
+///
+/// # Panic
+/// Calling this method outside of a Ylong Runtime could cause panic, for
+/// example, outside of an async closure that is passed to ylong_runtime::spawn
+/// or ylong_runtime::block_on. The async wrapping is necessary since it makes
+/// the function become lazy in order to get successfully executed on the
+/// runtime.
 pub fn sleep_until(instant: Instant) -> Sleep {
-    #[cfg(not(feature = "ffrt"))]
-    let start_time = {
-        let context = get_current_ctx().expect("not in a worker ctx");
-        match context {
-            WorkerContext::Multi(ctx) => ctx.handle.start_time(),
-            WorkerContext::Curr(ctx) => ctx.handle.start_time(),
-        }
-    };
-    #[cfg(feature = "ffrt")]
-    let start_time = TimeDriver::get_ref().start_time();
-    let instant = if instant < start_time {
-        start_time
-    } else {
-        instant
-    };
     Sleep::new_timeout(instant)
 }
 
 /// Waits until 'duration' has elapsed.
+///
+/// # Panic
+/// Calling this method outside of a Ylong Runtime could cause panic, for
+/// example, outside of an async closure that is passed to ylong_runtime::spawn
+/// or ylong_runtime::block_on. The async wrapping is necessary since it makes
+/// the function become lazy in order to get successfully executed on the
+/// runtime.
 pub fn sleep(duration: Duration) -> Sleep {
     // If the time reaches the maximum value,
     // then set the default timing time to 10 years.
@@ -81,16 +84,30 @@ pub struct Sleep {
 
     // Corresponding Timer structure.
     timer: Clock,
+
+    #[cfg(not(feature = "ffrt"))]
+    handle: Arc<Handle>,
 }
 
 impl Sleep {
     // Creates a Sleep structure based on the given deadline.
     fn new_timeout(deadline: Instant) -> Self {
+        #[cfg(not(feature = "ffrt"))]
+        let handle = Handle::get_handle().expect("sleep new out of worker ctx");
+
+        #[cfg(feature = "ffrt")]
+        let handle = TimeDriver::get_ref();
+
+        let start_time = handle.start_time();
+        let deadline = cmp::max(deadline, start_time);
+
         let timer = Clock::new();
         Self {
             need_insert: true,
             deadline,
             timer,
+            #[cfg(not(feature = "ffrt"))]
+            handle,
         }
     }
 
@@ -109,13 +126,7 @@ impl Sleep {
     // Cancels the Sleep
     fn cancel(&mut self) {
         #[cfg(not(feature = "ffrt"))]
-        let driver = {
-            let context = get_current_ctx().expect("not in a worker ctx");
-            match context {
-                WorkerContext::Multi(ctx) => &ctx.handle,
-                WorkerContext::Curr(ctx) => &ctx.handle,
-            }
-        };
+        let driver = &self.handle;
         #[cfg(feature = "ffrt")]
         let driver = TimeDriver::get_ref();
         driver.timer_cancel(NonNull::from(&self.timer));
@@ -125,40 +136,36 @@ impl Sleep {
 impl Future for Sleep {
     type Output = ();
 
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.get_mut();
+
         #[cfg(not(feature = "ffrt"))]
-        let driver = {
-            let context = get_current_ctx().expect("not in a worker ctx");
-            match context {
-                WorkerContext::Multi(ctx) => &ctx.handle,
-                WorkerContext::Curr(ctx) => &ctx.handle,
-            }
-        };
+        let driver = &this.handle;
         #[cfg(feature = "ffrt")]
         let driver = TimeDriver::get_ref();
-        if self.need_insert {
-            let ms = self
+        if this.need_insert {
+            let ms = this
                 .deadline
                 .checked_duration_since(driver.start_time())
                 .unwrap()
                 .as_millis()
                 .try_into()
                 .unwrap_or(u64::MAX);
-            self.timer.set_expiration(ms);
-            self.timer.set_waker(cx.waker().clone());
+            this.timer.set_expiration(ms);
+            this.timer.set_waker(cx.waker().clone());
 
-            match driver.timer_register(NonNull::from(&self.timer)) {
-                Ok(_) => self.need_insert = false,
+            match driver.timer_register(NonNull::from(&this.timer)) {
+                Ok(_) => this.need_insert = false,
                 Err(_) => {
                     // Even if the insertion fails, there is no need to insert again here,
                     // it is a timeout clock and needs to be triggered immediately at the next poll.
-                    self.need_insert = false;
-                    self.timer.set_result(true);
+                    this.need_insert = false;
+                    this.timer.set_result(true);
                 }
             }
         }
 
-        if self.timer.result() {
+        if this.timer.result() {
             Poll::Ready(())
         } else {
             Poll::Pending

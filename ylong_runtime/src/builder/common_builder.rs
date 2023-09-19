@@ -14,9 +14,10 @@
 use std::time::Duration;
 
 use crate::builder::CallbackHook;
-#[cfg(not(feature = "ffrt"))]
-use crate::builder::ScheduleAlgo;
 use crate::executor::blocking_pool::BLOCKING_MAX_THEAD_NUM;
+cfg_not_ffrt!(
+    use crate::builder::ScheduleAlgo;
+);
 
 const BLOCKING_PERMANENT_THREAD_NUM: u8 = 0;
 
@@ -71,24 +72,49 @@ impl CommonBuilder {
 
 macro_rules! impl_common {
     ($self:ident) => {
-        #[cfg(not(feature = "ffrt"))]
-        use std::sync::Arc;
         use std::time::Duration;
+        cfg_not_ffrt!(
+            use crate::builder::ScheduleAlgo;
+            use std::sync::Arc;
+        );
 
         #[cfg(not(feature = "ffrt"))]
-        use crate::builder::ScheduleAlgo;
+        impl $self {
+            /// Sets the core affinity of the worker threads
+            pub fn is_affinity(mut self, is_affinity: bool) -> Self {
+                self.common.is_affinity = is_affinity;
+                self
+            }
+
+            /// Sets the schedule policy.
+            pub fn schedule_algo(mut self, schedule_algo: ScheduleAlgo) -> Self {
+                self.common.schedule_algo = schedule_algo;
+                self
+            }
+
+            /// Sets the callback function to be called when a worker thread starts.
+            pub fn after_start<F>(mut self, f: F) -> Self
+            where
+                F: Fn() + Send + Sync + 'static,
+            {
+                self.common.after_start = Some(Arc::new(f));
+                self
+            }
+
+            /// Sets the callback function to be called when a worker thread stops.
+            pub fn before_stop<F>(mut self, f: F) -> Self
+            where
+                F: Fn() + Send + Sync + 'static,
+            {
+                self.common.before_stop = Some(Arc::new(f));
+                self
+            }
+        }
 
         impl $self {
             /// Sets the name prefix for all worker threads.
             pub fn worker_name(mut self, name: String) -> Self {
                 self.common.worker_name = Some(name);
-                self
-            }
-
-            /// Sets the core affinity of the worker threads
-            #[cfg(not(feature = "ffrt"))]
-            pub fn is_affinity(mut self, is_affinity: bool) -> Self {
-                self.common.is_affinity = is_affinity;
                 self
             }
 
@@ -121,13 +147,6 @@ macro_rules! impl_common {
                 self
             }
 
-            /// Sets the schedule policy.
-            #[cfg(not(feature = "ffrt"))]
-            pub fn schedule_algo(mut self, schedule_algo: ScheduleAlgo) -> Self {
-                self.common.schedule_algo = schedule_algo;
-                self
-            }
-
             /// Sets the stack size for every worker thread that gets spawned by the
             /// runtime. The minimum stack size is 1.
             pub fn worker_stack_size(mut self, stack_size: usize) -> Self {
@@ -143,26 +162,6 @@ macro_rules! impl_common {
             /// after it becomes idle.
             pub fn keep_alive_time(mut self, keep_alive_time: Duration) -> Self {
                 self.common.keep_alive_time = Some(keep_alive_time);
-                self
-            }
-
-            /// Sets the callback function to be called when a worker thread starts.
-            #[cfg(not(feature = "ffrt"))]
-            pub fn after_start<F>(mut self, f: F) -> Self
-            where
-                F: Fn() + Send + Sync + 'static,
-            {
-                self.common.after_start = Some(Arc::new(f));
-                self
-            }
-
-            /// Sets the callback function to be called when a worker thread stops.
-            #[cfg(not(feature = "ffrt"))]
-            pub fn before_stop<F>(mut self, f: F) -> Self
-            where
-                F: Fn() + Send + Sync + 'static,
-            {
-                self.common.before_stop = Some(Arc::new(f));
                 self
             }
         }

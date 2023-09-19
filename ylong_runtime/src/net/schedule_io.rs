@@ -16,7 +16,7 @@ use std::future::Future;
 use std::io;
 use std::marker::PhantomPinned;
 use std::pin::Pin;
-use std::ptr::NonNull;
+use std::ptr::{addr_of_mut, NonNull};
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Release, SeqCst};
 use std::sync::Mutex;
@@ -25,8 +25,9 @@ use std::task::{Context, Poll, Waker};
 use ylong_io::Interest;
 
 use crate::futures::poll_fn;
-use crate::net::{LinkedList, Node, Ready, ReadyEvent};
+use crate::net::{Ready, ReadyEvent};
 use crate::util::bit::{Bit, Mask};
+use crate::util::linked_list::{Link, LinkedList, Node};
 use crate::util::slab::Entry;
 
 const GENERATION: Mask = Mask::new(7, 24);
@@ -48,7 +49,7 @@ pub(crate) struct ScheduleIO {
 
 #[derive(Default)]
 pub(crate) struct Waiters {
-    list: LinkedList<UnsafeCell<Waiter>>,
+    list: LinkedList<Waiter>,
 
     // Reader & writer wakers are for AsyncRead/AsyncWriter
     reader: Option<Waker>,
@@ -65,6 +66,8 @@ pub(crate) struct Waiter {
 
     is_ready: bool,
 
+    node: Node<Waiter>,
+
     _p: PhantomPinned,
 }
 
@@ -79,6 +82,28 @@ impl Default for ScheduleIO {
             status: AtomicUsize::new(0),
             waiters: Mutex::new(Default::default()),
         }
+    }
+}
+
+impl Default for Waiter {
+    fn default() -> Self {
+        Waiter {
+            waker: None,
+            interest: Interest::READABLE,
+            is_ready: false,
+            node: Node::new(),
+            _p: PhantomPinned,
+        }
+    }
+}
+
+unsafe impl Link for Waiter {
+    unsafe fn node(mut ptr: NonNull<Self>) -> NonNull<Node<Self>>
+    where
+        Self: Sized,
+    {
+        let node_ptr = addr_of_mut!(ptr.as_mut().node);
+        NonNull::new_unchecked(node_ptr)
     }
 }
 
@@ -237,13 +262,10 @@ impl ScheduleIO {
         }
 
         waiters.list.for_each_mut(|waiter| {
-            let waiter = waiter.get();
-            unsafe {
-                if ready.satisfies((*waiter).interest) {
-                    if let Some(waker) = (*waiter).waker.take() {
-                        (*waiter).is_ready = true;
-                        wakers.push(Some(waker));
-                    }
+            if ready.satisfies(waiter.interest) {
+                if let Some(waker) = waiter.waker.take() {
+                    waiter.is_ready = true;
+                    wakers.push(Some(waker));
                 }
             }
         });
@@ -269,9 +291,7 @@ pub(crate) struct Readiness<'a> {
 
     state: State,
 
-    interest: Option<Interest>,
-
-    waiter: Option<NonNull<Node<UnsafeCell<Waiter>>>>,
+    waiter: UnsafeCell<Waiter>,
 }
 
 enum State {
@@ -285,8 +305,13 @@ impl Readiness<'_> {
         Readiness {
             schedule_io,
             state: State::Init,
-            interest: Some(interest),
-            waiter: None,
+            waiter: UnsafeCell::new(Waiter {
+                waker: None,
+                interest,
+                is_ready: false,
+                node: Node::new(),
+                _p: PhantomPinned,
+            }),
         }
     }
 }
@@ -295,17 +320,18 @@ impl Future for Readiness<'_> {
     type Output = io::Result<ReadyEvent>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let (schedule_io, state, interest, waiter) = unsafe {
+        let (schedule_io, state, waiter) = unsafe {
             let me = self.get_unchecked_mut();
-            (me.schedule_io, &mut me.state, me.interest, &mut me.waiter)
+            (me.schedule_io, &mut me.state, &me.waiter)
         };
+        // Safety: `waiter.interest` never changes after initialization.
+        let interest = unsafe { (*waiter.get()).interest };
         loop {
             match *state {
                 State::Init => {
                     let status_bit = Bit::from_usize(schedule_io.status.load(SeqCst));
                     let readiness = Ready::from_usize(status_bit.get_by_mask(READINESS));
-
-                    let ready = readiness.intersection(interest.unwrap());
+                    let ready = readiness.intersection(interest);
 
                     // if events are ready, change status to done
                     if !ready.is_empty() {
@@ -323,7 +349,7 @@ impl Future for Readiness<'_> {
                         readiness = Ready::ALL;
                     }
 
-                    let ready = readiness.intersection(interest.unwrap());
+                    let ready = readiness.intersection(interest);
 
                     // check one more time to see if events are ready
                     if !ready.is_empty() {
@@ -332,35 +358,36 @@ impl Future for Readiness<'_> {
                         return Poll::Ready(Ok(ReadyEvent::new(tick, ready)));
                     }
 
-                    *waiter = Some(waiters.list.add_item(UnsafeCell::new(Waiter {
-                        waker: Some(cx.waker().clone()),
-                        interest: interest.unwrap(),
-                        is_ready: false,
-                        _p: PhantomPinned,
-                    })));
+                    unsafe {
+                        (*waiter.get()).waker = Some(cx.waker().clone());
+
+                        waiters
+                            .list
+                            .push_front(NonNull::new_unchecked(waiter.get()));
+                    }
 
                     *state = State::Waiting;
                 }
-                State::Waiting => unsafe {
+                State::Waiting => {
                     // waiters could also be accessed in other places, so get the lock
                     let waiters = schedule_io.waiters.lock().unwrap();
 
-                    let waiter = waiter.as_mut().unwrap().as_mut().get_mut().get();
-                    if (*waiter).is_ready {
+                    let waiter = unsafe { &mut *waiter.get() };
+                    if waiter.is_ready {
                         *state = State::Done;
                     } else {
-                        if !(*waiter).waker.as_ref().unwrap().will_wake(cx.waker()) {
-                            (*waiter).waker = Some(cx.waker().clone());
+                        if !waiter.waker.as_ref().unwrap().will_wake(cx.waker()) {
+                            waiter.waker = Some(cx.waker().clone());
                         }
                         return Poll::Pending;
                     }
                     drop(waiters);
-                },
+                }
                 State::Done => {
                     let status_bit = Bit::from_usize(schedule_io.status.load(Acquire));
                     return Poll::Ready(Ok(ReadyEvent::new(
                         status_bit.get_by_mask(DRIVER_TICK) as u8,
-                        Ready::from_interest(interest.unwrap()),
+                        Ready::from_interest(interest),
                     )));
                 }
             }
@@ -374,9 +401,12 @@ unsafe impl Send for Readiness<'_> {}
 impl Drop for Readiness<'_> {
     fn drop(&mut self) {
         let mut waiters = self.schedule_io.waiters.lock().unwrap();
-
-        if self.waiter.is_some() {
-            waiters.list.remove_node(*self.waiter.as_mut().unwrap());
+        // Safety: There is only one queue holding the node, and this is the only way
+        // for the node to dequeue.
+        unsafe {
+            waiters
+                .list
+                .remove(NonNull::new_unchecked(self.waiter.get()));
         }
     }
 }

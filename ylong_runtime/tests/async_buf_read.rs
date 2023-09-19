@@ -11,13 +11,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::fs;
-use std::io::SeekFrom;
+#![cfg(all(feature = "fs", feature = "net"))]
 
-use ylong_runtime::fs::File;
-use ylong_runtime::io::{
-    AsyncBufReadExt, AsyncBufReader, AsyncReadExt, AsyncSeekExt, AsyncWriteExt,
-};
+use ylong_runtime::io::{AsyncBufReadExt, AsyncBufReader, AsyncReadExt, AsyncWriteExt};
 use ylong_runtime::net::{TcpListener, TcpStream};
 
 /// SDV test cases for AsyncBufReader `read_util`
@@ -202,8 +198,14 @@ fn sdv_buf_reader_lines() {
 /// 4. Check the read buf.
 #[test]
 fn sdv_buf_reader_seek() {
+    use std::fs;
+    use std::io::SeekFrom;
+
+    use ylong_runtime::fs::File;
+    use ylong_runtime::io::AsyncSeekExt;
+
     let handle = ylong_runtime::spawn(async move {
-        let mut file = File::create("./tests/buf_reader_seek_file").await.unwrap();
+        let mut file = File::create("buf_reader_seek_file").await.unwrap();
         let buf = "lorem-ipsum-dolor".as_bytes();
         let res = file.write(buf).await.unwrap();
         assert_eq!(res, 17);
@@ -211,7 +213,7 @@ fn sdv_buf_reader_seek() {
     ylong_runtime::block_on(handle).unwrap();
 
     let handle1 = ylong_runtime::spawn(async move {
-        let file = File::open("./tests/buf_reader_seek_file").await.unwrap();
+        let file = File::open("buf_reader_seek_file").await.unwrap();
         let mut buf_reader = AsyncBufReader::new(file);
         let mut res = vec![];
         let ret = buf_reader.read_until(b'-', &mut res).await.unwrap();
@@ -240,5 +242,5 @@ fn sdv_buf_reader_seek() {
         assert_eq!(buf, "dolor".as_bytes());
     });
     ylong_runtime::block_on(handle1).unwrap();
-    assert!(fs::remove_file("./tests/buf_reader_seek_file").is_ok());
+    assert!(fs::remove_file("buf_reader_seek_file").is_ok());
 }

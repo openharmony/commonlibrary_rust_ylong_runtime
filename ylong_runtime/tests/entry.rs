@@ -11,33 +11,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::ffi::{c_int, c_long};
-use std::time::Duration;
+#![cfg(gn_test)]
 
-use libc::timespec;
-
-/// Yields the current task.
-pub fn task_yield() {
-    unsafe {
-        ffrt_yield();
-    }
-}
-
-/// Turns the current task to sleep for a specific duration.
-pub fn task_sleep(d: Duration) {
-    unsafe {
-        let t = timespec {
-            tv_sec: d.as_secs() as i64,
-            tv_nsec: d.subsec_nanos() as c_long,
-        };
-        ffrt_sleep(&t);
-    }
-}
-
-#[link(name = "ffrt")]
-// sleep.h
-extern "C" {
-    #![allow(unused)]
-    fn ffrt_sleep(duration: *const timespec) -> c_int;
-    fn ffrt_yield();
-}
+mod async_buf_read;
+mod async_buf_write;
+mod async_dir;
+mod async_fs;
+mod async_pool;
+mod async_read;
+mod block_on;
+mod builder;
+mod core_affinity;
+mod join_set;
+mod mpsc_test;
+mod mutex;
+mod num_cpus;
+mod par_iter;
+mod semaphore_test;
+mod singleton_runtime;
+mod slab;
+mod slots;
+mod spawn;
+mod spawn_blocking;
+mod sync;
+mod task_cancel;
+mod tcp_test;
+mod timer_test;
+mod udp_test;

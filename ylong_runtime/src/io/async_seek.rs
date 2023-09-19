@@ -85,8 +85,8 @@ impl<T: AsyncSeek + ?Sized> AsyncSeekExt for T {}
 pub trait AsyncSeekExt: AsyncSeek {
     /// Asynchronously seek to an offset, in bytes, in a stream.
     ///
-    /// A seek beyond the end of a stream is allowed, but behavior is defined
-    /// by the implementation.
+    /// A seek beyond the end of a stream is allowed, but the behavior is
+    /// defined by the implementation.
     ///
     /// If the seek operation completed successfully,
     /// this method returns the new position from the start of the stream.
@@ -102,5 +102,74 @@ pub trait AsyncSeekExt: AsyncSeek {
         Self: Unpin,
     {
         SeekTask::new(self, pos)
+    }
+
+    /// Rewinds to the beginning of a stream.
+    ///
+    /// This is a convenience method, equivalent to seek(SeekFrom::Start(0)).
+    ///
+    /// # Errors
+    ///
+    /// Rewinding can fail, for example because it might involve flushing a
+    /// buffer.
+    ///
+    /// # Example
+    ///
+    /// ```no run
+    /// use std::io;
+    ///
+    /// use ylong_runtime::fs::OpenOptions;
+    /// use ylong_runtime::io::AsyncSeekExt;
+    ///
+    /// async fn async_io() -> io::Result<()> {
+    ///     let mut f = OpenOptions::new()
+    ///         .write(true)
+    ///         .read(true)
+    ///         .create(true)
+    ///         .open("foo.txt")
+    ///         .await
+    ///         .unwrap();
+    ///
+    ///     let hello = "Hello!\n";
+    ///     f.rewind().await.unwrap();
+    ///     Ok(())
+    /// }
+    /// ```
+    fn rewind(&mut self) -> SeekTask<'_, Self>
+    where
+        Self: Unpin,
+    {
+        self.seek(SeekFrom::Start(0))
+    }
+
+    /// Returns the current seek position from the start of the stream.
+    ///
+    /// This is a convenience method, equivalent to
+    /// `self.seek(SeekFrom::Current(0))`.
+    ///
+    /// # Example
+    ///
+    /// ```no run
+    /// use std::io;
+    ///
+    /// use ylong_runtime::fs::{File, OpenOptions};
+    /// use ylong_runtime::io::{AsyncBufReadExt, AsyncBufReader, AsyncSeekExt};
+    ///
+    /// async fn async_io() -> io::Result<()> {
+    ///     let mut f = AsyncBufReader::new(File::open("foo.txt").await?);
+    ///
+    ///     let before = f.stream_position().await?;
+    ///     f.read_line(&mut String::new()).await?;
+    ///     let after = f.stream_position().await?;
+    ///
+    ///     println!("The first line was {} bytes long", after - before);
+    ///     Ok(())
+    /// }
+    /// ```
+    fn stream_position(&mut self) -> SeekTask<'_, Self>
+    where
+        Self: Unpin,
+    {
+        self.seek(SeekFrom::Current(0))
     }
 }

@@ -22,12 +22,7 @@ use crate::task::raw::{Header, Inner, TaskMngInfo};
 use crate::task::state::StateAction;
 use crate::task::waker::WakerRefHeader;
 use crate::task::{state, Task};
-cfg_ffrt! {
-    use std::ffi::c_void;
-    use std::ptr::null_mut;
-    use ylong_ffrt::FfrtTaskHandle;
-    use crate::ffrt::ffrt_task::FfrtTaskCtx;
-}
+
 cfg_not_ffrt! {
     use crate::task::raw::Stage;
 }
@@ -284,8 +279,8 @@ where
             Err(e) => panic!("{}", e.as_str()),
         };
 
-        if !state::is_set_waker(cur) {
-            FfrtTaskCtx::set_waker_flag(false);
+        if state::is_set_waker(cur) {
+            self.inner().wake_join();
         }
     }
 
@@ -318,7 +313,11 @@ where
             }
 
             Ok(Poll::Pending) => match self.header().state.turning_to_idle() {
-                StateAction::Enqueue => false,
+                StateAction::Enqueue => {
+                    let ffrt_task = unsafe { (*self.inner().task.get()).as_ref().unwrap() };
+                    ffrt_task.wake_task();
+                    false
+                }
                 StateAction::Failed(state) => panic!("task state invalid: {:b}", state),
                 StateAction::Canceled(state) => {
                     let output = self.ffrt_get_canceled();
@@ -336,56 +335,6 @@ where
         }
     }
 
-    fn ffrt_set_waker_inner(
-        &self,
-        des_waker: Waker,
-        cur_state: usize,
-        task_handle: &FfrtTaskHandle,
-    ) -> Result<usize, (usize, *mut c_void)> {
-        if !state::is_care_join_handle(cur_state) || state::is_set_waker(cur_state) {
-            panic!("set waker failed: the join handle either get dropped or the task already has a waker set");
-        }
-
-        let waker = Box::new(des_waker);
-        let waker_ptr = Box::into_raw(waker) as *mut () as *mut c_void;
-        unsafe {
-            task_handle.set_waker_hook(waker_hook, waker_ptr);
-        }
-
-        let result = self
-            .header()
-            .state
-            .turn_to_set_waker()
-            .map_err(|size| (size, waker_ptr));
-        result
-    }
-
-    pub(crate) fn ffrt_set_waker(self, cur: usize, des_waker: &Waker) -> bool {
-        let task_handle = self.header().task_handle.as_ref().unwrap();
-        let res = if state::is_set_waker(cur) {
-            self.header()
-                .state
-                .turn_to_un_set_waker()
-                .map_err(|cur| (cur, null_mut()))
-                .and_then(|cur| self.ffrt_set_waker_inner(des_waker.clone(), cur, task_handle))
-        } else {
-            self.ffrt_set_waker_inner(des_waker.clone(), cur, task_handle)
-        };
-
-        if let Err((cur, ptr)) = res {
-            if !ptr.is_null() {
-                let waker = ptr as *mut () as *mut Waker;
-                unsafe { drop(Box::from_raw(waker)) };
-            }
-
-            if !state::is_finished(cur) {
-                panic!("the state is not finished, it is wrong");
-            }
-            return true;
-        }
-        false
-    }
-
     pub(crate) fn ffrt_wake(self) {
         self.ffrt_wake_by_ref();
         self.drop_ref();
@@ -393,7 +342,7 @@ where
 
     pub(crate) fn ffrt_wake_by_ref(&self) {
         let prev = self.header().state.turn_to_scheduling();
-        if !state::is_scheduling(prev) {
+        if state::need_enqueue(prev) {
             let ffrt_task = unsafe { (*self.inner().task.get()).as_ref().unwrap() };
             ffrt_task.wake_task();
         }
@@ -411,14 +360,5 @@ where
             let ffrt_task = unsafe { (*self.inner().task.get()).as_ref().unwrap() };
             ffrt_task.wake_task();
         }
-    }
-}
-
-#[cfg(feature = "ffrt")]
-extern "C" fn waker_hook(waker: *mut c_void) {
-    let waker = waker as *mut () as *mut Waker;
-    unsafe {
-        (*waker).wake_by_ref();
-        drop(Box::from_raw(waker));
     }
 }

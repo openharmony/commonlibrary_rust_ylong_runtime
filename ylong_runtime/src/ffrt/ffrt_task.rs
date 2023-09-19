@@ -12,7 +12,7 @@
 // limitations under the License.
 
 use libc::c_void;
-use ylong_ffrt::{ffrt_set_wake_flag, ffrt_task_get, ffrt_wake_coroutine};
+use ylong_ffrt::{ffrt_get_current_task, ffrt_wake_coroutine};
 
 type RawTaskCtx = *mut c_void;
 
@@ -21,14 +21,8 @@ pub(crate) struct FfrtTaskCtx(RawTaskCtx);
 
 impl FfrtTaskCtx {
     pub(crate) fn get_current() -> Self {
-        let task_ctx = unsafe { ffrt_task_get() };
+        let task_ctx = unsafe { ffrt_get_current_task() };
         FfrtTaskCtx(task_ctx)
-    }
-
-    pub(crate) fn set_waker_flag(flag: bool) {
-        unsafe {
-            ffrt_set_wake_flag(flag);
-        }
     }
 
     pub(crate) fn wake_task(&self) {

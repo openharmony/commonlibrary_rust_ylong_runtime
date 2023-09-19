@@ -45,17 +45,26 @@ This capability of asynchronous interfaces is achieved through the `Reactor` and
 
 ## Compile
 
-Method 1: Introduce `ylong_runtime` in `Cargo.toml`
+### Use Cargo
+1. Introduce `ylong_runtime` in `Cargo.toml`
 
 ```toml
-#[dependencies]
+[dependencies]
 ylong_runtime = { git = "https://gitee.com/openharmony-sig/commonlibrary_rust_ylong_runtime.git", features = ["full"]}
 ```
-
-Method 2: Add dependencies to `BUILD.gn` where appropriate
+### Use gn
+1. add `ylong_runtime` in bundle.json
 
 ```
-deps += ["//commonlibrary/rust/ylong_runtime/ylong_runtime:lib"]
+"deps": {
+   "components": ["ylong_runtime"]
+}
+```
+
+2. add `ylong_runtime:ylong_runtime` in `BUILD.gn`
+
+```
+external_deps = ["ylong_runtime:ylong_runtime"]
 ```
 
 ## Directory

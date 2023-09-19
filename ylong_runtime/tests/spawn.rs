@@ -11,30 +11,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use ylong_runtime::builder::RuntimeBuilder;
+async fn test_future(num: usize) -> usize {
+    num
+}
 
-mod helpers;
-use helpers::*;
+async fn test_multi_future_in_async(i: usize, j: usize) -> (usize, usize) {
+    let result_one = test_future(i).await;
+    let result_two = test_future(j).await;
 
+    (result_one, result_two)
+}
+
+async fn test_async_in_async(i: usize, j: usize) -> (usize, usize) {
+    test_multi_future_in_async(i, j).await
+}
 // One Core Test
 #[test]
 fn sdv_one_core_test() {
-    let core_pool_size = 1;
     let num = 1000;
-
-    let runtime = RuntimeBuilder::new_multi_thread()
-        .worker_num(core_pool_size)
-        .build()
-        .unwrap();
 
     let mut handles = Vec::with_capacity(num);
 
     for i in 0..num {
-        handles.push(runtime.spawn(test_future(i)));
+        handles.push(ylong_runtime::spawn(test_future(i)));
     }
 
     for (times, handle) in handles.into_iter().enumerate() {
-        let ret = runtime.block_on(handle);
+        let ret = ylong_runtime::block_on(handle);
         assert_eq!(ret.unwrap(), times);
     }
 }
@@ -42,22 +45,16 @@ fn sdv_one_core_test() {
 // Two-core test
 #[test]
 fn sdv_two_core_test() {
-    let core_pool_size = 2;
     let num = 1000;
-
-    let runtime = RuntimeBuilder::new_multi_thread()
-        .worker_num(core_pool_size)
-        .build()
-        .unwrap();
 
     let mut handles = Vec::with_capacity(num);
 
     for i in 0..num {
-        handles.push(runtime.spawn(test_future(i)));
+        handles.push(ylong_runtime::spawn(test_future(i)));
     }
 
     for (times, handle) in handles.into_iter().enumerate() {
-        let ret = runtime.block_on(handle);
+        let ret = ylong_runtime::block_on(handle);
         assert_eq!(ret.unwrap(), times);
     }
 }
@@ -65,22 +62,16 @@ fn sdv_two_core_test() {
 // Three Core Test
 #[test]
 fn sdv_three_core_test() {
-    let core_pool_size = 3;
     let num = 1000;
-
-    let runtime = RuntimeBuilder::new_multi_thread()
-        .worker_num(core_pool_size)
-        .build()
-        .unwrap();
 
     let mut handles = Vec::with_capacity(num);
 
     for i in 0..num {
-        handles.push(runtime.spawn(test_future(i)));
+        handles.push(ylong_runtime::spawn(test_future(i)));
     }
 
     for (times, handle) in handles.into_iter().enumerate() {
-        let ret = runtime.block_on(handle);
+        let ret = ylong_runtime::block_on(handle);
         assert_eq!(ret.unwrap(), times);
     }
 }
@@ -88,22 +79,16 @@ fn sdv_three_core_test() {
 // Four Core Test
 #[test]
 fn sdv_four_core_test() {
-    let core_pool_size = 4;
     let num = 1000;
-
-    let runtime = RuntimeBuilder::new_multi_thread()
-        .worker_num(core_pool_size)
-        .build()
-        .unwrap();
 
     let mut handles = Vec::with_capacity(num);
 
     for i in 0..num {
-        handles.push(runtime.spawn(test_future(i)));
+        handles.push(ylong_runtime::spawn(test_future(i)));
     }
 
     for (times, handle) in handles.into_iter().enumerate() {
-        let ret = runtime.block_on(handle);
+        let ret = ylong_runtime::block_on(handle);
         assert_eq!(ret.unwrap(), times);
     }
 }
@@ -111,22 +96,16 @@ fn sdv_four_core_test() {
 // Eight Core Test
 #[test]
 fn sdv_eight_core_test() {
-    let core_pool_size = 8;
     let num = 1000;
-
-    let runtime = RuntimeBuilder::new_multi_thread()
-        .worker_num(core_pool_size)
-        .build()
-        .unwrap();
 
     let mut handles = Vec::with_capacity(num);
 
     for i in 0..num {
-        handles.push(runtime.spawn(test_future(i)));
+        handles.push(ylong_runtime::spawn(test_future(i)));
     }
 
     for (times, handle) in handles.into_iter().enumerate() {
-        let ret = runtime.block_on(handle);
+        let ret = ylong_runtime::block_on(handle);
         assert_eq!(ret.unwrap(), times);
     }
 }
@@ -134,22 +113,16 @@ fn sdv_eight_core_test() {
 // 64 Core Test, It is also the largest number of cores supported
 #[test]
 fn sdv_max_core_test() {
-    let core_pool_size = 64;
     let num = 1000;
-
-    let runtime = RuntimeBuilder::new_multi_thread()
-        .worker_num(core_pool_size)
-        .build()
-        .unwrap();
 
     let mut handles = Vec::with_capacity(num);
 
     for i in 0..num {
-        handles.push(runtime.spawn(test_future(i)));
+        handles.push(ylong_runtime::spawn(test_future(i)));
     }
 
     for (times, handle) in handles.into_iter().enumerate() {
-        let ret = runtime.block_on(handle);
+        let ret = ylong_runtime::block_on(handle);
         assert_eq!(ret.unwrap(), times);
     }
 }
@@ -157,22 +130,16 @@ fn sdv_max_core_test() {
 // Having multiple tasks in one `async` block
 #[test]
 fn sdv_multi_future_in_async() {
-    let core_pool_size = 4;
     let num = 1000;
-
-    let runtime = RuntimeBuilder::new_multi_thread()
-        .worker_num(core_pool_size)
-        .build()
-        .unwrap();
 
     let mut handles = Vec::with_capacity(num);
 
     for i in 0..num {
-        handles.push(runtime.spawn(test_multi_future_in_async(i, i + 1)));
+        handles.push(ylong_runtime::spawn(test_multi_future_in_async(i, i + 1)));
     }
 
     for (times, handle) in handles.into_iter().enumerate() {
-        let ret = runtime.block_on(handle);
+        let ret = ylong_runtime::block_on(handle);
         assert_eq!(ret.unwrap(), (times, times + 1));
     }
 }
@@ -181,22 +148,16 @@ fn sdv_multi_future_in_async() {
 // relationship
 #[test]
 fn sdv_multi_async_in_async() {
-    let core_pool_size = 4;
     let num = 1000;
-
-    let runtime = RuntimeBuilder::new_multi_thread()
-        .worker_num(core_pool_size)
-        .build()
-        .unwrap();
 
     let mut handles = Vec::with_capacity(num);
 
     for i in 0..num {
-        handles.push(runtime.spawn(test_async_in_async(i, i + 1)));
+        handles.push(ylong_runtime::spawn(test_async_in_async(i, i + 1)));
     }
 
     for (times, handle) in handles.into_iter().enumerate() {
-        let ret = runtime.block_on(handle);
+        let ret = ylong_runtime::block_on(handle);
         assert_eq!(ret.unwrap(), (times, times + 1));
     }
 }

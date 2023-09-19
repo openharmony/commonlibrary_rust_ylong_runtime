@@ -1,40 +1,50 @@
 {
-  "name": "@ohos/rust_ylong_runtime",
-  "description": "Rust runtime implementation",
+  "name": "@ohos/ylong_runtime",
   "version": "4.0",
-  "license": "MIT",
+  "description": "Rust runtime implementation",
   "publishAs": "code-segment",
-  "dirs": {},
-  "scripts": {},
+  "homePage": "https://gitee.com/openharmony",
+  "repository": "https://gitee.com/openharmony/commonlibrary_rust_ylong_runtime",
+  "license": "Apache License 2.0",
+  "language": "Rust",
+  "segment": {
+    "destPath": "commonlibrary/rust/ylong_runtime"
+  },
   "licensePath": "COPYING",
   "readmePath": {
     "en": "README.md",
     "zh": "README_zh.md"
   },
   "component": {
-    "name": "ylong_runtime_mod",
+    "name": "ylong_runtime",
     "subsystem": "commonlibrary",
-    "syscap": [],
     "features": [],
-    "adapted_system_type": [],
-    "rom": "1500KB",
-    "ram": "5000KB",
+    "adapted_system_type": [
+      "standard"
+    ],
+    "rom": "100KB",
+    "ram": "~200KB",
     "deps": {
       "components": [],
       "third_party": []
     },
     "build": {
-      "sub_component": [],
+      "sub_component": [
+        "//commonlibrary/rust/ylong_runtime/ylong_io:ylong_io"
+      ],
       "inner_kits": [
         {
+          "name": "//commonlibrary/rust/ylong_runtime/ylong_runtime:ylong_runtime",
           "header": {
             "header_base": [],
             "header_files": []
-          },
-          "name": "//commonlibrary/rust/ylong_runtime/ylong_runtime:lib"
+          }
         }
       ],
-      "test": []
+      "test": [
+        "//commonlibrary/rust/ylong_runtime/ylong_runtime:unittest",
+        "//commonlibrary/rust/ylong_runtime/ylong_runtime:sdvtest"
+      ]
     }
   }
 }

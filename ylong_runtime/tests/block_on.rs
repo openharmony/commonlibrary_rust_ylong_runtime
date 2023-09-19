@@ -11,6 +11,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#![cfg(feature = "multi_instance_runtime")]
+
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
