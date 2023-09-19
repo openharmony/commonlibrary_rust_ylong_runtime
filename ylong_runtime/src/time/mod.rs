@@ -32,7 +32,7 @@ pub use sleep::{sleep, sleep_until, Sleep};
 pub use timeout::timeout;
 pub use timer::{periodic_schedule, timer, timer_at, Timer};
 
-use crate::util::link_list::{Link, Node};
+use crate::util::linked_list::{Link, Node};
 
 // Struct for timing and waking up corresponding tasks on the timing wheel.
 pub(crate) struct Clock {

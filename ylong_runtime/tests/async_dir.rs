@@ -13,7 +13,6 @@
 
 #![cfg(feature = "fs")]
 
-
 use ylong_runtime::fs::{create_dir, create_dir_all, read_dir, remove_dir, remove_dir_all, File};
 
 /// SDV test cases for directory operations.
@@ -27,12 +26,8 @@ use ylong_runtime::fs::{create_dir, create_dir_all, read_dir, remove_dir, remove
 fn sdv_async_dir() {
     let handle = ylong_runtime::spawn(async move {
         let _ = create_dir("dir_test").await;
-        File::create("dir_test/test1.txt")
-            .await
-            .unwrap();
-        File::create("dir_test/test2.txt")
-            .await
-            .unwrap();
+        File::create("dir_test/test1.txt").await.unwrap();
+        File::create("dir_test/test2.txt").await.unwrap();
         let mut dir = read_dir("dir_test").await.unwrap();
         let entry = dir.next().await.unwrap().unwrap();
         assert!(!entry.file_type().await.unwrap().is_dir());
@@ -67,12 +62,8 @@ fn sdv_async_dir_create_remove() {
     let handle = ylong_runtime::spawn(async move {
         assert!(create_dir("dir_test1").await.is_ok());
         assert!(create_dir("dir_test1").await.is_err());
-        assert!(create_dir("dir_test2/dir_test_child")
-            .await
-            .is_err());
-        assert!(create_dir_all("dir_test2/dir_test_child")
-            .await
-            .is_ok());
+        assert!(create_dir("dir_test2/dir_test_child").await.is_err());
+        assert!(create_dir_all("dir_test2/dir_test_child").await.is_ok());
         assert!(remove_dir("dir_test1").await.is_ok());
         assert!(remove_dir("dir_test1").await.is_err());
         assert!(remove_dir("async_dir").await.is_err());
