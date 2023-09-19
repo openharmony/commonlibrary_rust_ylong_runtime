@@ -15,8 +15,9 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
+use std::time::Duration;
 
-use crate::executor::driver::{Driver, Handle};
+use crate::executor::driver::{Driver, Handle, ParkFlag};
 
 #[derive(Clone)]
 pub(crate) struct Parker {
@@ -82,15 +83,20 @@ impl Inner {
             }
             thread::yield_now();
         }
+
+        let mut permit = ParkFlag::Park;
         if let Ok(mut driver) = self.driver.try_lock() {
-            self.park_on_driver(&mut driver);
-            return;
+            permit = self.park_on_driver(&mut driver);
         }
 
-        self.park_on_condvar();
+        match permit {
+            ParkFlag::NotPark => {}
+            ParkFlag::Park => self.park_on_condvar(),
+            ParkFlag::ParkTimeout(duration) => self.park_on_condvar_timeout(duration),
+        }
     }
 
-    fn park_on_driver(&self, driver: &mut Driver) {
+    fn park_on_driver(&self, driver: &mut Driver) -> ParkFlag {
         match self
             .state
             .compare_exchange(IDLE, PARKED_ON_DRIVER, SeqCst, SeqCst)
@@ -98,16 +104,17 @@ impl Inner {
             Ok(_) => {}
             Err(NOTIFIED) => {
                 self.state.swap(IDLE, SeqCst);
-                return;
+                return ParkFlag::NotPark;
             }
             Err(actual) => panic!("inconsistent park state; actual = {}", actual),
         }
 
-        driver.run();
+        let permit = driver.run();
 
         match self.state.swap(IDLE, SeqCst) {
             // got notified by real io events or not
-            NOTIFIED | PARKED_ON_DRIVER => {}
+            NOTIFIED => ParkFlag::NotPark,
+            PARKED_ON_DRIVER => permit,
             n => panic!("inconsistent park_timeout state: {}", n),
         }
     }
@@ -136,6 +143,42 @@ impl Inner {
                 .is_ok()
             {
                 // got a notification, finish parking
+                return;
+            }
+            // got spurious wakeup, go back to park again
+        }
+    }
+
+    fn park_on_condvar_timeout(&self, duration: Duration) {
+        let mut l = self.mutex.lock().unwrap();
+        match self
+            .state
+            .compare_exchange(IDLE, PARKED_ON_CONDVAR, SeqCst, SeqCst)
+        {
+            Ok(_) => {}
+            Err(NOTIFIED) => {
+                // got a notification, exit parking
+                self.state.swap(IDLE, SeqCst);
+                return;
+            }
+            Err(actual) => panic!("inconsistent park state; actual = {}", actual),
+        }
+
+        loop {
+            let (lock, timeout_result) = self.condvar.wait_timeout(l, duration).unwrap();
+            l = lock;
+
+            if self
+                .state
+                .compare_exchange(NOTIFIED, IDLE, SeqCst, SeqCst)
+                .is_ok()
+            {
+                // got a notification, finish parking
+                return;
+            }
+
+            if timeout_result.timed_out() {
+                self.state.store(IDLE, SeqCst);
                 return;
             }
             // got spurious wakeup, go back to park again
