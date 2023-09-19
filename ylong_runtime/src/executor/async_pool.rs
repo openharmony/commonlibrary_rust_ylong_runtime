@@ -265,9 +265,9 @@ impl MultiThreadScheduler {
         let task_from_global = self.global.pop_front();
 
         // end searching
-        if self.sleeper.dec_searching_num() {
-            self.wake_up_rand_one()
-        };
+        // regardless of whether a task can be stolen from the global queue,
+        // wake_up_rand_one is not called.
+        self.sleeper.dec_searching_num();
 
         task_from_global
     }
