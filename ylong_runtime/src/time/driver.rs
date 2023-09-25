@@ -101,9 +101,6 @@ impl TimeDriver {
         loop {
             match lock.poll(now) {
                 TimeOut::ClockEntry(mut clock_entry) => {
-                    let elapsed = lock.elapsed();
-                    lock.set_last_elapsed(elapsed);
-
                     // Unsafe access to timer_handle is only unsafe when Sleep Drop,
                     // but does not let `Sleep` go to `Ready` before access to timer_handle fetched
                     // by poll.
