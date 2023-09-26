@@ -13,10 +13,14 @@
 
 //! Unbounded channel
 
+pub(crate) mod queue;
+
+use std::task::{Context, Poll};
+
+use crate::futures::poll_fn;
 use crate::sync::error::{RecvError, SendError, TryRecvError};
-use crate::sync::mpsc::channel::{channel, Rx, Tx};
-use crate::sync::mpsc::queue::Queue;
-use crate::sync::mpsc::Container;
+use crate::sync::mpsc::unbounded::queue::Queue;
+use crate::sync::mpsc::{channel, Container, Rx, Tx};
 
 cfg_time!(
     use crate::time::timeout;
@@ -256,6 +260,40 @@ impl<T> UnboundedReceiver<T> {
         self.channel.try_recv()
     }
 
+    /// Polls to receive a value from the associated [`UnboundedSender`].
+    ///
+    /// When the sender has not yet sent a message, calling this method will
+    /// return pending, and the waker from the Context will receive a
+    /// wakeup when the message arrives or when the channel is closed. Multiple
+    /// calls to this method, only the waker from the last call will receive a
+    /// wakeup
+    ///
+    /// # Return value
+    /// * `Poll::Pending` if no messages in the channel now, but the channel is
+    ///   not closed.
+    /// * `Poll::Ready(Ok(T))` if receiving a value successfully.
+    /// * `Poll::Ready(Ok(Err(RecvError)))` in the following situations:
+    ///    1.All senders have been dropped or the channel is closed.
+    ///    2.No messages remaining.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ylong_runtime::futures::poll_fn;
+    /// use ylong_runtime::sync::mpsc::unbounded::unbounded_channel;
+    /// async fn io_func() {
+    ///     let (tx, mut rx) = unbounded_channel();
+    ///     let handle = ylong_runtime::spawn(async move {
+    ///         let msg = poll_fn(|cx| rx.poll_recv(cx)).await;
+    ///         assert_eq!(msg, Ok(1));
+    ///     });
+    ///     assert!(tx.send(1).is_ok());
+    /// }
+    /// ```
+    pub fn poll_recv(&mut self, cx: &mut Context<'_>) -> Poll<Result<T, RecvError>> {
+        self.channel.poll_recv(cx)
+    }
+
     /// Receives a value from the associated [`UnboundedSender`].
     ///
     /// The `receiver` can still receive all sent messages in the channel after
@@ -263,7 +301,9 @@ impl<T> UnboundedReceiver<T> {
     ///
     /// # Return value
     /// * `Ok(T)` if receiving a value successfully.
-    /// * `Err(RecvError::Closed)` if all senders have been dropped.
+    /// * `Err(RecvError)` in the following situations:
+    ///    1.All senders have been dropped or the channel is closed.
+    ///    2.No messages remaining.
     ///
     /// # Examples
     ///
@@ -278,7 +318,7 @@ impl<T> UnboundedReceiver<T> {
     /// }
     /// ```
     pub async fn recv(&mut self) -> Result<T, RecvError> {
-        self.channel.recv().await
+        poll_fn(|cx| self.channel.poll_recv(cx)).await
     }
 
     /// Attempts to receive a value from the associated [`UnboundedSender`] in a
@@ -289,8 +329,8 @@ impl<T> UnboundedReceiver<T> {
     ///
     /// # Return value
     /// * `Ok(T)` if receiving a value successfully.
-    /// * `Err(RecvError::Closed)` if all senders have been dropped.
-    /// * `Err(RecvError::TimeOut)` if receiving timeout has elapsed.
+    /// * `Err(RecvTimeoutError::Closed)` if all senders have been dropped.
+    /// * `Err(RecvTimeoutError::TimeOut)` if receiving timeout has elapsed.
     ///
     /// # Examples
     ///
@@ -308,7 +348,7 @@ impl<T> UnboundedReceiver<T> {
     /// ```
     #[cfg(feature = "time")]
     pub async fn recv_timeout(&mut self, time: Duration) -> Result<T, RecvTimeoutError> {
-        match timeout(time, self.channel.recv()).await {
+        match timeout(time, self.recv()).await {
             Ok(res) => res.map_err(|_| RecvTimeoutError::Closed),
             Err(_) => Err(RecvTimeoutError::Timeout),
         }

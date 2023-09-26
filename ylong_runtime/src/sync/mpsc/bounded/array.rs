@@ -20,7 +20,6 @@ use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
 use std::task::Poll::{Pending, Ready};
 use std::task::{Context, Poll};
 
-use crate::futures::poll_fn;
 use crate::sync::atomic_waker::AtomicWaker;
 use crate::sync::error::{RecvError, SendError, TryRecvError, TrySendError};
 use crate::sync::mpsc::Container;
@@ -167,7 +166,7 @@ impl<T> Array<T> {
         }
     }
 
-    fn poll_recv(&self, cx: &mut Context<'_>) -> Poll<Result<T, RecvError>> {
+    pub(crate) fn poll_recv(&self, cx: &mut Context<'_>) -> Poll<Result<T, RecvError>> {
         match self.try_recv() {
             Ok(val) => return Ready(Ok(val)),
             Err(TryRecvError::Closed) => return Ready(Err(RecvError)),
@@ -181,10 +180,6 @@ impl<T> Array<T> {
             Err(TryRecvError::Closed) => Ready(Err(RecvError)),
             Err(TryRecvError::Empty) => Pending,
         }
-    }
-
-    pub(crate) async fn recv(&self) -> Result<T, RecvError> {
-        poll_fn(|cx| self.poll_recv(cx)).await
     }
 
     pub(crate) fn capacity(&self) -> usize {

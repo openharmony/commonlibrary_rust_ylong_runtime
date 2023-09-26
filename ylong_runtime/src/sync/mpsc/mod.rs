@@ -13,10 +13,7 @@
 
 //! Message passing style communication
 
-pub(crate) mod array;
 pub mod bounded;
-pub(crate) mod channel;
-pub(crate) mod queue;
 pub mod unbounded;
 
 pub use bounded::{bounded_channel, BoundedReceiver, BoundedSender};
@@ -28,4 +25,83 @@ pub(crate) trait Container {
     fn is_close(&self) -> bool;
 
     fn len(&self) -> usize;
+}
+
+use std::ops::Deref;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering::{AcqRel, Relaxed};
+use std::sync::Arc;
+
+pub(crate) struct Channel<C: Container> {
+    chan: C,
+    tx_cnt: AtomicUsize,
+}
+
+impl<C: Container> Channel<C> {
+    fn new(chan: C) -> Channel<C> {
+        Channel {
+            chan,
+            tx_cnt: AtomicUsize::new(1),
+        }
+    }
+}
+
+pub(crate) fn channel<C: Container>(chan: C) -> (Tx<C>, Rx<C>) {
+    let channel = Arc::new(Channel::new(chan));
+    (Tx::new(channel.clone()), Rx::new(channel))
+}
+
+pub(crate) struct Tx<C: Container> {
+    inner: Arc<Channel<C>>,
+}
+
+impl<C: Container> Clone for Tx<C> {
+    fn clone(&self) -> Self {
+        self.inner.tx_cnt.fetch_add(1, Relaxed);
+        Tx {
+            inner: self.inner.clone(),
+        }
+    }
+}
+
+impl<C: Container> Tx<C> {
+    fn new(channel: Arc<Channel<C>>) -> Tx<C> {
+        Tx { inner: channel }
+    }
+
+    pub(crate) fn is_same(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.inner, &other.inner)
+    }
+
+    pub(crate) fn close(&self) {
+        if self.inner.tx_cnt.fetch_sub(1, AcqRel) == 1 {
+            self.inner.chan.close();
+        }
+    }
+}
+
+impl<C: Container> Deref for Tx<C> {
+    type Target = C;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner.chan
+    }
+}
+
+pub(crate) struct Rx<C: Container> {
+    inner: Arc<Channel<C>>,
+}
+
+impl<C: Container> Rx<C> {
+    fn new(channel: Arc<Channel<C>>) -> Rx<C> {
+        Rx { inner: channel }
+    }
+}
+
+impl<C: Container> Deref for Rx<C> {
+    type Target = C;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner.chan
+    }
 }
