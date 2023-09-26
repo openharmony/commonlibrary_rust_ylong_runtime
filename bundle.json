@@ -42,8 +42,8 @@
         }
       ],
       "test": [
-        "//commonlibrary/rust/ylong_runtime/ylong_runtime:unittest",
-        "//commonlibrary/rust/ylong_runtime/ylong_runtime:sdvtest"
+        "//commonlibrary/rust/ylong_runtime/test:unittest",
+        "//commonlibrary/rust/ylong_runtime/test:sdvtest"
       ]
     }
   }
