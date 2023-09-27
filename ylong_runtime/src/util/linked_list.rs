@@ -319,6 +319,7 @@ mod tests {
     /// 2. Push nodes into the list.
     /// 3. Check the value in node after traversing the list.
     #[test]
+    #[cfg(feature = "net")]
     fn ut_link_list_for_each_mut() {
         let mut list = LinkedList::<Entry>::new();
         assert!(list.is_empty());

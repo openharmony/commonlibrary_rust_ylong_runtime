@@ -1463,8 +1463,8 @@ mod tests {
     #[test]
     fn ut_udp_basic_v4() {
         block_on(async {
-            let sender_addr = "127.0.0.1:8096";
-            let receiver_addr = "127.0.0.1:8097";
+            let sender_addr = "127.0.0.1:8181";
+            let receiver_addr = "127.0.0.1:8182";
 
             let sender = UdpSocket::bind(sender_addr).await.unwrap();
             let receiver = UdpSocket::bind(receiver_addr).await.unwrap();
