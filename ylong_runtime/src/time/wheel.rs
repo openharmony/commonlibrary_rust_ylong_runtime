@@ -35,15 +35,16 @@ pub(crate) enum TimeOut {
     None,
 }
 
+pub(crate) struct Expiration {
+    level: usize,
+    slot: usize,
+    deadline: u64,
+}
+
 pub(crate) struct Wheel {
     // Since the wheel started,
     // the number of milliseconds elapsed.
     elapsed: u64,
-
-    // Since the time wheel started,
-    // to the end of the last future run,
-    // the number of milliseconds elapsed.
-    last_elapsed: u64,
 
     // The time wheel levels are similar to a multi-layered dial.
     //
@@ -69,7 +70,6 @@ impl Wheel {
 
         Self {
             elapsed: 0,
-            last_elapsed: 0,
             levels,
             trigger: Default::default(),
         }
@@ -85,16 +85,6 @@ impl Wheel {
         self.elapsed = elapsed;
     }
 
-    // Return the last_elapsed.
-    pub(crate) fn last_elapsed(&self) -> u64 {
-        self.last_elapsed
-    }
-
-    // Set the last_elapsed.
-    pub(crate) fn set_last_elapsed(&mut self, last_elapsed: u64) {
-        self.last_elapsed = last_elapsed;
-    }
-
     // Compare the timing wheel elapsed with the expiration,
     // from which to decide which level to insert.
     pub(crate) fn find_level(&self, expiration: u64) -> usize {
@@ -103,7 +93,6 @@ impl Wheel {
 
         // Use the time difference value to find at which level.
         let mut masked = (expiration - self.elapsed()) | SLOT_MASK;
-
         // 1111 1111 1111 1111 1111 1111 1111 1111 1111
         if masked >= MAX_DURATION {
             masked = MAX_DURATION - 1;
@@ -153,11 +142,9 @@ impl Wheel {
     }
 
     // Return where the next expiration is located, and its deadline.
-    pub(crate) fn next_expiration(&self) -> Option<(usize, usize, u64)> {
+    pub(crate) fn next_expiration(&self) -> Option<Expiration> {
         for level in 0..LEVELS_NUM {
-            if let Some(expiration) =
-                self.levels[level].next_expiration(self.elapsed() - self.last_elapsed())
-            {
+            if let Some(expiration) = self.levels[level].next_expiration(self.elapsed()) {
                 return Some(expiration);
             }
         }
@@ -166,10 +153,35 @@ impl Wheel {
     }
 
     // Retrieve the corresponding expired TimerHandle.
-    pub(crate) fn process_expiration(&mut self, expiration: &(usize, usize, u64)) {
-        let mut handles = self.levels[expiration.0].take_slot(expiration.1);
-        while let Some(item) = handles.pop_back() {
-            self.trigger.push_front(item);
+    pub(crate) fn process_expiration(&mut self, expiration: &Expiration) {
+        let mut handles = self.levels[expiration.level].take_slot(expiration.slot);
+        while let Some(mut item) = handles.pop_back() {
+            let expected_expiration = unsafe { item.as_ref().expiration() };
+            if expected_expiration > expiration.deadline {
+                // 0011_1111
+                const SLOT_MASK: u64 = (1 << 6) - 1;
+
+                // When inserting the remaining data again,
+                // the level of insertion should be determined by the expiration time of each
+                // insertion.
+                let mut masked = (expected_expiration - expiration.deadline) | SLOT_MASK;
+                if masked >= MAX_DURATION {
+                    masked = MAX_DURATION - 1;
+                }
+                let leading_zeros = masked.leading_zeros() as usize;
+                // Calculate how many valid bits there are.
+                // Leading zeros have up to 63 bits.
+                let significant = 63 - leading_zeros;
+
+                // One level per 6 bit.
+                let level = significant / 6;
+
+                unsafe { item.as_mut().set_level(level) };
+
+                self.levels[level].insert(item, expiration.deadline);
+            } else {
+                self.trigger.push_front(item);
+            }
         }
     }
 
@@ -183,10 +195,8 @@ impl Wheel {
             let expiration = self.next_expiration();
 
             match expiration {
-                Some(ref expiration) if expiration.2 > now - self.last_elapsed() => {
-                    return TimeOut::Duration(Duration::from_millis(
-                        expiration.2 - (now - self.last_elapsed()),
-                    ))
+                Some(ref expiration) if expiration.deadline > now => {
+                    return TimeOut::Duration(Duration::from_millis(expiration.deadline - now))
                 }
                 Some(ref expiration) => {
                     self.process_expiration(expiration);
@@ -243,13 +253,16 @@ impl Level {
     // and the expected expiration time of the clock_entry,
     // find the corresponding slot and insert it.
     pub(crate) fn insert(&mut self, mut clock_entry: NonNull<Clock>, elapsed: u64) {
-        let duration = unsafe { clock_entry.as_ref().expiration() } - elapsed;
+        // This duration represents how long it takes for the current slot to complete,
+        // at least 0. If you don't reduce it with saturating_sub, the slot will
+        // loop to a very large number, resulting in a slot insertion error.
+        let duration = unsafe { clock_entry.as_ref().expiration() }.saturating_sub(elapsed);
+
         // Unsafe access to clock_entry is only unsafe when Sleep Drop,
         // `Sleep` here does not go into `Ready`.
         unsafe { clock_entry.as_mut().set_duration(duration) };
 
         let slot = ((duration >> (self.level * LEVELS_NUM)) % SLOTS_NUM as u64) as usize;
-
         self.slots[slot].push_front(clock_entry);
 
         self.occupied |= 1 << slot;
@@ -270,23 +283,24 @@ impl Level {
 
         if self.slots[slot].is_empty() {
             // Unset the bit
-            self.occupied ^= 1 << slot;
+            self.occupied &= !(1 << slot);
         }
     }
 
     // Return where the next expiration is located, and its deadline.
-    pub(crate) fn next_expiration(&self, now: u64) -> Option<(usize, usize, u64)> {
+    pub(crate) fn next_expiration(&self, now: u64) -> Option<Expiration> {
         let slot = self.next_occupied_slot(now)?;
 
-        let level_range = level_range(self.level);
         let slot_range = slot_range(self.level);
 
-        // Find the start time at this level for the current point in time.
-        let level_start = now & !(level_range - 1);
         // Add the time of the last slot at this level to represent a time period.
-        let deadline = level_start + slot as u64 * slot_range;
+        let deadline = now + slot as u64 * slot_range;
 
-        Some((self.level, slot, deadline))
+        Some(Expiration {
+            level: self.level,
+            slot,
+            deadline,
+        })
     }
 
     // Find the next slot that needs to be executed.
@@ -315,12 +329,6 @@ fn slot_range(level: usize) -> u64 {
     SLOTS_NUM.pow(level as u32) as u64
 }
 
-// All the slots before this level(including this level) add up to
-// approximately.
-fn level_range(level: usize) -> u64 {
-    SLOTS_NUM as u64 * slot_range(level)
-}
-
 #[cfg(test)]
 mod test {
     use crate::time::wheel::{Wheel, LEVELS_NUM};
@@ -343,7 +351,6 @@ mod test {
     fn ut_wheel_new_test() {
         let wheel = Wheel::new();
         assert_eq!(wheel.elapsed, 0);
-        assert_eq!(wheel.last_elapsed, 0);
         assert_eq!(wheel.levels.len(), LEVELS_NUM);
     }
 

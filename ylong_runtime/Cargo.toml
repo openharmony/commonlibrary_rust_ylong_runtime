@@ -141,3 +141,8 @@ required-features = ["multi_instance_runtime"]
 name = "ylong_runtime_timer_sleep"
 path = "examples/ylong_runtime_timer_sleep.rs"
 required-features = ["time", "multi_instance_runtime"]
+
+[[example]]
+name = "ylong_runtime_timer_memory"
+path = "examples/ylong_runtime_timer_memory.rs"
+required-features = ["time", "multi_instance_runtime"]
