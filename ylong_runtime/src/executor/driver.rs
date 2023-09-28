@@ -12,6 +12,7 @@
 // limitations under the License.
 
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 cfg_event!(
     use std::io;
@@ -27,9 +28,15 @@ cfg_time! {
 cfg_net! {
     use crate::util::slab::Ref;
     use crate::net::{IoDriver, IoHandle};
-    use std::time::Duration;
     use ylong_io::{Interest, Source};
     use crate::net::ScheduleIO;
+}
+
+// Flag used to identify whether to park on condvar.
+pub(crate) enum ParkFlag {
+    NotPark,
+    Park,
+    ParkTimeout(Duration),
 }
 
 pub(crate) struct Driver {
@@ -67,13 +74,20 @@ impl Driver {
         (Arc::new(handle), Arc::new(Mutex::new(driver)))
     }
 
-    pub(crate) fn run(&mut self) {
-        #[cfg(feature = "net")]
+    pub(crate) fn run(&mut self) -> ParkFlag {
         let _duration: Option<Duration> = None;
         #[cfg(feature = "time")]
         let _duration = self.time.run();
         #[cfg(feature = "net")]
         self.io.drive(_duration).expect("io driver running failed");
+        if cfg!(feature = "net") {
+            ParkFlag::NotPark
+        } else {
+            match _duration {
+                None => ParkFlag::Park,
+                Some(duration) => ParkFlag::ParkTimeout(duration),
+            }
+        }
     }
 
     pub(crate) fn run_once(&mut self) {

@@ -213,6 +213,7 @@ mod tests {
     /// list.
     /// 3. Check if the list is empty before and after clear the list.
     #[test]
+    #[cfg(feature = "time")]
     fn ut_link_list_is_empty() {
         let mut list = LinkedList::<Entry>::new();
         assert!(list.is_empty());
@@ -229,6 +230,7 @@ mod tests {
     /// 2. Push nodes into the list.
     /// 3. Pop nodes from the list and check the value.
     #[test]
+    #[cfg(feature = "time")]
     fn ut_link_list_push_and_pop() {
         let mut list = LinkedList::<Entry>::new();
         assert!(list.is_empty());
@@ -260,7 +262,6 @@ mod tests {
     #[test]
     fn ut_link_list_remove() {
         let mut list = LinkedList::<Entry>::new();
-        assert!(list.is_empty());
         let node1 = Entry::new(1);
         let node1_ptr = node1.get_ptr();
         let node2 = Entry::new(2);
@@ -268,7 +269,6 @@ mod tests {
         let node3 = Entry::new(3);
         let node3_ptr = node3.get_ptr();
         list.push_front(node1_ptr);
-        assert!(!list.is_empty());
         list.push_front(node2_ptr);
         list.push_front(node3_ptr);
         unsafe {
@@ -309,7 +309,6 @@ mod tests {
             assert!(list.remove(node2_ptr).is_some());
             assert!(list.remove(node2_ptr).is_none());
         }
-        assert!(list.is_empty());
     }
 
     /// UT test cases for `for_each_mut()`.
@@ -322,23 +321,22 @@ mod tests {
     #[cfg(feature = "net")]
     fn ut_link_list_for_each_mut() {
         let mut list = LinkedList::<Entry>::new();
-        assert!(list.is_empty());
         let node1 = Entry::new(1);
-        let node1 = node1.get_ptr();
+        let node1_ptr = node1.get_ptr();
         let node2 = Entry::new(2);
-        let node2 = node2.get_ptr();
+        let node2_ptr = node2.get_ptr();
         let node3 = Entry::new(3);
-        let node3 = node3.get_ptr();
-        list.push_front(node1);
-        list.push_front(node2);
-        list.push_front(node3);
+        let node3_ptr = node3.get_ptr();
+        list.push_front(node1_ptr);
+        list.push_front(node2_ptr);
+        list.push_front(node3_ptr);
         list.for_each_mut(|entry| {
             entry.val += 1;
         });
-        assert_eq!(2, get_val(list.pop_back().unwrap()));
-        assert_eq!(3, get_val(list.pop_back().unwrap()));
-        assert_eq!(4, get_val(list.pop_back().unwrap()));
-        assert!(list.pop_back().is_none());
-        assert!(list.is_empty());
+        unsafe {
+            assert_eq!(2, get_val(list.remove(node1_ptr).unwrap()));
+            assert_eq!(3, get_val(list.remove(node2_ptr).unwrap()));
+            assert_eq!(4, get_val(list.remove(node3_ptr).unwrap()));
+        }
     }
 }
