@@ -15,9 +15,11 @@ use std::fmt::Formatter;
 use std::io::{IoSlice, IoSliceMut, Read, Write};
 use std::net::{Shutdown, SocketAddr};
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
+use std::time::Duration;
 use std::{fmt, io, net};
 
 use crate::source::Fd;
+use crate::sys::windows::tcp::socket::{get_sock_linger, set_sock_linger};
 use crate::sys::windows::tcp::TcpSocket;
 use crate::sys::NetState;
 use crate::{Interest, Selector, Source, Token};
@@ -151,6 +153,43 @@ impl TcpStream {
     /// ```
     pub fn nodelay(&self) -> io::Result<bool> {
         self.inner.nodelay()
+    }
+
+    /// Gets the value of the linger on this socket by getting `SO_LINGER`
+    /// option.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ylong_io::TcpStream;
+    ///
+    /// let addr = "127.0.0.1:1234".parse().unwrap();
+    /// let stream = TcpStream::connect(addr).expect("Couldn't connect to the server...");
+    /// println!("{:?}", stream.linger());
+    /// ```
+    pub fn linger(&self) -> io::Result<Option<Duration>> {
+        get_sock_linger(self.as_raw_socket())
+    }
+
+    /// Sets the value of the linger on this socket by setting `SO_LINGER`
+    /// option.
+    ///
+    /// This value controls how the socket close when a stream has unsent data.
+    /// If SO_LINGER is set, the socket will still open for the duration as
+    /// the system attempts to send pending data. Otherwise, the system may
+    /// close the socket immediately, or wait for a default timeout.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use ylong_io::TcpStream;
+    ///
+    /// let addr = "127.0.0.1:1234".parse().unwrap();
+    /// let stream = TcpStream::connect(addr).expect("Couldn't connect to the server...");
+    /// stream.set_linger(None).expect("Sets linger fail.");
+    /// ```
+    pub fn set_linger(&self, linger: Option<Duration>) -> io::Result<()> {
+        set_sock_linger(self.as_raw_socket(), linger)
     }
 
     /// Sets the value for the `IP_TTL`.

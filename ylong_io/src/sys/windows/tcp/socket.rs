@@ -11,13 +11,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::mem::MaybeUninit;
 use std::net::SocketAddr;
 use std::os::windows::io::{AsRawSocket, FromRawSocket, RawSocket};
+use std::time::Duration;
 use std::{io, mem, net};
 
+use libc::{c_int, getsockopt};
 use windows_sys::Win32::Networking::WinSock::{
-    self, closesocket, ioctlsocket, socket, ADDRESS_FAMILY, AF_INET, AF_INET6, FIONBIO,
-    INVALID_SOCKET, SOCKET, SOCKET_ERROR, SOCK_STREAM,
+    self, closesocket, ioctlsocket, setsockopt, socket, ADDRESS_FAMILY, AF_INET, AF_INET6, FIONBIO,
+    INVALID_SOCKET, LINGER, SOCKET, SOCKET_ERROR, SOCK_STREAM, SOL_SOCKET, SO_LINGER,
 };
 
 use crate::sys::windows::net::init;
@@ -129,5 +132,63 @@ impl FromRawSocket for TcpSocket {
 impl Drop for TcpSocket {
     fn drop(&mut self) {
         self.close();
+    }
+}
+
+pub(crate) fn get_sock_linger(socket: RawSocket) -> io::Result<Option<Duration>> {
+    let mut optval: MaybeUninit<LINGER> = MaybeUninit::uninit();
+    let mut optlen = mem::size_of::<LINGER>() as c_int;
+
+    socket_syscall!(
+        getsockopt(
+            socket as SOCKET,
+            SOL_SOCKET as c_int,
+            SO_LINGER as c_int,
+            optval.as_mut_ptr().cast(),
+            &mut optlen,
+        ),
+        PartialEq::eq,
+        SOCKET_ERROR
+    )
+    .map(|_| {
+        let linger = unsafe { optval.assume_init() };
+        from_linger(linger)
+    })
+}
+
+pub(crate) fn set_sock_linger(socket: RawSocket, linger: Option<Duration>) -> io::Result<()> {
+    let optval = into_linger(linger);
+    socket_syscall!(
+        setsockopt(
+            socket as SOCKET,
+            SOL_SOCKET as c_int,
+            SO_LINGER as c_int,
+            (&optval as *const LINGER).cast(),
+            mem::size_of::<LINGER>() as c_int,
+        ),
+        PartialEq::eq,
+        SOCKET_ERROR
+    )
+    .map(|_| ())
+}
+
+fn from_linger(linger: LINGER) -> Option<Duration> {
+    if linger.l_onoff == 0 {
+        None
+    } else {
+        Some(Duration::from_secs(linger.l_linger as u64))
+    }
+}
+
+fn into_linger(linger: Option<Duration>) -> LINGER {
+    match linger {
+        None => LINGER {
+            l_onoff: 0,
+            l_linger: 0,
+        },
+        Some(dur) => LINGER {
+            l_onoff: 1,
+            l_linger: dur.as_secs() as _,
+        },
     }
 }
