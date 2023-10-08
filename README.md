@@ -50,7 +50,7 @@ This capability of asynchronous interfaces is achieved through the `Reactor` and
 
 ```toml
 [dependencies]
-ylong_runtime = { git = "https://gitee.com/openharmony-sig/commonlibrary_rust_ylong_runtime.git", features = ["full"]}
+ylong_runtime = { git = "https://gitee.com/openharmony/commonlibrary_rust_ylong_runtime.git", features = ["full"]}
 ```
 ### Use gn
 1. add `ylong_runtime` in bundle.json

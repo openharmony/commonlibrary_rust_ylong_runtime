@@ -92,7 +92,7 @@ ylong_runtime
 1. 在 `Cargo.toml` 中引入 `ylong_runtime`
 ```toml
 [dependencies]
-ylong_runtime = { git = "https://gitee.com/openharmony-sig/commonlibrary_rust_ylong_runtime.git", features = ["full"]}
+ylong_runtime = { git = "https://gitee.com/openharmony/commonlibrary_rust_ylong_runtime.git", features = ["full"]}
 ```
 
 ### 使用gn编译
