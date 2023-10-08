@@ -390,7 +390,7 @@ impl<T> BoundedReceiver<T> {
     /// * `Poll::Pending` if no messages in the channel now, but the channel is
     ///   not closed.
     /// * `Poll::Ready(Ok(T))` if receiving a value successfully.
-    /// * `Poll::Ready(Ok(Err(RecvError)))` in the following situations:
+    /// * `Poll::Ready(Err(RecvError))` in the following situations:
     ///    1.All senders have been dropped or the channel is closed.
     ///    2.No messages remaining.
     ///
