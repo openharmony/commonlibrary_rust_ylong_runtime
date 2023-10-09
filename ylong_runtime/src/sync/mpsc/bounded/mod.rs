@@ -391,8 +391,8 @@ impl<T> BoundedReceiver<T> {
     ///   not closed.
     /// * `Poll::Ready(Ok(T))` if receiving a value successfully.
     /// * `Poll::Ready(Err(RecvError))` in the following situations:
-    ///    1.All senders have been dropped or the channel is closed.
-    ///    2.No messages remaining.
+    ///    1. All senders have been dropped or the channel is closed.
+    ///    2. No messages remaining.
     ///
     /// # Examples
     ///
@@ -421,8 +421,8 @@ impl<T> BoundedReceiver<T> {
     /// # Return value
     /// * `Ok(T)` if receiving a value successfully.
     /// * `Err(RecvError)` in the following situations:
-    ///    1.All senders have been dropped or the channel is closed.
-    ///    2.No messages remaining.
+    ///    1. All senders have been dropped or the channel is closed.
+    ///    2. No messages remaining.
     ///
     /// # Examples
     ///

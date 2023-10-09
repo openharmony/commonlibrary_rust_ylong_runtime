@@ -613,7 +613,7 @@ impl ReadDir {
     }
 }
 
-/// Entries returned by the [`ReadDir::next_entry`].
+/// Entries returned by the [`ReadDir::next`].
 ///
 /// Represents an entry inside of a directory on the filesystem.
 /// Each entry can be inspected via methods to learn about the full path

@@ -55,7 +55,7 @@ pub(crate) struct Header {
     pub(crate) vtable: &'static TaskVirtualTable,
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(PartialEq, Eq, Hash, Clone, Copy)]
 pub(crate) struct RawTask {
     pub(crate) ptr: NonNull<Header>,
 }
@@ -111,14 +111,6 @@ impl RawTask {
         unsafe {
             (vir_table.release)(self.ptr);
         }
-    }
-}
-
-impl Copy for RawTask {}
-
-impl Clone for RawTask {
-    fn clone(&self) -> Self {
-        RawTask { ptr: self.ptr }
     }
 }
 

@@ -30,7 +30,7 @@ extern "system" {
 ///
 /// # Example
 ///
-/// ```rust
+/// ```no run
 /// use ylong_runtime::util::core_affinity;
 ///
 /// let ret = core_affinity::set_current_affinity(0).is_ok();

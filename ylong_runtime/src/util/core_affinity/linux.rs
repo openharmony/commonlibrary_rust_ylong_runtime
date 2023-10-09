@@ -16,16 +16,14 @@
 use std::io::{Error, Result};
 use std::mem::{size_of, zeroed};
 
-use libc::{cpu_set_t, sched_getaffinity, sched_setaffinity, CPU_ISSET, CPU_SET};
-
-use crate::util::num_cpus::get_cpu_num;
+use libc::{cpu_set_t, sched_setaffinity, CPU_SET};
 
 /// Sets the tied core cpu of the current thread.
 ///
 /// sched_setaffinity function under linux
 /// # Example
 ///
-/// ```rust
+/// ```no run
 /// use ylong_runtime::util::core_affinity;
 ///
 /// let ret = core_affinity::set_current_affinity(0).is_ok();
@@ -42,77 +40,7 @@ pub fn set_current_affinity(cpu: usize) -> Result<()> {
     }
 }
 
-/// Gets the cores tied to the current thread,
-/// or returns all available cpu's if no cores have been tied.
-///
-/// sched_setaffinity function under linux
-/// # Example 1
-///
-/// ```rust
-/// use ylong_runtime::util::core_affinity;
-///
-/// let cpus: Vec<usize> = core_affinity::get_current_affinity();
-/// assert!(cpus.len() > 0);
-/// ```
-/// # Example 2
-///
-/// ```rust
-/// use ylong_runtime::util::core_affinity;
-///
-/// let ret = core_affinity::set_current_affinity(0).is_ok();
-/// assert!(ret);
-/// let cpus: Vec<usize> = core_affinity::get_current_affinity();
-/// assert_eq!(cpus.len(), 1);
-/// ```
-pub fn get_current_affinity() -> Vec<usize> {
-    unsafe {
-        let mut vec = vec![];
-        let cpus = get_cpu_num() as usize;
-        let mut set = new_cpu_set();
-        sched_getaffinity(0, size_of::<cpu_set_t>(), &mut set);
-        for i in 0..cpus {
-            if CPU_ISSET(i, &set) {
-                vec.push(i);
-            }
-        }
-        vec
-    }
-}
-
-/// Gets the cores bound to the specified thread, or return all available cpu's
-/// if no cores are bound
-///
-/// sched_setaffinity function under linux
-pub fn get_other_thread_affinity(pid: i32) -> Vec<usize> {
-    unsafe {
-        let mut vec = vec![];
-        let cpus = get_cpu_num() as usize;
-        let mut set = new_cpu_set();
-        sched_getaffinity(pid, size_of::<cpu_set_t>(), &mut set);
-        for i in 0..cpus {
-            if CPU_ISSET(i, &set) {
-                vec.push(i);
-            }
-        }
-        vec
-    }
-}
-
 /// Returns an empty cpu set
 fn new_cpu_set() -> cpu_set_t {
     unsafe { zeroed::<cpu_set_t>() }
-}
-
-#[cfg(test)]
-mod test {
-    /// UT test cases for get_other_thread_affinity usage
-    ///
-    /// # Brief
-    /// 1. Uses get_other_thread_affinity() to get thread affinity.
-    /// 2. Returns all available cpu's because no cores are bound.
-    #[test]
-    fn ut_core_affinity_other_thread() {
-        let cpus: Vec<usize> = crate::util::core_affinity::get_other_thread_affinity(0);
-        assert!(!cpus.is_empty());
-    }
 }

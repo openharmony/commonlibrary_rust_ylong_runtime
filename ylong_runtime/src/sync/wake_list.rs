@@ -185,7 +185,7 @@ mod tests {
         let wakelist = WakerList::new();
         assert_eq!(wakelist.flag.load(Ordering::SeqCst), 0);
         unsafe {
-            assert_eq!((*wakelist.inner.get()).wake_list.len(), 0);
+            assert_eq!((*wakelist.inner.get()).wake_list.len, 0);
         }
     }
 }

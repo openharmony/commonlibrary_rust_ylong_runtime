@@ -103,7 +103,7 @@ impl Selector {
             self.ep,
             libc::EPOLL_CTL_DEL,
             fd,
-            std::ptr::null_mut() as *mut libc::epoll_event
+            std::ptr::null_mut()
         )) {
             Ok(_) => Ok(()),
             Err(err) => Err(err),

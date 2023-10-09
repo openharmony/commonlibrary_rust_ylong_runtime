@@ -115,7 +115,7 @@ impl Wheel {
         if expiration <= self.elapsed() {
             // This means that the timeout period has passed,
             // and the time should be triggered immediately.
-            return Err(Error::default());
+            return Err(Error);
         }
 
         let level = self.find_level(expiration);
