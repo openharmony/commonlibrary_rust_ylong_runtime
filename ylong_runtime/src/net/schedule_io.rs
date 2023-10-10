@@ -261,13 +261,15 @@ impl ScheduleIO {
             }
         }
 
-        waiters.list.for_each_mut(|waiter| {
+        waiters.list.drain_filtered(|waiter| {
             if ready.satisfies(waiter.interest) {
                 if let Some(waker) = waiter.waker.take() {
                     waiter.is_ready = true;
                     wakers.push(Some(waker));
                 }
+                return true;
             }
+            false
         });
 
         drop(waiters);
