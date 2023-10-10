@@ -93,6 +93,7 @@ impl TimeDriver {
 
         let mut waker_list: [Option<Waker>; 32] = Default::default();
         let mut waker_idx = 0;
+        let mut is_wake = false;
 
         let mut lock = self.wheel.lock().unwrap();
 
@@ -107,6 +108,7 @@ impl TimeDriver {
                     let clock_handle = unsafe { clock_entry.as_mut() };
                     waker_list[waker_idx] = clock_handle.take_waker();
                     waker_idx += 1;
+                    is_wake = true;
 
                     clock_handle.set_result(true);
 
@@ -129,6 +131,9 @@ impl TimeDriver {
         drop(lock);
         for waker in waker_list[0..waker_idx].iter_mut() {
             waker.take().unwrap().wake();
+        }
+        if is_wake {
+            timeout = Some(Duration::new(0, 0));
         }
         timeout
     }
