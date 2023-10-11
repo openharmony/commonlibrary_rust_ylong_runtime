@@ -135,19 +135,23 @@ impl<L: Link + Default> LinkedList<L> {
         unsafe { L::node(self.head).as_ref().next == Some(self.head) }
     }
 
-    /// Traverses the list and execute the closure.
+    /// Traverses the list and applies the closure on each element. If the
+    /// element meets the condition, removes it from the list.
     #[cfg(feature = "net")]
-    pub(crate) fn for_each_mut<F>(&mut self, mut f: F)
+    pub(crate) fn drain_filtered<F>(&mut self, mut f: F)
     where
-        F: FnMut(&mut L),
+        F: FnMut(&mut L) -> bool,
     {
         unsafe {
             let head = L::node(self.head).as_ref();
             let mut p = head.next;
             while p != Some(self.head) {
                 let node = p.unwrap();
-                f(&mut *node.as_ptr());
-                p = L::node(node).as_ref().next;
+                let next = L::node(node).as_ref().next;
+                if f(&mut *node.as_ptr()) {
+                    Node::remove_node(node);
+                }
+                p = next;
             }
         }
     }
@@ -311,12 +315,12 @@ mod tests {
         }
     }
 
-    /// UT test cases for `for_each_mut()`.
+    /// UT test cases for `drain_filtered()`.
     ///
     /// # Brief
     /// 1. Create a linked list.
     /// 2. Push nodes into the list.
-    /// 3. Check the value in node after traversing the list.
+    /// 3. Drain filtered the list for node that contains a value of 2.
     #[test]
     #[cfg(feature = "net")]
     fn ut_link_list_for_each_mut() {
@@ -330,13 +334,23 @@ mod tests {
         list.push_front(node1_ptr);
         list.push_front(node2_ptr);
         list.push_front(node3_ptr);
-        list.for_each_mut(|entry| {
-            entry.val += 1;
+
+        let mut value = 0;
+        list.drain_filtered(|x| {
+            if x.val == 2 {
+                value = x.val;
+                return true;
+            }
+            false
         });
+        assert_eq!(value, 2);
         unsafe {
-            assert_eq!(2, get_val(list.remove(node1_ptr).unwrap()));
-            assert_eq!(3, get_val(list.remove(node2_ptr).unwrap()));
-            assert_eq!(4, get_val(list.remove(node3_ptr).unwrap()));
+            let node = list.pop_back();
+            assert_eq!(node.unwrap().as_mut().val, 1);
+            let node = list.pop_back();
+            assert_eq!(node.unwrap().as_mut().val, 3);
+            let node = list.pop_back();
+            assert_eq!(node, None);
         }
     }
 }
