@@ -38,14 +38,15 @@ use crate::task::{JoinHandle, Task, TaskBuilder};
 pub mod builder;
 pub mod error;
 pub mod executor;
+pub mod fastrand;
+pub mod futures;
+pub mod io;
+pub mod iter;
 
 #[cfg(feature = "ffrt")]
 pub(crate) mod ffrt;
 #[cfg(feature = "fs")]
 pub mod fs;
-pub mod futures;
-pub mod io;
-pub mod iter;
 #[cfg(feature = "macros")]
 mod select;
 #[cfg(feature = "macros")]
@@ -59,7 +60,7 @@ cfg_time! {
     pub mod time;
 }
 
-pub mod util;
+mod util;
 cfg_metrics!(
     mod metrics;
     pub use metrics::Metrics;

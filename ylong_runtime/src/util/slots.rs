@@ -50,7 +50,7 @@ pub struct SlotsIter<'a, T: 'a> {
 #[derive(Eq, PartialEq)]
 pub struct Slots<T> {
     entries: Vec<Entry<T>>,
-    len: usize,
+    pub len: usize,
     head: usize,
     tail: usize,
     next: usize,
@@ -73,7 +73,7 @@ impl<T> Slots<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```no run
     /// use ylong_runtime::util::slots::Slots;
     ///
     /// let slots: Slots<i32> = Slots::new();
@@ -82,71 +82,6 @@ impl<T> Slots<T> {
         Slots::with_capacity(0)
     }
 
-    /// Returns the current number of elements in the container.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use ylong_runtime::util::slots::Slots;
-    ///
-    /// let mut slots = Slots::new();
-    /// for i in 0..3 {
-    ///     slots.push_back(i);
-    /// }
-    /// assert_eq!(3, slots.len());
-    /// ```
-    pub fn len(&self) -> usize {
-        self.len
-    }
-
-    /// Empty the container.
-    ///
-    /// # Examples
-    /// ```
-    /// use ylong_runtime::util::slots::Slots;
-    ///
-    /// let mut slots = Slots::new();
-    /// for i in 0..3 {
-    ///     slots.push_back(i);
-    /// }
-    /// slots.clear();
-    /// assert_eq!(slots.len(), 0);
-    /// ```
-    pub fn clear(&mut self) {
-        self.entries.clear();
-        self.len = 0;
-        self.head = NULL;
-        self.tail = NULL;
-        self.next = 0;
-    }
-
-    /// Insert an element to the end of the list of container.
-    ///
-    /// Two situations:
-    ///
-    /// 1. The next slot is exactly the next position of the array. Insert the
-    ///    data into the vector, increase the length, and calculate the next
-    ///    insertion position.
-    /// 2. The next slot is the recycled slot. Update the index of `next` and
-    ///    then insert the data.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use ylong_runtime::util::slots::Slots;
-    ///
-    /// let mut slots = Slots::new();
-    /// let zero = slots.push_back("zero");
-    /// let one = slots.push_back("one");
-    /// assert_eq!(zero, 0);
-    /// assert_eq!(one, 1);
-    ///
-    /// let temp = slots.remove(zero);
-    /// assert_eq!(temp, Ok("zero"));
-    ///
-    /// let two = slots.push_back("two");
-    /// assert_eq!(two, zero);
-    /// ```
     pub fn push_back(&mut self, val: T) -> usize {
         let key = self.next;
         let tail = self.tail;
@@ -183,7 +118,7 @@ impl<T> Slots<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```no run
     /// use ylong_runtime::util::slots::Slots;
     ///
     /// let mut slots = Slots::new();
@@ -220,7 +155,7 @@ impl<T> Slots<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```no run
     /// use ylong_runtime::util::slots::Slots;
     ///
     /// let mut slots = Slots::new();
@@ -266,106 +201,11 @@ impl<T> Slots<T> {
         Err(SlotsError)
     }
 
-    /// Get the reference of the element in the container according to the
-    /// index.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use ylong_runtime::util::slots::Slots;
-    ///
-    /// let mut slots = Slots::new();
-    /// let key = slots.push_back("key");
-    ///
-    /// assert_eq!(slots.get(key), Some(&"key"));
-    /// assert_eq!(slots.get(123), None);
-    /// ```
-    pub fn get(&self, key: usize) -> Option<&T> {
-        match self.entries.get(key) {
-            Some(entry) => match entry.data.as_ref() {
-                Some(val) => Some(val),
-                None => None,
-            },
-            None => None,
-        }
-    }
-
-    /// Get the mutable reference of the element in the container according to
-    /// the index.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use ylong_runtime::util::slots::Slots;
-    ///
-    /// let mut slots = Slots::new();
-    /// let key = slots.push_back("key");
-    ///
-    /// *slots.get_mut(key).unwrap() = "change_key";
-    /// assert_eq!(*slots.get(key).unwrap(), "change_key");
-    /// assert_eq!(slots.get(123), None);
-    /// ```
-    pub fn get_mut(&mut self, key: usize) -> Option<&mut T> {
-        match self.entries.get_mut(key) {
-            Some(entry) => match entry.data.as_mut() {
-                Some(val) => Some(val),
-                None => None,
-            },
-            None => None,
-        }
-    }
-
-    /// Check whether the index is valid and whether there is an element at the
-    /// index in the container.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use ylong_runtime::util::slots::Slots;
-    ///
-    /// let mut slots = Slots::new();
-    /// let key = slots.push_back("key");
-    ///
-    /// assert!(slots.contains(key));
-    /// assert!(!slots.contains(123));
-    /// ```
-    pub fn contains(&self, key: usize) -> bool {
-        match self.entries.get(key) {
-            Some(entry) => entry.data.is_some(),
-            None => false,
-        }
-    }
-
-    /// Create an immutable iterator for the container to poll all elements int
-    /// the order of insertion.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use ylong_runtime::util::slots::Slots;
-    ///
-    /// let mut slots = Slots::new();
-    /// for i in 0..3 {
-    ///     slots.push_back(i);
-    /// }
-    ///
-    /// for (key, element) in slots.iter() {
-    ///     assert_eq!(slots.get(key).unwrap(), element);
-    /// }
-    /// ```
-    pub fn iter(&self) -> SlotsIter<T> {
-        SlotsIter {
-            entries: &self.entries,
-            len: self.len,
-            head: self.head,
-        }
-    }
-
     /// Check whether the container is empty.
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```no run
     /// use ylong_runtime::util::slots::Slots;
     ///
     /// let mut slots = Slots::new();
@@ -382,7 +222,7 @@ impl<T> Slots<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```no run
     /// use ylong_runtime::util::slots::Slots;
     ///
     /// let slots: Slots<i32> = Slots::with_capacity(0);
@@ -395,20 +235,6 @@ impl<T> Slots<T> {
             next: 0,
             len: 0,
         }
-    }
-
-    /// Get the capacity of the container.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use ylong_runtime::util::slots::Slots;
-    ///
-    /// let mut slots: Slots<i32> = Slots::new();
-    /// assert_eq!(slots.capacity(), 0);
-    /// ```
-    pub fn capacity(&self) -> usize {
-        self.entries.capacity()
     }
 }
 
@@ -483,7 +309,17 @@ impl<'a, T> Iterator for SlotsIter<'a, T> {
 #[cfg(test)]
 mod test {
     use crate::util::slots::Slots;
-
+    impl<T> Slots<T> {
+        fn get(&self, key: usize) -> Option<&T> {
+            match self.entries.get(key) {
+                Some(entry) => match entry.data.as_ref() {
+                    Some(val) => Some(val),
+                    None => None,
+                },
+                None => None,
+            }
+        }
+    }
     #[derive(Debug, Eq, PartialEq)]
     struct Data {
         inner: i32,
@@ -493,63 +329,6 @@ mod test {
         fn new(inner: i32) -> Self {
             Data { inner }
         }
-    }
-
-    /// UT test cases for Slots::new().
-    ///
-    /// # Brief
-    /// 1. Verify the parameters after initialization, which should be
-    ///    consistent with the initial value.
-    #[test]
-    fn ut_slots_new() {
-        let slots: Slots<i32> = Slots::new();
-        assert_eq!(slots.len, 0);
-        assert_eq!(slots.next, 0);
-        assert_eq!(slots.entries, Vec::with_capacity(0));
-    }
-
-    /// UT test cases for Slots::with_capacity().
-    ///
-    /// # Brief
-    /// 1. Verify the parameters after initialization, which should be
-    ///    consistent with the initial value.
-    #[test]
-    fn ut_slots_with_capacity() {
-        let slots_new: Slots<i32> = Slots::new();
-        let slots_with_capacity: Slots<i32> = Slots::with_capacity(0);
-        assert_eq!(slots_new, slots_with_capacity);
-    }
-
-    /// UT test cases for Slots::len().
-    ///
-    /// # Brief
-    /// 1. Inserting a certain number of data into the container.
-    #[test]
-    fn ut_slots_len() {
-        let mut slots = Slots::new();
-        assert_eq!(slots.len(), 0_usize);
-
-        for i in 0..1000 {
-            slots.push_back(i);
-        }
-        assert_eq!(slots.len(), 1000);
-    }
-
-    /// UT test cases for Slots::clear().
-    ///
-    /// # Brief
-    /// 1. Empty the container to make it exactly the same as the initialized
-    ///    container.
-    #[test]
-    fn ut_slots_clear() {
-        let mut slots = Slots::new();
-        for i in 0..1000 {
-            slots.push_back(i);
-        }
-        assert_ne!(slots, Slots::new());
-
-        slots.clear();
-        assert_eq!(slots, Slots::new());
     }
 
     /// UT test cases for Slots::insert().
@@ -628,7 +407,7 @@ mod test {
             assert_eq!(slots.pop_front(), Some(index));
             assert_eq!(slots.get(index), None);
         }
-        assert_eq!(slots.len(), 50);
+        assert_eq!(slots.len, 50);
 
         for data in 100..150 {
             slots.push_back(data);
@@ -637,7 +416,7 @@ mod test {
             assert_eq!(slots.pop_front(), Some(target));
         }
         assert_eq!(slots.pop_front(), None);
-        assert_eq!(slots.len(), 0);
+        assert_eq!(slots.len, 0);
     }
 
     /// UT test cases for Slots::remove().
@@ -658,73 +437,6 @@ mod test {
         assert_eq!(slots.remove(0), Ok(0));
     }
 
-    /// UT test cases for Slots::get().
-    ///
-    /// # Brief
-    /// 1. Enter the location that stores data.
-    /// 2. Enter the location that doesn't store data.
-    #[test]
-    fn ut_slots_get() {
-        let mut slots = Slots::new();
-        let key = slots.push_back("key");
-
-        assert_eq!(slots.get(key), Some(&"key"));
-        assert_eq!(slots.get(123), None);
-    }
-
-    /// UT test cases for Slots::get_mut().
-    ///
-    /// # Brief
-    /// 1. Enter the location that stores data.
-    /// 2. Enter the location that doesn't store data.
-    #[test]
-    fn ut_slots_get_mut() {
-        let mut slots = Slots::new();
-        let key = slots.push_back("key");
-
-        *slots.get_mut(key).unwrap() = "change_key";
-        assert_eq!(*slots.get(key).unwrap(), "change_key");
-        assert_eq!(slots.get(123), None);
-    }
-
-    /// UT test cases for Slots::contains().
-    ///
-    /// # Brief
-    /// 1. The container exists the location and there are data at that
-    ///    location.
-    /// 2. The container exists the location and there are no data at that
-    ///    location.
-    /// 3. The container doesn't exist the location.
-    #[test]
-    fn ut_slots_contains() {
-        let mut slots = Slots::new();
-        let key = slots.push_back("key");
-
-        assert!(slots.contains(key));
-        assert!(!slots.contains(123));
-
-        let res = slots.remove(key);
-        assert!(res.is_ok());
-        assert!(!slots.contains(key));
-    }
-
-    /// UT test cases for Slots::iter().
-    ///
-    /// # Brief
-    /// 1. Validate elements through iterators.
-    #[test]
-    fn ut_slots_iter() {
-        let mut slots = Slots::new();
-
-        for i in 0..3 {
-            slots.push_back(i);
-        }
-
-        for (key, element) in slots.iter() {
-            assert_eq!(slots.get(key).unwrap(), element);
-        }
-    }
-
     /// UT test cases for Slots::is_empty().
     ///
     /// # Brief
@@ -739,17 +451,144 @@ mod test {
         assert!(!slots.is_empty());
     }
 
-    /// UT test cases for Slots::capacity().
+    /// UT test cases for Slots
     ///
     /// # Brief
-    /// 1. Verify the container that is initialized.
-    /// 2. Verify the container that is initialized with specific capacity.
+    /// 1. Push a large amount of data into the initialized container.
+    /// 2. Check the correctness of inserted data iteratively.
     #[test]
-    fn ut_slots_capacity() {
-        let slots: Slots<i32> = Slots::new();
-        assert_eq!(slots.capacity(), 0);
+    fn ut_slots_huge_data_push_back() {
+        let mut slots = Slots::new();
+        let mut keys = Vec::new();
 
-        let slots: Slots<i32> = Slots::with_capacity(10);
-        assert_eq!(slots.capacity(), 10);
+        for data in 0..10000 {
+            let key = slots.push_back(data);
+            keys.push(key);
+        }
+
+        for (index, key) in keys.iter().enumerate() {
+            assert_eq!(slots[*key], index);
+        }
+    }
+
+    /// UT test cases for Slots
+    ///
+    /// # Brief
+    /// 1. Push a large amount of data into the initialized container.
+    /// 2. Remove the first half of the container.
+    /// 3. Push new data into the container again.
+    /// 4. Check the correctness of data sequence and values.
+    #[test]
+    fn ut_slots_huge_data_remove() {
+        let mut slots = Slots::new();
+        let mut keys = Vec::new();
+
+        for data in 0..10000 {
+            let key = slots.push_back(data);
+            keys.push(key);
+        }
+
+        for remove_index in 0..5000 {
+            let res = slots.remove(remove_index);
+            assert!(res.is_ok());
+        }
+
+        for data in 10000..15000 {
+            slots.push_back(data);
+        }
+
+        let mut cnt = 14999;
+        for key in 0..5000 {
+            assert_eq!(slots[key], cnt);
+            cnt -= 1;
+        }
+    }
+
+    /// UT test cases for Slots
+    ///
+    /// # Brief
+    /// 1. Push data into the initialized container.
+    /// 2. Remove slots that have been popped.
+    /// 3. Remove slots at wrong index.
+    /// 4. Pop the remaining data.
+    #[test]
+    fn ut_slots_remove_and_pop() {
+        let mut slots = Slots::new();
+
+        for data in 0..100 {
+            slots.push_back(data);
+        }
+
+        for index in 0..10 {
+            slots.pop_front();
+            let res = slots.remove(index);
+            assert!(res.is_err());
+        }
+
+        for remove_index in 100..150 {
+            let res = slots.remove(remove_index);
+            assert!(res.is_err());
+        }
+
+        for remove_index in 10..20 {
+            let res = slots.remove(remove_index);
+            assert!(res.is_ok());
+        }
+
+        for index in 20..100 {
+            assert_eq!(slots.pop_front(), Some(index));
+        }
+        assert!(slots.pop_front().is_none());
+    }
+
+    /// UT test cases for Slots
+    ///
+    /// # Brief
+    /// 1. Push a large amount of data into the initialized container.
+    /// 2. Find data through key-value pairs.
+    #[test]
+    fn ut_slots_huge_data_find() {
+        let mut slots = Slots::new();
+        let mut keys = Vec::new();
+
+        for data in 0..10000 {
+            let key = slots.push_back(data);
+            keys.push(key);
+        }
+
+        for key in keys {
+            assert_eq!(slots[key], key);
+        }
+    }
+
+    /// UT test cases for Slots
+    ///
+    /// # Brief
+    /// 1. Push a large amount of data into the initialized container.
+    /// 2. Pop the first half of the container.
+    /// 3. Push new data into the container again.
+    /// 4. Pop all of the data and check correctness of data sequence and
+    ///    values.
+    #[test]
+    fn ut_slots_huge_data_pop_front() {
+        let mut slots = Slots::new();
+
+        for data in 0..10000 {
+            slots.push_back(data);
+        }
+
+        for _ in 0..5000 {
+            slots.pop_front();
+        }
+
+        for data in 10000..15000 {
+            slots.push_back(data);
+        }
+
+        let mut cnt = 14999;
+        for key in 0..5000 {
+            assert_eq!(slots[key], cnt);
+            cnt -= 1;
+        }
     }
 }

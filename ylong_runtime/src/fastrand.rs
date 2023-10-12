@@ -23,7 +23,7 @@ use std::num::Wrapping;
 ///
 /// # Examples
 /// ```rust
-/// use ylong_runtime::util::fastrand::fast_random;
+/// use ylong_runtime::fastrand::fast_random;
 /// let rand = fast_random();
 /// assert!(rand <= u64::MAX);
 /// ```

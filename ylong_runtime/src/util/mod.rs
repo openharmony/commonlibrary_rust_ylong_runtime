@@ -13,11 +13,16 @@
 
 //! Utilities for runtime.
 
-pub mod bit;
-pub mod core_affinity;
-pub mod fastrand;
+cfg_net! {
+    pub(crate) mod bit;
+    pub(crate) mod slab;
+}
+
 #[cfg(any(feature = "time", feature = "net"))]
 pub(crate) mod linked_list;
-pub mod num_cpus;
-pub mod slab;
-pub mod slots;
+
+#[cfg(feature = "sync")]
+pub(crate) mod slots;
+
+pub(crate) mod core_affinity;
+pub(crate) mod num_cpus;

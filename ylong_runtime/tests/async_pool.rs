@@ -19,13 +19,12 @@
 
 use std::ffi::OsString;
 use std::fs;
+use std::mem::{size_of, zeroed};
 
-use libc::getpid;
+use libc::{
+    c_long, cpu_set_t, getpid, sched_getaffinity, sysconf, CPU_ISSET, _SC_NPROCESSORS_ONLN,
+};
 use ylong_runtime::builder::RuntimeBuilder;
-#[cfg(target_os = "linux")]
-use ylong_runtime::util::core_affinity::linux::get_other_thread_affinity;
-#[cfg(target_os = "linux")]
-use ylong_runtime::util::num_cpus::get_cpu_num;
 
 // Simple asynchronous tasks
 async fn test_future(num: usize) -> usize {
@@ -75,6 +74,30 @@ unsafe fn name_of_pid(pid: &str) -> Option<String> {
         }
         Err(_) => None,
     }
+}
+
+fn get_other_thread_affinity(pid: i32) -> Vec<usize> {
+    unsafe {
+        let mut vec = vec![];
+        let cpus = get_cpu_num() as usize;
+        let mut set = new_cpu_set();
+        sched_getaffinity(pid, size_of::<cpu_set_t>(), &mut set);
+        for i in 0..cpus {
+            if CPU_ISSET(i, &set) {
+                vec.push(i);
+            }
+        }
+        vec
+    }
+}
+
+/// Returns an empty cpu set
+fn new_cpu_set() -> cpu_set_t {
+    unsafe { zeroed::<cpu_set_t>() }
+}
+
+fn get_cpu_num() -> c_long {
+    unsafe { sysconf(_SC_NPROCESSORS_ONLN) }
 }
 
 /// SDV test cases for asynchronous thread pool

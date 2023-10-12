@@ -34,11 +34,26 @@ use crate::util::num_cpus::windows::get_cpu_num_online;
 /// state by default. Windows, using GetSystemInfo() function, which gets the
 /// number of cpu cores in the available state by default. # Example
 ///
-/// ```rust
+/// ```no run
 /// use ylong_runtime::util::num_cpus;
 ///
 /// let cpus = num_cpus::get_cpu_num();
 /// ```
 pub fn get_cpu_num() -> c_long {
     get_cpu_num_online()
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    /// UT test cases for num_cpus.
+    ///
+    /// # Brief
+    /// 1. call get_cpu_num and check it greater than zero
+    #[test]
+    fn ut_num_cpus_test() {
+        let cpus = get_cpu_num();
+        assert!(cpus > 0);
+    }
 }

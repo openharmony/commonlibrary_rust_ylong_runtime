@@ -27,9 +27,9 @@ use super::worker::{get_current_ctx, run_worker, Worker};
 use super::{worker, Schedule};
 use crate::builder::multi_thread_builder::MultiThreadBuilder;
 use crate::builder::CallbackHook;
+use crate::fastrand::fast_random;
 use crate::task::{Task, TaskBuilder, VirtualTableType};
 use crate::util::core_affinity::set_current_affinity;
-use crate::util::fastrand::fast_random;
 use crate::util::num_cpus::get_cpu_num;
 use crate::JoinHandle;
 

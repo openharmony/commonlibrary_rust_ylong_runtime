@@ -21,7 +21,7 @@
 /// For example: 0000_1111(mask) & 1010_1010(target number) = 0000_1010
 ///
 /// # Example
-/// ```rust
+/// ```no run
 /// use ylong_runtime::util::bit::Mask;
 ///
 /// // On a 64-bit machine, you can get the mask 0xf
@@ -44,7 +44,7 @@ impl Mask {
     ///
     /// # Example
     /// When width + shift < Machine word length time
-    /// ```rust
+    /// ```no run
     /// use ylong_runtime::util::bit::Mask;
     ///
     /// let width = 4;
@@ -59,7 +59,7 @@ impl Mask {
     /// ```
     /// When width >= machine word length, a mask of all 1's is returned
     /// regardless of the shift.
-    /// ```rust
+    /// ```no run
     /// use ylong_runtime::util::bit::Mask;
     ///
     /// let width = 128;
@@ -68,7 +68,7 @@ impl Mask {
     /// // On a 64-bit machine, the mask is 0xffff_ffff_ffff_ffff
     /// ```
     /// When width == 0, an all-0 mask is returned, regardless of the shift.
-    /// ```rust
+    /// ```no run
     /// use ylong_runtime::util::bit::Mask;
     ///
     /// let width = 0;
@@ -79,7 +79,7 @@ impl Mask {
     /// When width < machine word length and width + shift > machine word
     /// length, it will ensure that width remains unchanged and shift becomes
     /// machine word length - width.
-    /// ```rust
+    /// ```no run
     /// use ylong_runtime::util::bit::Mask;
     ///
     /// let width = 32;
@@ -152,7 +152,7 @@ impl Bit {
     /// Converts a usize type to a Bit type
     ///
     /// # Example
-    /// ```rust
+    /// ```no run
     /// use ylong_runtime::util::bit::Bit;
     ///
     /// let base = 0usize;
@@ -165,7 +165,7 @@ impl Bit {
     /// Converts a Bit type to a usize type
     ///
     /// # Example
-    /// ```rust
+    /// ```no run
     /// use ylong_runtime::util::bit::Bit;
     ///
     /// let base = 0usize;
@@ -184,7 +184,7 @@ impl Bit {
     ///
     /// # Example
     /// When Mask binary length >= val binary length (excluding leading zeros)
-    /// ```rust
+    /// ```no run
     /// use ylong_runtime::util::bit::{Bit, Mask};
     ///
     /// // mask's length 16
@@ -198,7 +198,7 @@ impl Bit {
     /// ```
     /// When Mask binary length < val binary length (excluding leading zeros),
     /// val is truncated and only the low bit is retained.
-    /// ```rust
+    /// ```no run
     /// use ylong_runtime::util::bit::{Bit, Mask};
     ///
     /// // mask's length 16
@@ -232,754 +232,737 @@ impl Bit {
     pub fn get_by_mask(&self, mask: Mask) -> usize {
         (self.0 & mask.mask) >> mask.shift
     }
+}
 
-    /// Sets bit to a new usize value.
+#[cfg(test)]
+mod test {
+    use super::*;
+    impl Bit {
+        fn set(&mut self, val: usize) {
+            self.0 = val;
+        }
+
+        fn clear(&mut self) {
+            self.0 = 0;
+        }
+    }
+    /// UT test cases for mask new function
     ///
-    /// # Example
-    /// ```not run
-    /// use ylong_runtime::util::bit::{Mask, Bit};
-    ///
-    /// let base = 0x0usize;
-    /// let mut bits = Bit::from_usize(base);
-    /// bits.set(0xffff_ffff_ffff_ffff);
-    /// assert_eq!(bits.as_usize(), 0xffff_ffff_ffff_ffff);
-    /// ```
-    pub fn set(&mut self, val: usize) {
-        self.0 = val;
+    /// # Brief  
+    /// 1. pass in the parameters, and create the Mask.
+    /// 2. Check return value.
+    #[cfg(target_pointer_width = "32")]
+    #[test]
+    fn ut_mask_new_bit32() {
+        assert_eq!(
+            Mask::new(0, 0),
+            Mask {
+                mask: 0x0,
+                shift: 0
+            }
+        );
+        assert_eq!(
+            Mask::new(0, 16),
+            Mask {
+                mask: 0x0,
+                shift: 0
+            }
+        );
+        assert_eq!(
+            Mask::new(0, 32),
+            Mask {
+                mask: 0x0,
+                shift: 0
+            }
+        );
+        assert_eq!(
+            Mask::new(0, 64),
+            Mask {
+                mask: 0x0,
+                shift: 0
+            }
+        );
+        assert_eq!(
+            Mask::new(1, 0),
+            Mask {
+                mask: 0x1,
+                shift: 0
+            }
+        );
+        assert_eq!(
+            Mask::new(1, 16),
+            Mask {
+                mask: 0x1_0000,
+                shift: 16
+            }
+        );
+        assert_eq!(
+            Mask::new(1, 31),
+            Mask {
+                mask: 0x8000_0000,
+                shift: 31
+            }
+        );
+        assert_eq!(
+            Mask::new(1, 32),
+            Mask {
+                mask: 0x8000_0000,
+                shift: 31
+            }
+        );
+        assert_eq!(
+            Mask::new(1, 128),
+            Mask {
+                mask: 0x8000_0000,
+                shift: 31
+            }
+        );
+        assert_eq!(
+            Mask::new(4, 0),
+            Mask {
+                mask: 0xf,
+                shift: 0
+            }
+        );
+        assert_eq!(
+            Mask::new(4, 16),
+            Mask {
+                mask: 0xf_0000,
+                shift: 16
+            }
+        );
+        assert_eq!(
+            Mask::new(4, 28),
+            Mask {
+                mask: 0xf000_0000,
+                shift: 28
+            }
+        );
+        assert_eq!(
+            Mask::new(4, 32),
+            Mask {
+                mask: 0xf000_0000,
+                shift: 28
+            }
+        );
+        assert_eq!(
+            Mask::new(4, 64),
+            Mask {
+                mask: 0xf000_0000,
+                shift: 28
+            }
+        );
+        assert_eq!(
+            Mask::new(16, 0),
+            Mask {
+                mask: 0xffff,
+                shift: 0
+            }
+        );
+        assert_eq!(
+            Mask::new(16, 16),
+            Mask {
+                mask: 0xffff_0000,
+                shift: 16
+            }
+        );
+        assert_eq!(
+            Mask::new(16, 32),
+            Mask {
+                mask: 0xffff_0000,
+                shift: 16
+            }
+        );
+        assert_eq!(
+            Mask::new(16, 64),
+            Mask {
+                mask: 0xffff_0000,
+                shift: 16
+            }
+        );
+        assert_eq!(
+            Mask::new(32, 0),
+            Mask {
+                mask: 0xffff_ffff,
+                shift: 0
+            }
+        );
+        assert_eq!(
+            Mask::new(32, 16),
+            Mask {
+                mask: 0xffff_ffff,
+                shift: 0
+            }
+        );
+        assert_eq!(
+            Mask::new(32, 32),
+            Mask {
+                mask: 0xffff_ffff,
+                shift: 0
+            }
+        );
+        assert_eq!(
+            Mask::new(32, 64),
+            Mask {
+                mask: 0xffff_ffff,
+                shift: 0
+            }
+        );
+        assert_eq!(
+            Mask::new(64, 0),
+            Mask {
+                mask: 0xffff_ffff,
+                shift: 0
+            }
+        );
+        assert_eq!(
+            Mask::new(64, 16),
+            Mask {
+                mask: 0xffff_ffff,
+                shift: 0
+            }
+        );
+        assert_eq!(
+            Mask::new(64, 32),
+            Mask {
+                mask: 0xffff_ffff,
+                shift: 0
+            }
+        );
+        assert_eq!(
+            Mask::new(64, 64),
+            Mask {
+                mask: 0xffff_ffff,
+                shift: 0
+            }
+        );
     }
 
-    /// Clear bit to 0usize
+    /// UT test cases for mask new function
     ///
-    /// # Example
-    /// ```rust
-    /// use ylong_runtime::util::bit::{Bit, Mask};
-    ///
-    /// let base = 0xffffusize;
-    /// let mut bits = Bit::from_usize(base);
-    /// bits.clear();
-    /// assert_eq!(bits.as_usize(), 0x0);
-    /// ```
-    pub fn clear(&mut self) {
-        self.0 = 0;
+    /// # Brief  
+    /// 1. pass in the parameters, and create the Mask.
+    /// 2. Check return value.
+    #[cfg(target_pointer_width = "64")]
+    #[test]
+    fn ut_mask_new_bit64() {
+        assert_eq!(
+            Mask::new(0, 0),
+            Mask {
+                mask: 0x0,
+                shift: 0
+            }
+        );
+        assert_eq!(
+            Mask::new(0, 32),
+            Mask {
+                mask: 0x0,
+                shift: 0
+            }
+        );
+        assert_eq!(
+            Mask::new(0, 64),
+            Mask {
+                mask: 0x0,
+                shift: 0
+            }
+        );
+        assert_eq!(
+            Mask::new(0, 128),
+            Mask {
+                mask: 0x0,
+                shift: 0
+            }
+        );
+
+        assert_eq!(
+            Mask::new(1, 0),
+            Mask {
+                mask: 0x1,
+                shift: 0
+            }
+        );
+        assert_eq!(
+            Mask::new(1, 32),
+            Mask {
+                mask: 0x1_0000_0000,
+                shift: 32
+            }
+        );
+        assert_eq!(
+            Mask::new(1, 63),
+            Mask {
+                mask: 0x8000_0000_0000_0000,
+                shift: 63
+            }
+        );
+        assert_eq!(
+            Mask::new(1, 64),
+            Mask {
+                mask: 0x8000_0000_0000_0000,
+                shift: 63
+            }
+        );
+        assert_eq!(
+            Mask::new(1, 128),
+            Mask {
+                mask: 0x8000_0000_0000_0000,
+                shift: 63
+            }
+        );
+
+        assert_eq!(
+            Mask::new(4, 0),
+            Mask {
+                mask: 0xf,
+                shift: 0
+            }
+        );
+        assert_eq!(
+            Mask::new(4, 32),
+            Mask {
+                mask: 0xf_0000_0000,
+                shift: 32
+            }
+        );
+        assert_eq!(
+            Mask::new(4, 60),
+            Mask {
+                mask: 0xf000_0000_0000_0000,
+                shift: 60
+            }
+        );
+        assert_eq!(
+            Mask::new(4, 64),
+            Mask {
+                mask: 0xf000_0000_0000_0000,
+                shift: 60
+            }
+        );
+        assert_eq!(
+            Mask::new(4, 128),
+            Mask {
+                mask: 0xf000_0000_0000_0000,
+                shift: 60
+            }
+        );
+
+        assert_eq!(
+            Mask::new(32, 0),
+            Mask {
+                mask: 0xffff_ffff,
+                shift: 0
+            }
+        );
+        assert_eq!(
+            Mask::new(32, 32),
+            Mask {
+                mask: 0xffff_ffff_0000_0000,
+                shift: 32
+            }
+        );
+        assert_eq!(
+            Mask::new(32, 64),
+            Mask {
+                mask: 0xffff_ffff_0000_0000,
+                shift: 32
+            }
+        );
+        assert_eq!(
+            Mask::new(32, 128),
+            Mask {
+                mask: 0xffff_ffff_0000_0000,
+                shift: 32
+            }
+        );
+
+        assert_eq!(
+            Mask::new(64, 0),
+            Mask {
+                mask: 0xffff_ffff_ffff_ffff,
+                shift: 0
+            }
+        );
+        assert_eq!(
+            Mask::new(64, 32),
+            Mask {
+                mask: 0xffff_ffff_ffff_ffff,
+                shift: 0
+            }
+        );
+        assert_eq!(
+            Mask::new(64, 64),
+            Mask {
+                mask: 0xffff_ffff_ffff_ffff,
+                shift: 0
+            }
+        );
+        assert_eq!(
+            Mask::new(64, 128),
+            Mask {
+                mask: 0xffff_ffff_ffff_ffff,
+                shift: 0
+            }
+        );
+
+        assert_eq!(
+            Mask::new(128, 0),
+            Mask {
+                mask: 0xffff_ffff_ffff_ffff,
+                shift: 0
+            }
+        );
+        assert_eq!(
+            Mask::new(128, 32),
+            Mask {
+                mask: 0xffff_ffff_ffff_ffff,
+                shift: 0
+            }
+        );
+        assert_eq!(
+            Mask::new(128, 64),
+            Mask {
+                mask: 0xffff_ffff_ffff_ffff,
+                shift: 0
+            }
+        );
+        assert_eq!(
+            Mask::new(128, 128),
+            Mask {
+                mask: 0xffff_ffff_ffff_ffff,
+                shift: 0
+            }
+        );
     }
-}
 
-/// UT test cases for mask new function
-///
-/// # Brief  
-/// 1. pass in the parameters, and create the Mask.
-/// 2. Check return value.
-#[cfg(target_pointer_width = "32")]
-#[test]
-fn ut_mask_new_bit32() {
-    assert_eq!(
-        Mask::new(0, 0),
-        Mask {
-            mask: 0x0,
-            shift: 0
-        }
-    );
-    assert_eq!(
-        Mask::new(0, 16),
-        Mask {
-            mask: 0x0,
-            shift: 0
-        }
-    );
-    assert_eq!(
-        Mask::new(0, 32),
-        Mask {
-            mask: 0x0,
-            shift: 0
-        }
-    );
-    assert_eq!(
-        Mask::new(0, 64),
-        Mask {
-            mask: 0x0,
-            shift: 0
-        }
-    );
-    assert_eq!(
-        Mask::new(1, 0),
-        Mask {
-            mask: 0x1,
-            shift: 0
-        }
-    );
-    assert_eq!(
-        Mask::new(1, 16),
-        Mask {
-            mask: 0x1_0000,
-            shift: 16
-        }
-    );
-    assert_eq!(
-        Mask::new(1, 31),
-        Mask {
-            mask: 0x8000_0000,
-            shift: 31
-        }
-    );
-    assert_eq!(
-        Mask::new(1, 32),
-        Mask {
-            mask: 0x8000_0000,
-            shift: 31
-        }
-    );
-    assert_eq!(
-        Mask::new(1, 128),
-        Mask {
-            mask: 0x8000_0000,
-            shift: 31
-        }
-    );
-    assert_eq!(
-        Mask::new(4, 0),
-        Mask {
-            mask: 0xf,
-            shift: 0
-        }
-    );
-    assert_eq!(
-        Mask::new(4, 16),
-        Mask {
-            mask: 0xf_0000,
-            shift: 16
-        }
-    );
-    assert_eq!(
-        Mask::new(4, 28),
-        Mask {
-            mask: 0xf000_0000,
-            shift: 28
-        }
-    );
-    assert_eq!(
-        Mask::new(4, 32),
-        Mask {
-            mask: 0xf000_0000,
-            shift: 28
-        }
-    );
-    assert_eq!(
-        Mask::new(4, 64),
-        Mask {
-            mask: 0xf000_0000,
-            shift: 28
-        }
-    );
-    assert_eq!(
-        Mask::new(16, 0),
-        Mask {
-            mask: 0xffff,
-            shift: 0
-        }
-    );
-    assert_eq!(
-        Mask::new(16, 16),
-        Mask {
-            mask: 0xffff_0000,
-            shift: 16
-        }
-    );
-    assert_eq!(
-        Mask::new(16, 32),
-        Mask {
-            mask: 0xffff_0000,
-            shift: 16
-        }
-    );
-    assert_eq!(
-        Mask::new(16, 64),
-        Mask {
-            mask: 0xffff_0000,
-            shift: 16
-        }
-    );
-    assert_eq!(
-        Mask::new(32, 0),
-        Mask {
-            mask: 0xffff_ffff,
-            shift: 0
-        }
-    );
-    assert_eq!(
-        Mask::new(32, 16),
-        Mask {
-            mask: 0xffff_ffff,
-            shift: 0
-        }
-    );
-    assert_eq!(
-        Mask::new(32, 32),
-        Mask {
-            mask: 0xffff_ffff,
-            shift: 0
-        }
-    );
-    assert_eq!(
-        Mask::new(32, 64),
-        Mask {
-            mask: 0xffff_ffff,
-            shift: 0
-        }
-    );
-    assert_eq!(
-        Mask::new(64, 0),
-        Mask {
-            mask: 0xffff_ffff,
-            shift: 0
-        }
-    );
-    assert_eq!(
-        Mask::new(64, 16),
-        Mask {
-            mask: 0xffff_ffff,
-            shift: 0
-        }
-    );
-    assert_eq!(
-        Mask::new(64, 32),
-        Mask {
-            mask: 0xffff_ffff,
-            shift: 0
-        }
-    );
-    assert_eq!(
-        Mask::new(64, 64),
-        Mask {
-            mask: 0xffff_ffff,
-            shift: 0
-        }
-    );
-}
+    /// UT test cases for bit from_usize function
+    ///
+    /// # Brief
+    /// 1. Pass in any usize, call from_usize, and check the return value.
+    #[test]
+    fn ut_bit_from_usize() {
+        const USIZE_MAX: usize = 0usize.wrapping_sub(1);
+        const USIZE_MAX_HALF: usize = 0usize.wrapping_sub(1) / 2;
 
-/// UT test cases for mask new function
-///
-/// # Brief  
-/// 1. pass in the parameters, and create the Mask.
-/// 2. Check return value.
-#[cfg(target_pointer_width = "64")]
-#[test]
-fn ut_mask_new_bit64() {
-    assert_eq!(
-        Mask::new(0, 0),
-        Mask {
-            mask: 0x0,
-            shift: 0
-        }
-    );
-    assert_eq!(
-        Mask::new(0, 32),
-        Mask {
-            mask: 0x0,
-            shift: 0
-        }
-    );
-    assert_eq!(
-        Mask::new(0, 64),
-        Mask {
-            mask: 0x0,
-            shift: 0
-        }
-    );
-    assert_eq!(
-        Mask::new(0, 128),
-        Mask {
-            mask: 0x0,
-            shift: 0
-        }
-    );
+        assert_eq!(Bit::from_usize(0), Bit(0));
+        assert_eq!(Bit::from_usize(USIZE_MAX_HALF), Bit(USIZE_MAX_HALF));
+        assert_eq!(Bit::from_usize(USIZE_MAX), Bit(USIZE_MAX));
+    }
 
-    assert_eq!(
-        Mask::new(1, 0),
-        Mask {
-            mask: 0x1,
-            shift: 0
-        }
-    );
-    assert_eq!(
-        Mask::new(1, 32),
-        Mask {
-            mask: 0x1_0000_0000,
-            shift: 32
-        }
-    );
-    assert_eq!(
-        Mask::new(1, 63),
-        Mask {
-            mask: 0x8000_0000_0000_0000,
-            shift: 63
-        }
-    );
-    assert_eq!(
-        Mask::new(1, 64),
-        Mask {
-            mask: 0x8000_0000_0000_0000,
-            shift: 63
-        }
-    );
-    assert_eq!(
-        Mask::new(1, 128),
-        Mask {
-            mask: 0x8000_0000_0000_0000,
-            shift: 63
-        }
-    );
+    /// UT test cases for bit as_usize function
+    ///
+    /// # Brief  
+    /// 1. Creating a Bit Instance.
+    /// 2. Call as_usize.
+    /// 3. Check return value.
+    #[test]
+    fn ut_bit_as_usize() {
+        const USIZE_MAX: usize = 0usize.wrapping_sub(1);
+        const USIZE_MAX_HALF: usize = 0usize.wrapping_sub(1) / 2;
 
-    assert_eq!(
-        Mask::new(4, 0),
-        Mask {
-            mask: 0xf,
-            shift: 0
-        }
-    );
-    assert_eq!(
-        Mask::new(4, 32),
-        Mask {
-            mask: 0xf_0000_0000,
-            shift: 32
-        }
-    );
-    assert_eq!(
-        Mask::new(4, 60),
-        Mask {
-            mask: 0xf000_0000_0000_0000,
-            shift: 60
-        }
-    );
-    assert_eq!(
-        Mask::new(4, 64),
-        Mask {
-            mask: 0xf000_0000_0000_0000,
-            shift: 60
-        }
-    );
-    assert_eq!(
-        Mask::new(4, 128),
-        Mask {
-            mask: 0xf000_0000_0000_0000,
-            shift: 60
-        }
-    );
+        assert_eq!(Bit::from_usize(0).as_usize(), 0);
+        assert_eq!(Bit::from_usize(USIZE_MAX_HALF).as_usize(), USIZE_MAX_HALF);
+        assert_eq!(Bit::from_usize(USIZE_MAX).as_usize(), USIZE_MAX);
+    }
 
-    assert_eq!(
-        Mask::new(32, 0),
-        Mask {
-            mask: 0xffff_ffff,
-            shift: 0
-        }
-    );
-    assert_eq!(
-        Mask::new(32, 32),
-        Mask {
-            mask: 0xffff_ffff_0000_0000,
-            shift: 32
-        }
-    );
-    assert_eq!(
-        Mask::new(32, 64),
-        Mask {
-            mask: 0xffff_ffff_0000_0000,
-            shift: 32
-        }
-    );
-    assert_eq!(
-        Mask::new(32, 128),
-        Mask {
-            mask: 0xffff_ffff_0000_0000,
-            shift: 32
-        }
-    );
+    /// UT test cases for bit set function
+    ///
+    /// # Brief  
+    /// 1. Creating a Bit Instance.
+    /// 2. Call the set function and pass in a new usize.
+    /// 3. Check return value.
+    #[test]
+    fn ut_bit_set() {
+        const USIZE_MAX: usize = 0usize.wrapping_sub(1);
+        const USIZE_MAX_HALF: usize = 0usize.wrapping_sub(1) / 2;
 
-    assert_eq!(
-        Mask::new(64, 0),
-        Mask {
-            mask: 0xffff_ffff_ffff_ffff,
-            shift: 0
-        }
-    );
-    assert_eq!(
-        Mask::new(64, 32),
-        Mask {
-            mask: 0xffff_ffff_ffff_ffff,
-            shift: 0
-        }
-    );
-    assert_eq!(
-        Mask::new(64, 64),
-        Mask {
-            mask: 0xffff_ffff_ffff_ffff,
-            shift: 0
-        }
-    );
-    assert_eq!(
-        Mask::new(64, 128),
-        Mask {
-            mask: 0xffff_ffff_ffff_ffff,
-            shift: 0
-        }
-    );
+        let mut b = Bit::from_usize(0);
+        b.set(0xf0f0);
+        assert_eq!(b.as_usize(), 0xf0f0);
 
-    assert_eq!(
-        Mask::new(128, 0),
-        Mask {
-            mask: 0xffff_ffff_ffff_ffff,
-            shift: 0
-        }
-    );
-    assert_eq!(
-        Mask::new(128, 32),
-        Mask {
-            mask: 0xffff_ffff_ffff_ffff,
-            shift: 0
-        }
-    );
-    assert_eq!(
-        Mask::new(128, 64),
-        Mask {
-            mask: 0xffff_ffff_ffff_ffff,
-            shift: 0
-        }
-    );
-    assert_eq!(
-        Mask::new(128, 128),
-        Mask {
-            mask: 0xffff_ffff_ffff_ffff,
-            shift: 0
-        }
-    );
-}
+        let mut b = Bit::from_usize(USIZE_MAX_HALF);
+        b.set(0xf0f0);
+        assert_eq!(b.as_usize(), 0xf0f0);
 
-/// UT test cases for bit from_usize function
-///
-/// # Brief
-/// 1. Pass in any usize, call from_usize, and check the return value.
-#[test]
-fn ut_bit_from_usize() {
-    const USIZE_MAX: usize = 0usize.wrapping_sub(1);
-    const USIZE_MAX_HALF: usize = 0usize.wrapping_sub(1) / 2;
+        let mut b = Bit::from_usize(USIZE_MAX);
+        b.set(0xf0f0);
+        assert_eq!(b.as_usize(), 0xf0f0);
+    }
 
-    assert_eq!(Bit::from_usize(0), Bit(0));
-    assert_eq!(Bit::from_usize(USIZE_MAX_HALF), Bit(USIZE_MAX_HALF));
-    assert_eq!(Bit::from_usize(USIZE_MAX), Bit(USIZE_MAX));
-}
+    /// UT test cases for bit clear function
+    ///
+    /// # Brief  
+    /// 1. Creating a Bit Instance.
+    /// 2. Call clear().
+    /// 3. Calibrate the instance.
+    #[test]
+    fn ut_bit_clear() {
+        const USIZE_MAX: usize = 0usize.wrapping_sub(1);
+        const USIZE_MAX_HALF: usize = 0usize.wrapping_sub(1) / 2;
 
-/// UT test cases for bit as_usize function
-///
-/// # Brief  
-/// 1. Creating a Bit Instance.
-/// 2. Call as_usize.
-/// 3. Check return value.
-#[test]
-fn ut_bit_as_usize() {
-    const USIZE_MAX: usize = 0usize.wrapping_sub(1);
-    const USIZE_MAX_HALF: usize = 0usize.wrapping_sub(1) / 2;
+        let mut b = Bit::from_usize(0);
+        b.clear();
+        assert_eq!(b.as_usize(), 0);
 
-    assert_eq!(Bit::from_usize(0).as_usize(), 0);
-    assert_eq!(Bit::from_usize(USIZE_MAX_HALF).as_usize(), USIZE_MAX_HALF);
-    assert_eq!(Bit::from_usize(USIZE_MAX).as_usize(), USIZE_MAX);
-}
+        let mut b = Bit::from_usize(USIZE_MAX_HALF);
+        b.clear();
+        assert_eq!(b.as_usize(), 0);
 
-/// UT test cases for bit set function
-///
-/// # Brief  
-/// 1. Creating a Bit Instance.
-/// 2. Call the set function and pass in a new usize.
-/// 3. Check return value.
-#[test]
-fn ut_bit_set() {
-    const USIZE_MAX: usize = 0usize.wrapping_sub(1);
-    const USIZE_MAX_HALF: usize = 0usize.wrapping_sub(1) / 2;
+        let mut b = Bit::from_usize(USIZE_MAX);
+        b.clear();
+        assert_eq!(b.as_usize(), 0);
+    }
 
-    let mut b = Bit::from_usize(0);
-    b.set(0xf0f0);
-    assert_eq!(b.as_usize(), 0xf0f0);
+    /// UT test cases for bit set_by_mask function
+    ///
+    /// # Brief  
+    /// 1. Create a Bit instance, create a Mask instance.
+    /// 2. Call set_by_mask().
+    /// 3. Verify the Bit instance.
+    #[cfg(target_pointer_width = "32")]
+    #[test]
+    fn ut_bit_set_by_mask_bit32() {
+        let val = 0x0usize;
+        let mut bit = Bit::from_usize(val);
+        bit.set_by_mask(Mask::new(0, 0), 0x0);
+        assert_eq!(bit, Bit::from_usize(0x0));
 
-    let mut b = Bit::from_usize(USIZE_MAX_HALF);
-    b.set(0xf0f0);
-    assert_eq!(b.as_usize(), 0xf0f0);
+        bit.clear();
+        bit.set_by_mask(Mask::new(4, 0), 0xf);
+        assert_eq!(bit, Bit::from_usize(0xf));
 
-    let mut b = Bit::from_usize(USIZE_MAX);
-    b.set(0xf0f0);
-    assert_eq!(b.as_usize(), 0xf0f0);
-}
+        bit.clear();
+        bit.set_by_mask(Mask::new(8, 0), 0xff);
+        assert_eq!(bit, Bit::from_usize(0xff));
 
-/// UT test cases for bit clear function
-///
-/// # Brief  
-/// 1. Creating a Bit Instance.
-/// 2. Call clear().
-/// 3. Calibrate the instance.
-#[test]
-fn ut_bit_clear() {
-    const USIZE_MAX: usize = 0usize.wrapping_sub(1);
-    const USIZE_MAX_HALF: usize = 0usize.wrapping_sub(1) / 2;
+        bit.clear();
+        bit.set_by_mask(Mask::new(4, 4), 0xf);
+        assert_eq!(bit, Bit::from_usize(0xf0));
 
-    let mut b = Bit::from_usize(0);
-    b.clear();
-    assert_eq!(b.as_usize(), 0);
+        bit.clear();
+        bit.set_by_mask(Mask::new(4, 28), 0xf);
+        assert_eq!(bit, Bit::from_usize(0xf000_0000));
 
-    let mut b = Bit::from_usize(USIZE_MAX_HALF);
-    b.clear();
-    assert_eq!(b.as_usize(), 0);
+        bit.clear();
+        bit.set_by_mask(Mask::new(0, 0), 0xffff_ffff);
+        assert_eq!(bit, Bit::from_usize(0x0));
 
-    let mut b = Bit::from_usize(USIZE_MAX);
-    b.clear();
-    assert_eq!(b.as_usize(), 0);
-}
+        bit.clear();
+        bit.set_by_mask(Mask::new(4, 0), 0xffff_ffff);
+        assert_eq!(bit, Bit::from_usize(0xf));
 
-/// UT test cases for bit set_by_mask function
-///
-/// # Brief  
-/// 1. Create a Bit instance, create a Mask instance.
-/// 2. Call set_by_mask().
-/// 3. Verify the Bit instance.
-#[cfg(target_pointer_width = "32")]
-#[test]
-fn ut_bit_set_by_mask_bit32() {
-    let val = 0x0usize;
-    let mut bit = Bit::from_usize(val);
-    bit.set_by_mask(Mask::new(0, 0), 0x0);
-    assert_eq!(bit, Bit::from_usize(0x0));
+        bit.clear();
+        bit.set_by_mask(Mask::new(4, 4), 0xffff_ffff);
+        assert_eq!(bit, Bit::from_usize(0xf0));
 
-    bit.clear();
-    bit.set_by_mask(Mask::new(4, 0), 0xf);
-    assert_eq!(bit, Bit::from_usize(0xf));
+        let val = 0xffff_ffff;
+        let mut bit = Bit::from_usize(val);
+        bit.set_by_mask(Mask::new(0, 0), 0x0);
+        assert_eq!(bit, Bit::from_usize(0xffff_ffff));
 
-    bit.clear();
-    bit.set_by_mask(Mask::new(8, 0), 0xff);
-    assert_eq!(bit, Bit::from_usize(0xff));
+        bit.set(val);
+        bit.set_by_mask(Mask::new(4, 0), 0x0);
+        assert_eq!(bit, Bit::from_usize(0xffff_fff0));
 
-    bit.clear();
-    bit.set_by_mask(Mask::new(4, 4), 0xf);
-    assert_eq!(bit, Bit::from_usize(0xf0));
+        bit.set(val);
+        bit.set_by_mask(Mask::new(4, 4), 0x0);
+        assert_eq!(bit, Bit::from_usize(0xffff_ff0f));
 
-    bit.clear();
-    bit.set_by_mask(Mask::new(4, 28), 0xf);
-    assert_eq!(bit, Bit::from_usize(0xf000_0000));
+        bit.set(val);
+        bit.set_by_mask(Mask::new(4, 8), 0x0);
+        assert_eq!(bit, Bit::from_usize(0xffff_f0ff));
 
-    bit.clear();
-    bit.set_by_mask(Mask::new(0, 0), 0xffff_ffff);
-    assert_eq!(bit, Bit::from_usize(0x0));
+        bit.set(val);
+        bit.set_by_mask(Mask::new(4, 0), 0xabcd);
+        assert_eq!(bit, Bit::from_usize(0xffff_fffd));
 
-    bit.clear();
-    bit.set_by_mask(Mask::new(4, 0), 0xffff_ffff);
-    assert_eq!(bit, Bit::from_usize(0xf));
+        bit.set(val);
+        bit.set_by_mask(Mask::new(8, 0), 0xabcd);
+        assert_eq!(bit, Bit::from_usize(0xffff_ffcd));
 
-    bit.clear();
-    bit.set_by_mask(Mask::new(4, 4), 0xffff_ffff);
-    assert_eq!(bit, Bit::from_usize(0xf0));
+        bit.set(val);
+        bit.set_by_mask(Mask::new(16, 0), 0xabcd);
+        assert_eq!(bit, Bit::from_usize(0xffff_abcd));
 
-    let val = 0xffff_ffff;
-    let mut bit = Bit::from_usize(val);
-    bit.set_by_mask(Mask::new(0, 0), 0x0);
-    assert_eq!(bit, Bit::from_usize(0xffff_ffff));
+        bit.set(val);
+        bit.set_by_mask(Mask::new(16, 16), 0xabcd);
+        assert_eq!(bit, Bit::from_usize(0xabcd_ffff));
 
-    bit.set(val);
-    bit.set_by_mask(Mask::new(4, 0), 0x0);
-    assert_eq!(bit, Bit::from_usize(0xffff_fff0));
+        bit.set(val);
+        bit.set_by_mask(Mask::new(32, 0), 0xabcd);
+        assert_eq!(bit, Bit::from_usize(0x0000_abcd));
+    }
 
-    bit.set(val);
-    bit.set_by_mask(Mask::new(4, 4), 0x0);
-    assert_eq!(bit, Bit::from_usize(0xffff_ff0f));
+    /// UT test cases for bit set_by_mask function
+    ///
+    /// # Brief  
+    /// 1. Create a Bit instance, create a Mask instance.
+    /// 2. Call set_by_mask().
+    /// 3. Verify the Bit instance.
+    #[cfg(target_pointer_width = "64")]
+    #[test]
+    fn ut_bit_set_by_mask_bit64() {
+        let val = 0x0usize;
+        let mut bit = Bit::from_usize(val);
+        bit.set_by_mask(Mask::new(0, 0), 0x0);
+        assert_eq!(bit, Bit::from_usize(0x0));
 
-    bit.set(val);
-    bit.set_by_mask(Mask::new(4, 8), 0x0);
-    assert_eq!(bit, Bit::from_usize(0xffff_f0ff));
+        bit.clear();
+        bit.set_by_mask(Mask::new(4, 0), 0xf);
+        assert_eq!(bit, Bit::from_usize(0xf));
 
-    bit.set(val);
-    bit.set_by_mask(Mask::new(4, 0), 0xabcd);
-    assert_eq!(bit, Bit::from_usize(0xffff_fffd));
+        bit.clear();
+        bit.set_by_mask(Mask::new(8, 0), 0xff);
+        assert_eq!(bit, Bit::from_usize(0xff));
 
-    bit.set(val);
-    bit.set_by_mask(Mask::new(8, 0), 0xabcd);
-    assert_eq!(bit, Bit::from_usize(0xffff_ffcd));
+        bit.clear();
+        bit.set_by_mask(Mask::new(4, 4), 0xf);
+        assert_eq!(bit, Bit::from_usize(0xf0));
 
-    bit.set(val);
-    bit.set_by_mask(Mask::new(16, 0), 0xabcd);
-    assert_eq!(bit, Bit::from_usize(0xffff_abcd));
+        bit.clear();
+        bit.set_by_mask(Mask::new(4, 32), 0xf);
+        assert_eq!(bit, Bit::from_usize(0xf_0000_0000));
 
-    bit.set(val);
-    bit.set_by_mask(Mask::new(16, 16), 0xabcd);
-    assert_eq!(bit, Bit::from_usize(0xabcd_ffff));
+        bit.clear();
+        bit.set_by_mask(Mask::new(4, 0), 0xffff_ffff_ffff_ffff);
+        assert_eq!(bit, Bit::from_usize(0xf));
 
-    bit.set(val);
-    bit.set_by_mask(Mask::new(32, 0), 0xabcd);
-    assert_eq!(bit, Bit::from_usize(0x0000_abcd));
-}
+        bit.clear();
+        bit.set_by_mask(Mask::new(4, 4), 0xffff_ffff_ffff_ffff);
+        assert_eq!(bit, Bit::from_usize(0xf0));
 
-/// UT test cases for bit set_by_mask function
-///
-/// # Brief  
-/// 1. Create a Bit instance, create a Mask instance.
-/// 2. Call set_by_mask().
-/// 3. Verify the Bit instance.
-#[cfg(target_pointer_width = "64")]
-#[test]
-fn ut_bit_set_by_mask_bit64() {
-    let val = 0x0usize;
-    let mut bit = Bit::from_usize(val);
-    bit.set_by_mask(Mask::new(0, 0), 0x0);
-    assert_eq!(bit, Bit::from_usize(0x0));
+        bit.clear();
+        bit.set_by_mask(Mask::new(0, 0), 0xffff_ffff_ffff_ffff);
+        assert_eq!(bit, Bit::from_usize(0));
 
-    bit.clear();
-    bit.set_by_mask(Mask::new(4, 0), 0xf);
-    assert_eq!(bit, Bit::from_usize(0xf));
+        let val = 0xffff_ffff_ffff_ffffusize;
+        let mut bit = Bit::from_usize(val);
+        bit.set_by_mask(Mask::new(0, 0), 0x0);
+        assert_eq!(bit, Bit::from_usize(0xffff_ffff_ffff_ffff));
 
-    bit.clear();
-    bit.set_by_mask(Mask::new(8, 0), 0xff);
-    assert_eq!(bit, Bit::from_usize(0xff));
+        bit.set(0xffff_ffff_ffff_ffff);
+        bit.set_by_mask(Mask::new(4, 0), 0x0);
+        assert_eq!(bit, Bit::from_usize(0xffff_ffff_ffff_fff0));
 
-    bit.clear();
-    bit.set_by_mask(Mask::new(4, 4), 0xf);
-    assert_eq!(bit, Bit::from_usize(0xf0));
+        bit.set(0xffff_ffff_ffff_ffff);
+        bit.set_by_mask(Mask::new(4, 4), 0x0);
+        assert_eq!(bit, Bit::from_usize(0xffff_ffff_ffff_ff0f));
 
-    bit.clear();
-    bit.set_by_mask(Mask::new(4, 32), 0xf);
-    assert_eq!(bit, Bit::from_usize(0xf_0000_0000));
+        bit.set(0xffff_ffff_ffff_ffff);
+        bit.set_by_mask(Mask::new(4, 32), 0x0);
+        assert_eq!(bit, Bit::from_usize(0xffff_fff0_ffff_ffff));
 
-    bit.clear();
-    bit.set_by_mask(Mask::new(4, 0), 0xffff_ffff_ffff_ffff);
-    assert_eq!(bit, Bit::from_usize(0xf));
+        bit.set(0xffff_ffff_ffff_ffff);
+        bit.set_by_mask(Mask::new(4, 60), 0x0);
+        assert_eq!(bit, Bit::from_usize(0x0fff_ffff_ffff_ffff));
 
-    bit.clear();
-    bit.set_by_mask(Mask::new(4, 4), 0xffff_ffff_ffff_ffff);
-    assert_eq!(bit, Bit::from_usize(0xf0));
+        bit.set(0xffff_ffff_ffff_ffff);
+        bit.set_by_mask(Mask::new(16, 0), 0xabcd);
+        assert_eq!(bit, Bit::from_usize(0xffff_ffff_ffff_abcd));
 
-    bit.clear();
-    bit.set_by_mask(Mask::new(0, 0), 0xffff_ffff_ffff_ffff);
-    assert_eq!(bit, Bit::from_usize(0));
+        bit.set(0xffff_ffff_ffff_ffff);
+        bit.set_by_mask(Mask::new(32, 0), 0xabcd);
+        assert_eq!(bit, Bit::from_usize(0xffff_ffff_0000_abcd));
 
-    let val = 0xffff_ffff_ffff_ffffusize;
-    let mut bit = Bit::from_usize(val);
-    bit.set_by_mask(Mask::new(0, 0), 0x0);
-    assert_eq!(bit, Bit::from_usize(0xffff_ffff_ffff_ffff));
+        bit.set(0xffff_ffff_ffff_ffff);
+        bit.set_by_mask(Mask::new(12, 0), 0xabcd);
+        assert_eq!(bit, Bit::from_usize(0xffff_ffff_ffff_fbcd));
 
-    bit.set(0xffff_ffff_ffff_ffff);
-    bit.set_by_mask(Mask::new(4, 0), 0x0);
-    assert_eq!(bit, Bit::from_usize(0xffff_ffff_ffff_fff0));
+        bit.set(0xffff_ffff_ffff_ffff);
+        bit.set_by_mask(Mask::new(16, 8), 0xabcd);
+        assert_eq!(bit, Bit::from_usize(0xffff_ffff_ffab_cdff));
+    }
 
-    bit.set(0xffff_ffff_ffff_ffff);
-    bit.set_by_mask(Mask::new(4, 4), 0x0);
-    assert_eq!(bit, Bit::from_usize(0xffff_ffff_ffff_ff0f));
+    /// UT test cases for bit get_by_mask function
+    ///
+    /// # Brief  
+    /// 1. Create a Bit instance, create a Mask instance.
+    /// 2. Call get_by_mask().
+    /// 3. Check return value.
+    #[cfg(target_pointer_width = "32")]
+    #[test]
+    fn ut_bit_get_by_mask_bit32() {
+        let val = 0x0usize;
+        let bit = Bit::from_usize(val);
+        assert_eq!(bit.get_by_mask(Mask::new(0, 0)), 0x0);
+        assert_eq!(bit.get_by_mask(Mask::new(1, 0)), 0x0);
+        assert_eq!(bit.get_by_mask(Mask::new(16, 0)), 0x0);
+        assert_eq!(bit.get_by_mask(Mask::new(32, 0)), 0x0);
 
-    bit.set(0xffff_ffff_ffff_ffff);
-    bit.set_by_mask(Mask::new(4, 32), 0x0);
-    assert_eq!(bit, Bit::from_usize(0xffff_fff0_ffff_ffff));
+        let val = 0xffff_ffffusize;
+        let bit = Bit::from_usize(val);
+        assert_eq!(bit.get_by_mask(Mask::new(0, 0)), 0x0);
+        assert_eq!(bit.get_by_mask(Mask::new(1, 0)), 0x1);
+        assert_eq!(bit.get_by_mask(Mask::new(16, 0)), 0xffff);
+        assert_eq!(bit.get_by_mask(Mask::new(32, 0)), 0xffff_ffff);
 
-    bit.set(0xffff_ffff_ffff_ffff);
-    bit.set_by_mask(Mask::new(4, 60), 0x0);
-    assert_eq!(bit, Bit::from_usize(0x0fff_ffff_ffff_ffff));
+        let val = 0x1234_cdefusize;
+        let bit = Bit::from_usize(val);
+        assert_eq!(bit.get_by_mask(Mask::new(0, 0)), 0x0);
+        assert_eq!(bit.get_by_mask(Mask::new(4, 0)), 0xf);
+        assert_eq!(bit.get_by_mask(Mask::new(8, 0)), 0xef);
+        assert_eq!(bit.get_by_mask(Mask::new(12, 0)), 0xdef);
+        assert_eq!(bit.get_by_mask(Mask::new(16, 0)), 0xcdef);
+        assert_eq!(bit.get_by_mask(Mask::new(32, 0)), 0x1234_cdef);
+        assert_eq!(bit.get_by_mask(Mask::new(4, 4)), 0xe);
+        assert_eq!(bit.get_by_mask(Mask::new(8, 4)), 0xde);
+        assert_eq!(bit.get_by_mask(Mask::new(12, 4)), 0xcde);
+        assert_eq!(bit.get_by_mask(Mask::new(4, 16)), 0x4);
+        assert_eq!(bit.get_by_mask(Mask::new(8, 16)), 0x34);
+        assert_eq!(bit.get_by_mask(Mask::new(12, 16)), 0x234);
+        assert_eq!(bit.get_by_mask(Mask::new(3, 0)), 0x7);
+        assert_eq!(bit.get_by_mask(Mask::new(3, 4)), 0x6);
+        assert_eq!(bit.get_by_mask(Mask::new(3, 8)), 0x5);
+        assert_eq!(bit.get_by_mask(Mask::new(3, 16)), 0x4);
+        assert_eq!(bit.get_by_mask(Mask::new(3, 20)), 0x3);
+        assert_eq!(bit.get_by_mask(Mask::new(3, 24)), 0x2);
+        assert_eq!(bit.get_by_mask(Mask::new(3, 1)), 0x7);
+        assert_eq!(bit.get_by_mask(Mask::new(3, 5)), 0x7);
+        assert_eq!(bit.get_by_mask(Mask::new(3, 9)), 0x6);
+    }
 
-    bit.set(0xffff_ffff_ffff_ffff);
-    bit.set_by_mask(Mask::new(16, 0), 0xabcd);
-    assert_eq!(bit, Bit::from_usize(0xffff_ffff_ffff_abcd));
+    /// UT test cases for bit get_by_mask function
+    ///
+    /// # Brief  
+    /// 1. Create a Bit instance, create a Mask instance.
+    /// 2. Call get_by_mask().
+    /// 3. Check return value.
+    #[cfg(target_pointer_width = "64")]
+    #[test]
+    fn ut_bit_get_by_mask_bit64() {
+        let val = 0x0usize;
+        let bit = Bit::from_usize(val);
+        assert_eq!(bit.get_by_mask(Mask::new(0, 0)), 0x0);
+        assert_eq!(bit.get_by_mask(Mask::new(1, 0)), 0x0);
+        assert_eq!(bit.get_by_mask(Mask::new(32, 0)), 0x0);
+        assert_eq!(bit.get_by_mask(Mask::new(64, 0)), 0x0);
 
-    bit.set(0xffff_ffff_ffff_ffff);
-    bit.set_by_mask(Mask::new(32, 0), 0xabcd);
-    assert_eq!(bit, Bit::from_usize(0xffff_ffff_0000_abcd));
+        let val = 0xffff_ffff_ffff_ffffusize;
+        let bit = Bit::from_usize(val);
+        assert_eq!(bit.get_by_mask(Mask::new(0, 0)), 0x0);
+        assert_eq!(bit.get_by_mask(Mask::new(1, 0)), 0x1);
+        assert_eq!(bit.get_by_mask(Mask::new(32, 0)), 0xffff_ffff);
+        assert_eq!(bit.get_by_mask(Mask::new(64, 0)), 0xffff_ffff_ffff_ffff);
 
-    bit.set(0xffff_ffff_ffff_ffff);
-    bit.set_by_mask(Mask::new(12, 0), 0xabcd);
-    assert_eq!(bit, Bit::from_usize(0xffff_ffff_ffff_fbcd));
-
-    bit.set(0xffff_ffff_ffff_ffff);
-    bit.set_by_mask(Mask::new(16, 8), 0xabcd);
-    assert_eq!(bit, Bit::from_usize(0xffff_ffff_ffab_cdff));
-}
-
-/// UT test cases for bit get_by_mask function
-///
-/// # Brief  
-/// 1. Create a Bit instance, create a Mask instance.
-/// 2. Call get_by_mask().
-/// 3. Check return value.
-#[cfg(target_pointer_width = "32")]
-#[test]
-fn ut_bit_get_by_mask_bit32() {
-    let val = 0x0usize;
-    let bit = Bit::from_usize(val);
-    assert_eq!(bit.get_by_mask(Mask::new(0, 0)), 0x0);
-    assert_eq!(bit.get_by_mask(Mask::new(1, 0)), 0x0);
-    assert_eq!(bit.get_by_mask(Mask::new(16, 0)), 0x0);
-    assert_eq!(bit.get_by_mask(Mask::new(32, 0)), 0x0);
-
-    let val = 0xffff_ffffusize;
-    let bit = Bit::from_usize(val);
-    assert_eq!(bit.get_by_mask(Mask::new(0, 0)), 0x0);
-    assert_eq!(bit.get_by_mask(Mask::new(1, 0)), 0x1);
-    assert_eq!(bit.get_by_mask(Mask::new(16, 0)), 0xffff);
-    assert_eq!(bit.get_by_mask(Mask::new(32, 0)), 0xffff_ffff);
-
-    let val = 0x1234_cdefusize;
-    let bit = Bit::from_usize(val);
-    assert_eq!(bit.get_by_mask(Mask::new(0, 0)), 0x0);
-    assert_eq!(bit.get_by_mask(Mask::new(4, 0)), 0xf);
-    assert_eq!(bit.get_by_mask(Mask::new(8, 0)), 0xef);
-    assert_eq!(bit.get_by_mask(Mask::new(12, 0)), 0xdef);
-    assert_eq!(bit.get_by_mask(Mask::new(16, 0)), 0xcdef);
-    assert_eq!(bit.get_by_mask(Mask::new(32, 0)), 0x1234_cdef);
-    assert_eq!(bit.get_by_mask(Mask::new(4, 4)), 0xe);
-    assert_eq!(bit.get_by_mask(Mask::new(8, 4)), 0xde);
-    assert_eq!(bit.get_by_mask(Mask::new(12, 4)), 0xcde);
-    assert_eq!(bit.get_by_mask(Mask::new(4, 16)), 0x4);
-    assert_eq!(bit.get_by_mask(Mask::new(8, 16)), 0x34);
-    assert_eq!(bit.get_by_mask(Mask::new(12, 16)), 0x234);
-    assert_eq!(bit.get_by_mask(Mask::new(3, 0)), 0x7);
-    assert_eq!(bit.get_by_mask(Mask::new(3, 4)), 0x6);
-    assert_eq!(bit.get_by_mask(Mask::new(3, 8)), 0x5);
-    assert_eq!(bit.get_by_mask(Mask::new(3, 16)), 0x4);
-    assert_eq!(bit.get_by_mask(Mask::new(3, 20)), 0x3);
-    assert_eq!(bit.get_by_mask(Mask::new(3, 24)), 0x2);
-    assert_eq!(bit.get_by_mask(Mask::new(3, 1)), 0x7);
-    assert_eq!(bit.get_by_mask(Mask::new(3, 5)), 0x7);
-    assert_eq!(bit.get_by_mask(Mask::new(3, 9)), 0x6);
-}
-
-/// UT test cases for bit get_by_mask function
-///
-/// # Brief  
-/// 1. Create a Bit instance, create a Mask instance.
-/// 2. Call get_by_mask().
-/// 3. Check return value.
-#[cfg(target_pointer_width = "64")]
-#[test]
-fn ut_bit_get_by_mask_bit64() {
-    let val = 0x0usize;
-    let bit = Bit::from_usize(val);
-    assert_eq!(bit.get_by_mask(Mask::new(0, 0)), 0x0);
-    assert_eq!(bit.get_by_mask(Mask::new(1, 0)), 0x0);
-    assert_eq!(bit.get_by_mask(Mask::new(32, 0)), 0x0);
-    assert_eq!(bit.get_by_mask(Mask::new(64, 0)), 0x0);
-
-    let val = 0xffff_ffff_ffff_ffffusize;
-    let bit = Bit::from_usize(val);
-    assert_eq!(bit.get_by_mask(Mask::new(0, 0)), 0x0);
-    assert_eq!(bit.get_by_mask(Mask::new(1, 0)), 0x1);
-    assert_eq!(bit.get_by_mask(Mask::new(32, 0)), 0xffff_ffff);
-    assert_eq!(bit.get_by_mask(Mask::new(64, 0)), 0xffff_ffff_ffff_ffff);
-
-    let val = 0x0123_4567_89ab_cdefusize;
-    let bit = Bit::from_usize(val);
-    assert_eq!(bit.get_by_mask(Mask::new(0, 0)), 0x0);
-    assert_eq!(bit.get_by_mask(Mask::new(4, 0)), 0xf);
-    assert_eq!(bit.get_by_mask(Mask::new(8, 0)), 0xef);
-    assert_eq!(bit.get_by_mask(Mask::new(32, 0)), 0x89ab_cdef);
-    assert_eq!(bit.get_by_mask(Mask::new(64, 0)), 0x0123_4567_89ab_cdef);
-    assert_eq!(bit.get_by_mask(Mask::new(4, 4)), 0xe);
-    assert_eq!(bit.get_by_mask(Mask::new(8, 4)), 0xde);
-    assert_eq!(bit.get_by_mask(Mask::new(12, 4)), 0xcde);
-    assert_eq!(bit.get_by_mask(Mask::new(60, 4)), 0x0012_3456_789a_bcde);
-    assert_eq!(bit.get_by_mask(Mask::new(4, 32)), 0x7);
-    assert_eq!(bit.get_by_mask(Mask::new(8, 32)), 0x67);
-    assert_eq!(bit.get_by_mask(Mask::new(12, 32)), 0x567);
-    assert_eq!(bit.get_by_mask(Mask::new(3, 0)), 0x7);
-    assert_eq!(bit.get_by_mask(Mask::new(3, 4)), 0x6);
-    assert_eq!(bit.get_by_mask(Mask::new(3, 8)), 0x5);
-    assert_eq!(bit.get_by_mask(Mask::new(3, 1)), 0x7);
-    assert_eq!(bit.get_by_mask(Mask::new(3, 5)), 0x7);
-    assert_eq!(bit.get_by_mask(Mask::new(3, 9)), 0x6);
+        let val = 0x0123_4567_89ab_cdefusize;
+        let bit = Bit::from_usize(val);
+        assert_eq!(bit.get_by_mask(Mask::new(0, 0)), 0x0);
+        assert_eq!(bit.get_by_mask(Mask::new(4, 0)), 0xf);
+        assert_eq!(bit.get_by_mask(Mask::new(8, 0)), 0xef);
+        assert_eq!(bit.get_by_mask(Mask::new(32, 0)), 0x89ab_cdef);
+        assert_eq!(bit.get_by_mask(Mask::new(64, 0)), 0x0123_4567_89ab_cdef);
+        assert_eq!(bit.get_by_mask(Mask::new(4, 4)), 0xe);
+        assert_eq!(bit.get_by_mask(Mask::new(8, 4)), 0xde);
+        assert_eq!(bit.get_by_mask(Mask::new(12, 4)), 0xcde);
+        assert_eq!(bit.get_by_mask(Mask::new(60, 4)), 0x0012_3456_789a_bcde);
+        assert_eq!(bit.get_by_mask(Mask::new(4, 32)), 0x7);
+        assert_eq!(bit.get_by_mask(Mask::new(8, 32)), 0x67);
+        assert_eq!(bit.get_by_mask(Mask::new(12, 32)), 0x567);
+        assert_eq!(bit.get_by_mask(Mask::new(3, 0)), 0x7);
+        assert_eq!(bit.get_by_mask(Mask::new(3, 4)), 0x6);
+        assert_eq!(bit.get_by_mask(Mask::new(3, 8)), 0x5);
+        assert_eq!(bit.get_by_mask(Mask::new(3, 1)), 0x7);
+        assert_eq!(bit.get_by_mask(Mask::new(3, 5)), 0x7);
+        assert_eq!(bit.get_by_mask(Mask::new(3, 9)), 0x6);
+    }
 }
