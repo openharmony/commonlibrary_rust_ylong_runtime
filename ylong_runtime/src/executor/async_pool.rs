@@ -51,7 +51,7 @@ pub(crate) struct MultiThreadScheduler {
     locals: Vec<LocalQueue>,
     pub(crate) handle: Arc<Handle>,
     #[cfg(feature = "metrics")]
-    steal_count: std::sync::atomic::AtomicUsize,
+    steal_times: std::sync::atomic::AtomicU64,
 }
 
 impl Schedule for MultiThreadScheduler {
@@ -79,7 +79,7 @@ impl MultiThreadScheduler {
             locals,
             handle,
             #[cfg(feature = "metrics")]
-            steal_count: std::sync::atomic::AtomicUsize::new(0),
+            steal_times: std::sync::atomic::AtomicU64::new(0),
         }
     }
 
@@ -252,7 +252,7 @@ impl MultiThreadScheduler {
             let target = self.locals.get(i).unwrap();
             if let Some(task) = target.steal_into(local_run_queue) {
                 #[cfg(feature = "metrics")]
-                self.steal_count
+                self.steal_times
                     .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
                 if self.sleeper.dec_searching_num() {
@@ -281,12 +281,8 @@ impl MultiThreadScheduler {
             &self.handles
         }
 
-        pub(crate) fn get_steal_count(&self) -> usize {
-            self.steal_count.load(Acquire)
-        }
-
-        pub(crate) fn load_state(&self) -> (usize, usize) {
-            self.sleeper.load_state()
+        pub(crate) fn get_steal_times(&self) -> u64 {
+            self.steal_times.load(Acquire)
         }
     );
 }
@@ -527,11 +523,10 @@ impl AsyncPoolSpawner {
     }
 
     #[cfg(feature = "metrics")]
-    pub(crate) fn get_worker(&self, index: u8) -> Result<Arc<Worker>, ()> {
+    pub(crate) fn get_worker(&self, index: usize) -> Result<Arc<Worker>, ()> {
         let vec = self.inner.workers.lock().unwrap();
-        for i in 0..vec.len() {
-            let worker = vec.get(i).expect("worker index out of range");
-            if worker.index == index.into() {
+        for worker in vec.iter() {
+            if worker.index == index {
                 return Ok(worker.clone());
             }
         }

@@ -17,7 +17,7 @@ use std::mem;
 use std::pin::Pin;
 use std::sync::atomic::AtomicBool;
 #[cfg(feature = "metrics")]
-use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering::{Acquire, Release};
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
@@ -35,8 +35,9 @@ pub(crate) struct CurrentThreadSpawner {
 #[derive(Default)]
 pub(crate) struct CurrentThreadScheduler {
     pub(crate) inner: Mutex<VecDeque<Task>>,
+    /// Total task count
     #[cfg(feature = "metrics")]
-    pub(crate) count: AtomicUsize,
+    pub(crate) count: AtomicU64,
 }
 
 unsafe impl Sync for CurrentThreadScheduler {}

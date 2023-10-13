@@ -14,7 +14,7 @@
 use std::io;
 use std::ops::Deref;
 #[cfg(feature = "metrics")]
-use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, Mutex};
 
 use ylong_io::{Interest, Source, Token};
@@ -97,15 +97,15 @@ impl IoHandle {
     }
 
     #[cfg(feature = "metrics")]
-    pub(crate) fn get_register_count(&self) -> usize {
+    pub(crate) fn get_registered_count(&self) -> u64 {
         self.inner
             .metrics
-            .register_count
+            .registered_count
             .load(std::sync::atomic::Ordering::Acquire)
     }
 
     #[cfg(feature = "metrics")]
-    pub(crate) fn get_ready_count(&self) -> usize {
+    pub(crate) fn get_ready_count(&self) -> u64 {
         self.inner
             .metrics
             .ready_count
@@ -147,11 +147,11 @@ pub(crate) struct Inner {
 /// Metrics of Inner
 #[cfg(feature = "metrics")]
 struct InnerMetrics {
-    /// Register count. This value will only increment, not decrease.
-    register_count: AtomicUsize,
+    /// Fd registered count. This value will only increment, not decrease.
+    registered_count: AtomicU64,
 
     /// Ready events count. This value will only increment, not decrease.
-    ready_count: AtomicUsize,
+    ready_count: AtomicU64,
 }
 
 impl IoDriver {
@@ -199,8 +199,8 @@ impl IoDriver {
             registry: arc_poll.clone(),
             #[cfg(feature = "metrics")]
             metrics: InnerMetrics {
-                register_count: AtomicUsize::new(0),
-                ready_count: AtomicUsize::new(0),
+                registered_count: AtomicU64::new(0),
+                ready_count: AtomicU64::new(0),
             },
         });
 
@@ -262,7 +262,7 @@ impl IoDriver {
         self.io_handle_inner
             .metrics
             .ready_count
-            .fetch_add(events.len(), std::sync::atomic::Ordering::AcqRel);
+            .fetch_add(events.len() as u64, std::sync::atomic::Ordering::AcqRel);
 
         self.events = Some(events);
         Ok(has_events)
@@ -331,7 +331,7 @@ impl Inner {
             .register(io, Token::from_usize(token), interest)?;
         #[cfg(feature = "metrics")]
         self.metrics
-            .register_count
+            .registered_count
             .fetch_add(1, std::sync::atomic::Ordering::AcqRel);
         Ok(schedule_io)
     }

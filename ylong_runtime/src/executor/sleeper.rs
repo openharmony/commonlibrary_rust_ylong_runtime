@@ -72,11 +72,6 @@ impl Sleeper {
     pub fn dec_searching_num(&self) -> bool {
         self.record.dec_searching_num()
     }
-
-    #[cfg(feature = "metrics")]
-    pub(crate) fn load_state(&self) -> (usize, usize) {
-        self.record.load_state()
-    }
 }
 
 const ACTIVE_WORKER_SHIFT: usize = 16;
