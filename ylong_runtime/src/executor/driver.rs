@@ -85,6 +85,7 @@ impl Driver {
         } else {
             match _duration {
                 None => ParkFlag::Park,
+                Some(duration) if duration.is_zero() => ParkFlag::NotPark,
                 Some(duration) => ParkFlag::ParkTimeout(duration),
             }
         }
