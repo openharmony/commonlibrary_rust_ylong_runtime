@@ -14,10 +14,10 @@
 use std::cell::UnsafeCell;
 use std::collections::linked_list::LinkedList;
 use std::mem::MaybeUninit;
-use std::sync::atomic::Ordering::{AcqRel, Acquire, Release, SeqCst};
-use std::sync::atomic::{AtomicU16, AtomicU32, AtomicUsize};
 #[cfg(feature = "metrics")]
 use std::sync::atomic::AtomicU64;
+use std::sync::atomic::Ordering::{AcqRel, Acquire, Release, SeqCst};
+use std::sync::atomic::{AtomicU16, AtomicU32, AtomicUsize};
 use std::sync::{Arc, Mutex};
 use std::{cmp, ptr};
 
