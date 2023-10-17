@@ -322,7 +322,7 @@ mod tests {
     /// 2. Push nodes into the list.
     /// 3. Drain filtered the list for node that contains a value of 2.
     #[test]
-    #[cfg(feature = "net")]
+    #[cfg(all(feature = "net", feature = "time"))]
     fn ut_link_list_for_each_mut() {
         let mut list = LinkedList::<Entry>::new();
         let node1 = Entry::new(1);

@@ -80,7 +80,9 @@ impl Metrics<'_> {
         match &self.runtime.async_spawner {
             #[cfg(feature = "current_thread_runtime")]
             AsyncHandle::CurrentThread(_) => None,
-            AsyncHandle::MultiThread(spawner) => Some(Self::workers_state_statistic(spawner).park.len()),
+            AsyncHandle::MultiThread(spawner) => {
+                Some(Self::workers_state_statistic(spawner).park.len())
+            }
         }
     }
 
@@ -103,7 +105,9 @@ impl Metrics<'_> {
         match &self.runtime.async_spawner {
             #[cfg(feature = "current_thread_runtime")]
             AsyncHandle::CurrentThread(_) => None,
-            AsyncHandle::MultiThread(spawner) => Some(Self::workers_state_statistic(spawner).active.len()),
+            AsyncHandle::MultiThread(spawner) => {
+                Some(Self::workers_state_statistic(spawner).active.len())
+            }
         }
     }
 
@@ -149,7 +153,9 @@ impl Metrics<'_> {
         match &self.runtime.async_spawner {
             #[cfg(feature = "current_thread_runtime")]
             AsyncHandle::CurrentThread(_) => None,
-            AsyncHandle::MultiThread(spawner) => Some(Self::workers_state_statistic(spawner).active),
+            AsyncHandle::MultiThread(spawner) => {
+                Some(Self::workers_state_statistic(spawner).active)
+            }
         }
     }
 
@@ -295,7 +301,8 @@ impl Metrics<'_> {
         }
     }
 
-    /// Returns the number of task the given worker thread length has been polled.
+    /// Returns the number of task the given worker thread length has been
+    /// polled.
     ///
     /// This value will only increment, not decrease.
     /// Runtime build by `new_current_thread()` will return None.
