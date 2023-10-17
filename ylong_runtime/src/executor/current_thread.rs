@@ -15,26 +15,33 @@ use std::collections::VecDeque;
 use std::future::Future;
 use std::mem;
 use std::pin::Pin;
-use std::sync::atomic::AtomicBool;
 #[cfg(feature = "metrics")]
 use std::sync::atomic::AtomicU64;
-use std::sync::atomic::Ordering::{Acquire, Release};
-use std::sync::{Arc, Mutex};
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering::{AcqRel, Acquire};
+use std::sync::{Arc, Condvar, Mutex};
 use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 
-use crate::executor::driver::{Driver, Handle};
+use crate::executor::driver::{Driver, Handle, ParkFlag};
 use crate::executor::Schedule;
 use crate::task::{JoinHandle, Task, TaskBuilder, VirtualTableType};
 
+const IDLE: usize = 0;
+const PARKED_ON_CONDVAR: usize = 1;
+const PARKED_ON_DRIVER: usize = 2;
+const NOTIFIED: usize = 3;
+const NOTIFIED_BLOCK: usize = 4;
+
 pub(crate) struct CurrentThreadSpawner {
     pub(crate) scheduler: Arc<CurrentThreadScheduler>,
-    pub(crate) parker: Arc<Parker>,
+    pub(crate) driver: Arc<Mutex<Driver>>,
     pub(crate) handle: Arc<Handle>,
 }
 
 #[derive(Default)]
 pub(crate) struct CurrentThreadScheduler {
     pub(crate) inner: Mutex<VecDeque<Task>>,
+    pub(crate) parker_list: Mutex<Vec<Arc<Parker>>>,
     /// Total task count
     #[cfg(feature = "metrics")]
     pub(crate) count: AtomicU64,
@@ -47,8 +54,13 @@ impl Schedule for CurrentThreadScheduler {
     fn schedule(&self, task: Task, _lifo: bool) {
         let mut queue = self.inner.lock().unwrap();
         #[cfg(feature = "metrics")]
-        self.count.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
+        self.count.fetch_add(1, AcqRel);
         queue.push_back(task);
+
+        let parker_list = self.parker_list.lock().unwrap();
+        for parker in &*parker_list {
+            parker.unpark(false);
+        }
     }
 }
 
@@ -60,27 +72,130 @@ impl CurrentThreadScheduler {
 }
 
 pub(crate) struct Parker {
-    is_wake: AtomicBool,
+    state: AtomicUsize,
+    mutex: Mutex<bool>,
+    condvar: Condvar,
     driver: Arc<Mutex<Driver>>,
+    handle: Arc<Handle>,
 }
 
 impl Parker {
-    fn new(driver: Arc<Mutex<Driver>>) -> Parker {
+    fn new(driver: Arc<Mutex<Driver>>, handle: Arc<Handle>) -> Parker {
         Parker {
-            is_wake: AtomicBool::new(false),
+            state: AtomicUsize::new(IDLE),
+            mutex: Mutex::new(false),
+            condvar: Condvar::new(),
             driver,
+            handle,
         }
     }
 
-    fn wake(&self) {
-        self.is_wake.store(true, Release);
+    fn park(&self) -> bool {
+        let (mut park, mut wake) = (true, false);
+        if let Ok(mut driver) = self.driver.try_lock() {
+            (park, wake) = self.park_on_driver(&mut driver);
+        }
+        if park {
+            self.park_on_condvar()
+        } else {
+            wake
+        }
     }
 
-    fn get_wake_up(&self) -> bool {
-        self.is_wake
-            .compare_exchange(true, false, Release, Acquire)
-            .is_ok()
+    fn park_on_driver(&self, driver: &mut Driver) -> (bool, bool) {
+        match self
+            .state
+            .compare_exchange(IDLE, PARKED_ON_DRIVER, AcqRel, Acquire)
+        {
+            Ok(_) => {}
+            Err(NOTIFIED_BLOCK) => {
+                self.state.swap(IDLE, AcqRel);
+                return (false, true);
+            }
+            Err(NOTIFIED) => {
+                self.state.swap(IDLE, AcqRel);
+                return (false, false);
+            }
+            Err(actual) => panic!("inconsistent park state; actual = {}", actual),
+        }
+
+        let park = match driver.run() {
+            ParkFlag::NotPark => false,
+            ParkFlag::Park => true,
+            ParkFlag::ParkTimeout(_) => false,
+        };
+
+        match self.state.swap(IDLE, AcqRel) {
+            NOTIFIED => (false, false),
+            NOTIFIED_BLOCK => (false, true),
+            PARKED_ON_DRIVER => (park, false),
+            n => panic!("inconsistent park_timeout state: {}", n),
+        }
     }
+
+    fn park_on_condvar(&self) -> bool {
+        let mut lock = self.mutex.lock().unwrap();
+        match self
+            .state
+            .compare_exchange(IDLE, PARKED_ON_CONDVAR, AcqRel, Acquire)
+        {
+            Ok(_) => {}
+            Err(NOTIFIED_BLOCK) => {
+                self.state.swap(IDLE, AcqRel);
+                return true;
+            }
+            Err(NOTIFIED) => {
+                self.state.swap(IDLE, AcqRel);
+                return false;
+            }
+            Err(actual) => panic!("inconsistent park state; actual = {}", actual),
+        }
+
+        while !*lock {
+            lock = self.condvar.wait(lock).unwrap();
+        }
+        *lock = false;
+
+        match self.state.swap(IDLE, AcqRel) {
+            NOTIFIED => false,
+            NOTIFIED_BLOCK => true,
+            n => panic!("inconsistent park_timeout state: {}", n),
+        }
+    }
+
+    fn unpark(&self, wake: bool) {
+        if wake {
+            match self.state.swap(NOTIFIED_BLOCK, AcqRel) {
+                IDLE | NOTIFIED | NOTIFIED_BLOCK => {}
+                PARKED_ON_CONDVAR => {
+                    let mut lock = self.mutex.lock().unwrap();
+                    *lock = true;
+                    mem::drop(lock);
+                    self.condvar.notify_one();
+                }
+                PARKED_ON_DRIVER => self.handle.wake(),
+                actual => panic!("inconsistent state in unpark; actual = {}", actual),
+            }
+        } else {
+            match self.state.swap(NOTIFIED, AcqRel) {
+                IDLE | NOTIFIED => {}
+                NOTIFIED_BLOCK => self.unpark(true),
+                PARKED_ON_CONDVAR => {
+                    let mut lock = self.mutex.lock().unwrap();
+                    *lock = true;
+                    mem::drop(lock);
+                    self.condvar.notify_one();
+                }
+                PARKED_ON_DRIVER => self.handle.wake(),
+                actual => panic!("inconsistent state in unpark; actual = {}", actual),
+            }
+        }
+    }
+}
+
+fn waker(parker: Arc<Parker>) -> Waker {
+    let data = Arc::into_raw(parker) as *const ();
+    unsafe { Waker::from_raw(RawWaker::new(data, &CURRENT_THREAD_RAW_WAKER_VIRTUAL_TABLE)) }
 }
 
 static CURRENT_THREAD_RAW_WAKER_VIRTUAL_TABLE: RawWakerVTable =
@@ -98,12 +213,12 @@ fn clone(ptr: *const ()) -> RawWaker {
 
 fn wake(ptr: *const ()) {
     let parker = unsafe { Arc::from_raw(ptr as *const Parker) };
-    parker.wake();
+    parker.unpark(true);
 }
 
 fn wake_by_ref(ptr: *const ()) {
     let parker = unsafe { Arc::from_raw(ptr as *const Parker) };
-    parker.wake();
+    parker.unpark(true);
     mem::forget(parker);
 }
 
@@ -116,14 +231,13 @@ impl CurrentThreadSpawner {
         let (handle, driver) = Driver::initialize();
         Self {
             scheduler: Default::default(),
-            parker: Arc::new(Parker::new(driver)),
+            driver,
             handle,
         }
     }
 
-    fn waker(&self) -> Waker {
-        let data = Arc::into_raw(self.parker.clone()) as *const ();
-        unsafe { Waker::from_raw(RawWaker::new(data, &CURRENT_THREAD_RAW_WAKER_VIRTUAL_TABLE)) }
+    fn get_parker(&self) -> Parker {
+        Parker::new(self.driver.clone(), self.handle.clone())
     }
 
     pub(crate) fn spawn<T>(&self, builder: &TaskBuilder, task: T) -> JoinHandle<T::Output>
@@ -137,10 +251,12 @@ impl CurrentThreadSpawner {
         let mut queue = self.scheduler.inner.lock().unwrap();
         queue.push_back(task);
         #[cfg(feature = "metrics")]
-        self.scheduler
-            .count
-            .fetch_add(1, std::sync::atomic::Ordering::AcqRel);
+        self.scheduler.count.fetch_add(1, AcqRel);
 
+        let parker_list = self.scheduler.parker_list.lock().unwrap();
+        for parker in &*parker_list {
+            parker.unpark(false);
+        }
         handle
     }
 
@@ -148,27 +264,31 @@ impl CurrentThreadSpawner {
     where
         T: Future,
     {
-        let waker = self.waker();
+        let parker = Arc::new(self.get_parker());
+        let mut parker_list = self.scheduler.parker_list.lock().unwrap();
+        parker_list.push(parker.clone());
+        mem::drop(parker_list);
+
+        let waker = waker(parker.clone());
         let mut cx = Context::from_waker(&waker);
 
         let mut future = future;
         let mut future = unsafe { Pin::new_unchecked(&mut future) };
 
-        if let Poll::Ready(res) = future.as_mut().poll(&mut cx) {
-            return res;
-        }
+        let mut wake = true;
 
         loop {
-            if self.parker.get_wake_up() {
+            if wake {
                 if let Poll::Ready(res) = future.as_mut().poll(&mut cx) {
                     return res;
                 }
             }
-            if let Some(task) = self.scheduler.pop() {
+
+            while let Some(task) = self.scheduler.pop() {
                 task.run();
-            } else if let Ok(mut driver) = self.parker.driver.try_lock() {
-                driver.run_once();
             }
+
+            wake = parker.park();
         }
     }
 }
@@ -183,10 +303,6 @@ mod test {
             )*
         }
     }
-
-    use std::future::Future;
-    use std::pin::Pin;
-    use std::task::{Context, Poll};
 
     use crate::executor::current_thread::CurrentThreadSpawner;
     use crate::task::{yield_now, TaskBuilder};
@@ -264,82 +380,20 @@ mod test {
         }
     }
 
-    struct YieldTask {
-        cnt: u8,
-    }
-
-    impl Future for YieldTask {
-        type Output = ();
-
-        fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-            if self.cnt > 0 {
-                self.cnt -= 1;
-                cx.waker().wake_by_ref();
-                Poll::Pending
-            } else {
-                Poll::Ready(())
-            }
-        }
-    }
-
-    /// UT test cases for `spawn()`.
-    ///
-    /// # Brief
-    /// 1. Check the running status of tasks in the queue when the yield task is
-    ///    awakened once.
-    /// 2. Check the running status of tasks in the queue when the yield task is
-    ///    awakened twice.
-    /// 3. Check the running status of tasks in the queue when the yield task is
-    ///    awakened three times.
-    #[test]
-    fn ut_current_thread_spawn() {
-        let spawner = CurrentThreadSpawner::new();
-        spawner.spawn(&TaskBuilder::default(), async move { yield_now().await });
-        spawner.spawn(&TaskBuilder::default(), async move { yield_now().await });
-        spawner.block_on(YieldTask { cnt: 1 });
-        assert_eq!(spawner.scheduler.inner.lock().unwrap().len(), 2);
-
-        let spawner = CurrentThreadSpawner::new();
-        spawner.spawn(&TaskBuilder::default(), async move { yield_now().await });
-        spawner.spawn(&TaskBuilder::default(), async move { yield_now().await });
-        spawner.block_on(YieldTask { cnt: 2 });
-        assert_eq!(spawner.scheduler.inner.lock().unwrap().len(), 2);
-
-        let spawner = CurrentThreadSpawner::new();
-        spawner.spawn(&TaskBuilder::default(), async move { yield_now().await });
-        spawner.spawn(&TaskBuilder::default(), async move { yield_now().await });
-        spawner.block_on(YieldTask { cnt: 3 });
-        assert_eq!(spawner.scheduler.inner.lock().unwrap().len(), 2);
-    }
-
     /// UT test cases for `block_on()`.
     ///
     /// # Brief
-    /// 1. Check the running status of tasks in the queue when the yield task is
-    ///    awakened once.
-    /// 2. Check the running status of tasks in the queue when the yield task is
-    ///    awakened twice.
-    /// 3. Check the running status of tasks in the queue when the yield task is
-    ///    awakened three times.
+    /// 1. Spawn two tasks, check the running status of tasks in the queue when
+    ///    the yield task is blocked on.
     #[test]
     fn ut_current_thread_block_on() {
         let spawner = CurrentThreadSpawner::new();
-        spawner.spawn(&TaskBuilder::default(), async move { 1 });
-        spawner.spawn(&TaskBuilder::default(), async move { 1 });
-        spawner.block_on(YieldTask { cnt: 1 });
-        assert_eq!(spawner.scheduler.inner.lock().unwrap().len(), 2);
-
-        let spawner = CurrentThreadSpawner::new();
-        spawner.spawn(&TaskBuilder::default(), async move { 1 });
-        spawner.spawn(&TaskBuilder::default(), async move { 1 });
-        spawner.block_on(YieldTask { cnt: 2 });
-        assert_eq!(spawner.scheduler.inner.lock().unwrap().len(), 1);
-
-        let spawner = CurrentThreadSpawner::new();
-        spawner.spawn(&TaskBuilder::default(), async move { 1 });
-        spawner.spawn(&TaskBuilder::default(), async move { 1 });
-        spawner.block_on(YieldTask { cnt: 3 });
+        let handle1 = spawner.spawn(&TaskBuilder::default(), async move { 1 });
+        let handle2 = spawner.spawn(&TaskBuilder::default(), async move { 1 });
+        spawner.block_on(yield_now());
         assert_eq!(spawner.scheduler.inner.lock().unwrap().len(), 0);
+        assert_eq!(spawner.block_on(handle1).unwrap(), 1);
+        assert_eq!(spawner.block_on(handle2).unwrap(), 1);
     }
 
     /// UT test cases for `spawn()` and `block_on()`.

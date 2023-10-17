@@ -84,12 +84,12 @@ impl Inner {
             thread::yield_now();
         }
 
-        let mut permit = ParkFlag::Park;
+        let mut park_flag = ParkFlag::Park;
         if let Ok(mut driver) = self.driver.try_lock() {
-            permit = self.park_on_driver(&mut driver);
+            park_flag = self.park_on_driver(&mut driver);
         }
 
-        match permit {
+        match park_flag {
             ParkFlag::NotPark => {}
             ParkFlag::Park => self.park_on_condvar(),
             ParkFlag::ParkTimeout(duration) => self.park_on_condvar_timeout(duration),
@@ -109,12 +109,12 @@ impl Inner {
             Err(actual) => panic!("inconsistent park state; actual = {}", actual),
         }
 
-        let permit = driver.run();
+        let park_flag = driver.run();
 
         match self.state.swap(IDLE, SeqCst) {
             // got notified by real io events or not
             NOTIFIED => ParkFlag::NotPark,
-            PARKED_ON_DRIVER => permit,
+            PARKED_ON_DRIVER => park_flag,
             n => panic!("inconsistent park_timeout state: {}", n),
         }
     }
