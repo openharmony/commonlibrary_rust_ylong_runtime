@@ -70,6 +70,10 @@ impl<R> JoinHandle<R> {
             self.raw.cancel();
         }
     }
+    /// Returns true if the task associated with this `JoinHandle` has finished.
+    pub fn is_finished(&self) -> bool {
+        state::is_finished(self.raw.header().state.get_current_state())
+    }
 
     pub(crate) fn get_cancel_handle(&self) -> CancelHandle {
         CancelHandle::new(self.raw)
@@ -160,3 +164,29 @@ impl Drop for CancelHandle {
 
 unsafe impl Send for CancelHandle {}
 unsafe impl Sync for CancelHandle {}
+
+#[cfg(all(test, feature = "time"))]
+mod test {
+    /// UT test cases for `is_finished` in `JoinHandle``.
+    ///
+    /// # Brief
+    /// 1. create two JoinHandle
+    /// 2. check the correctness of the JoinHandle for completion
+    #[test]
+    fn ut_test_join_handle_is_finished() {
+        use std::time::Duration;
+        let handle1 = crate::spawn(async { 1 });
+
+        let handle2 = crate::spawn(async {
+            loop {
+                crate::time::sleep(Duration::from_millis(10)).await;
+            }
+        });
+        while !handle1.is_finished() {
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(handle1.is_finished());
+        assert!(!handle2.is_finished());
+        handle2.cancel();
+    }
+}
