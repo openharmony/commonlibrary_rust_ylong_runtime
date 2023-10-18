@@ -245,6 +245,8 @@ impl<'a> ReadBuf<'a> {
 
 #[cfg(test)]
 mod test {
+    use std::mem::MaybeUninit;
+
     use crate::io::ReadBuf;
 
     /// UT test cases for `ReadBuf`.
@@ -253,6 +255,9 @@ mod test {
     /// 1. Create ReadBuf.
     /// 2. Calls functions to get parameters
     /// 3. Check if the test results are correct.
+    /// 4. Create ReadBuf using uninitialized buffer.
+    /// 5. Calls functions to get parameters.
+    /// 6. Check if the test results are correct.
     #[test]
     fn ut_test_readbuf_new() {
         let mut buf = [0; 16];
@@ -298,5 +303,25 @@ mod test {
 
         let new_read_buf = read_buf.take(8);
         assert_eq!(new_read_buf.initialized_len(), 0);
+
+        let mut uninit_buf: [MaybeUninit<u8>; 16] = unsafe { MaybeUninit::zeroed().assume_init() };
+        let mut len: usize = 0;
+        let filled = 4;
+        for var in &mut uninit_buf[0..8] {
+            if len < filled {
+                var.write(3);
+            } else {
+                var.write(0);
+            }
+            len += 1;
+        }
+        let mut uninit_read_buf = ReadBuf::create(&mut uninit_buf, filled, len);
+        assert_eq!(uninit_read_buf.filled().len(), filled);
+        assert_eq!(uninit_read_buf.initialized_len(), len);
+        assert_eq!(uninit_read_buf.capacity(), 16);
+        assert_eq!(uninit_read_buf.initialized().len(), len);
+
+        let buf_b = uninit_read_buf.initialize_unfilled_to(6);
+        assert_eq!(buf_b.len(), 6);
     }
 }

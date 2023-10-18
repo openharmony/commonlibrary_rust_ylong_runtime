@@ -150,3 +150,46 @@ fn sdv_buf_writer_seek() {
     ylong_runtime::block_on(handle1).unwrap();
     assert!(fs::remove_file("buf_writer_seek_file").is_ok());
 }
+
+
+/// SDV test cases for AsyncBufWriter `write_vectored`
+///
+/// # Brief
+/// 1. Establish an asynchronous tcp connection.
+/// 2. The client wraps the TcpStream inside a AsyncBufWriter and calls
+///    `write_vectored` to send segmented data.
+/// 3. The server receives data.
+/// 4. Check the read buf.
+#[test]
+fn sdv_buf_writer_write_vectored_2() {
+    let server = ylong_runtime::spawn(async move {
+        let addr = "127.0.0.1:8188";
+        let tcp = TcpListener::bind(addr).await.unwrap();
+        let (mut stream, _) = tcp.accept().await.unwrap();
+
+        let mut buf = [0; 17];
+        let ret = stream.read(&mut buf).await.unwrap();
+        assert_eq!(ret, 17);
+        assert_eq!(buf, "lorem-ipsum-dolor".as_bytes());
+    });
+
+    let client = ylong_runtime::spawn(async move {
+        let addr = "127.0.0.1:8188";
+        let mut tcp = TcpStream::connect(addr).await;
+        while tcp.is_err() {
+            tcp = TcpStream::connect(addr).await;
+        }
+        let tcp = tcp.unwrap();
+        let buf1 = "lorem-".as_bytes();
+        let buf2 = "ipsum-".as_bytes();
+        let buf3 = "dolor".as_bytes();
+        let bufs = &mut [IoSlice::new(buf1), IoSlice::new(buf2), IoSlice::new(buf3)][..];
+
+        let mut buf_writer = AsyncBufWriter::with_capacity(30, tcp);
+        buf_writer.write_vectored(bufs).await.unwrap();
+        buf_writer.flush().await.unwrap();
+    });
+
+    ylong_runtime::block_on(server).unwrap();
+    ylong_runtime::block_on(client).unwrap();
+}
