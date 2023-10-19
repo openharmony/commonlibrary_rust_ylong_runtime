@@ -244,3 +244,40 @@ fn sdv_buf_reader_seek() {
     ylong_runtime::block_on(handle1).unwrap();
     assert!(fs::remove_file("buf_reader_seek_file").is_ok());
 }
+
+/// SDV test cases for AsyncBufReader `read`
+///
+/// # Brief
+/// 1. Establish an asynchronous tcp connection.
+/// 2. The client sends some data to the server.
+/// 3. The server wraps the TcpStream inside a AsyncBufReader
+/// 4. The server calls `read`.
+/// 5. Check the read buf.
+#[test]
+fn sdv_buf_reader_read() {
+    let server = ylong_runtime::spawn(async move {
+        let addr = "127.0.0.1:8187";
+        let tcp = TcpListener::bind(addr).await.unwrap();
+        let (stream, _) = tcp.accept().await.unwrap();
+        let mut buf_reader = AsyncBufReader::new(stream);
+
+        let mut buf = [0; 8193];
+        let ret = buf_reader.read(&mut buf).await.unwrap();
+        assert_eq!(ret, 6);
+        assert_eq!(buf[..7], [1, 2, 3, 4, 5, 6, 0]);
+    });
+
+    let client = ylong_runtime::spawn(async move {
+        let addr = "127.0.0.1:8187";
+        let mut tcp = TcpStream::connect(addr).await;
+        while tcp.is_err() {
+            tcp = TcpStream::connect(addr).await;
+        }
+        let mut tcp = tcp.unwrap();
+        let buf = [1, 2, 3, 4, 5, 6];
+        tcp.write_all(&buf).await.unwrap();
+    });
+
+    ylong_runtime::block_on(server).unwrap();
+    ylong_runtime::block_on(client).unwrap();
+}

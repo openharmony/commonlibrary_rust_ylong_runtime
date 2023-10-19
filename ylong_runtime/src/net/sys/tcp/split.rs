@@ -114,11 +114,12 @@ impl AsyncWrite for SplitWriteHalf {
 
 #[cfg(test)]
 mod test {
-    use std::net::SocketAddr;
+    use std::net::{SocketAddr, Ipv6Addr};
     use std::thread;
 
     use crate::io::{AsyncReadExt, AsyncWriteExt};
     use crate::net::{TcpListener, TcpStream};
+    use std::io::IoSlice;
 
     /// UT test cases for `TcpStream` of split().
     ///
@@ -136,16 +137,12 @@ mod test {
                 let listener = TcpListener::bind(addr).await.unwrap();
                 let (mut stream, _) = listener.accept().await.unwrap();
                 let mut buf = [0; 16];
-                match stream.read(&mut buf).await {
-                    Ok(n) => {
-                        assert_eq!(n, 16);
-                        assert_eq!(
-                            String::from_utf8(Vec::from(buf)).unwrap().as_str(),
-                            "I am write half."
-                        );
-                    }
-                    Err(e) => panic!("server read err:{e:?}"),
-                }
+                let n = stream.read(&mut buf).await.expect("server read err");
+                assert_eq!(n, 16);
+                assert_eq!(
+                    String::from_utf8(Vec::from(buf)).unwrap().as_str(),
+                    "I am write half."
+                );
                 stream.write(b"hello read half.").await.unwrap();
             })
         });
@@ -158,16 +155,12 @@ mod test {
                     let mut buf = [0; 16];
                     write_half.write(b"I am write half.").await.unwrap();
 
-                    match read_half.read(&mut buf).await {
-                        Ok(n) => {
-                            assert_eq!(n, 16);
-                            assert_eq!(
-                                String::from_utf8(Vec::from(buf)).unwrap().as_str(),
-                                "hello read half."
-                            );
-                        }
-                        Err(e) => panic!("server read err:{e:?}"),
-                    }
+                    let n = read_half.read(&mut buf).await.expect("server read err");
+                    assert_eq!(n, 16);
+                    assert_eq!(
+                        String::from_utf8(Vec::from(buf)).unwrap().as_str(),
+                        "hello read half."
+                    );
                     break;
                 }
             }
@@ -190,16 +183,12 @@ mod test {
                 let listener = TcpListener::bind(addr).await.unwrap();
                 let (mut stream, _) = listener.accept().await.unwrap();
                 let mut buf = [0; 16];
-                match stream.read(&mut buf).await {
-                    Ok(n) => {
-                        assert_eq!(n, 16);
-                        assert_eq!(
-                            String::from_utf8(Vec::from(buf)).unwrap().as_str(),
-                            "I am write half."
-                        );
-                    }
-                    Err(e) => panic!("server read err:{e:?}"),
-                }
+                let n = stream.read(&mut buf).await.expect("server read err");
+                assert_eq!(n, 16);
+                assert_eq!(
+                    String::from_utf8(Vec::from(buf)).unwrap().as_str(),
+                    "I am write half."
+                );
                 stream.write(b"hello read half.").await.unwrap();
             })
         });
@@ -212,16 +201,124 @@ mod test {
                     let mut buf = [0; 16];
                     write_half.write(b"I am write half.").await.unwrap();
 
-                    match read_half.read(&mut buf).await {
-                        Ok(n) => {
-                            assert_eq!(n, 16);
-                            assert_eq!(
-                                String::from_utf8(Vec::from(buf)).unwrap().as_str(),
-                                "hello read half."
-                            );
-                        }
-                        Err(e) => panic!("server read err:{e:?}"),
-                    }
+                    let n = read_half.read(&mut buf).await.expect("server read err");
+                    assert_eq!(n, 16);
+                    assert_eq!(
+                        String::from_utf8(Vec::from(buf)).unwrap().as_str(),
+                        "hello read half."
+                    );
+                    break;
+                }
+            }
+        });
+    }
+
+    /// UT test cases for `TcpStream` of split() and write_vectored().
+    ///
+    /// # Brief
+    /// 1. Bind `TcpListener` and wait for `accept()`.
+    /// 2. `TcpStream` connect to listener.
+    /// 3. Split TcpStream into read half and write half with borrowed.
+    /// 4. Write with write half and read with read half.
+    /// 5. Check result is correct.
+    #[test]
+    fn ut_test_borrow_half_vector() {
+        thread::spawn(|| {
+            crate::block_on(async {
+                let addr: SocketAddr = "127.0.0.1:8127".parse().unwrap();
+                let listener = TcpListener::bind(addr).await.unwrap();
+                let (mut stream, _) = listener.accept().await.unwrap();
+                let mut buf = [0; 6];
+                let n = stream.read(&mut buf).await.expect("server read err");
+                assert_eq!(n, 6);
+                assert_eq!(
+                    buf,
+                    [1, 2, 3, 4, 5, 6]
+                );
+                let data1 = [6, 5, 4];
+                let data2 = [3, 2, 1];
+                let slice1 = IoSlice::new(&data1);
+                let slice2 = IoSlice::new(&data2);
+                stream.write_vectored(&[slice1, slice2]).await.unwrap();
+            })
+        });
+
+        crate::block_on(async {
+            let addr: SocketAddr = "127.0.0.1:8127".parse().unwrap();
+            loop {
+                if let Ok(mut stream) = TcpStream::connect(addr).await {
+                    let (mut read_half, mut write_half) = stream.split();
+                    let mut buf = [0; 6];
+                    let data1 = [1, 2, 3];
+                    let data2 = [4, 5, 6];
+                    let slice1 = IoSlice::new(&data1);
+                    let slice2 = IoSlice::new(&data2);
+                    write_half.write_vectored(&[slice1, slice2]).await.unwrap();
+                    write_half.flush().await.unwrap();
+                    write_half.shutdown().await.unwrap();
+
+                    let n = read_half.read(&mut buf).await.expect("server read err");
+                    assert_eq!(n, 6);
+                    assert_eq!(
+                        buf,
+                        [6, 5, 4, 3, 2, 1]
+                    );
+                    break;
+                }
+            }
+        });
+    }
+
+    /// UT test cases for `TcpStream` of into_split() and write_vectored().
+    ///
+    /// # Brief
+    /// 1. Bind `TcpListener` and wait for `accept()`.
+    /// 2. `TcpStream` connect to listener.
+    /// 3. Split TcpStream into read half and write half with owned.
+    /// 4. Write with write half and read with read half.
+    /// 5. Check result is correct.
+    #[test]
+    fn ut_test_owned_half_vector() {
+        thread::spawn(|| {
+            crate::block_on(async {
+                let addr = SocketAddr::new(std::net::IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), 8128);
+                let listener = TcpListener::bind(addr).await.unwrap();
+                let (mut stream, _) = listener.accept().await.unwrap();
+                let mut buf = [0; 6];
+                let n = stream.read(&mut buf).await.expect("server read err");
+                assert_eq!(n, 6);
+                assert_eq!(
+                    buf,
+                    [1, 2, 3, 4, 5, 6]
+                );
+                let data1 = [6, 5, 4];
+                let data2 = [3, 2, 1];
+                let slice1 = IoSlice::new(&data1);
+                let slice2 = IoSlice::new(&data2);
+                stream.write_vectored(&[slice1, slice2]).await.unwrap();
+            })
+        });
+
+        crate::block_on(async {
+            let addr = SocketAddr::new(std::net::IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), 8128);
+            loop {
+                if let Ok(stream) = TcpStream::connect(addr).await {
+                    let (mut read_half, mut write_half) = stream.into_split();
+                    let mut buf = [0; 6];
+                    let data1 = [1, 2, 3];
+                    let data2 = [4, 5, 6];
+                    let slice1 = IoSlice::new(&data1);
+                    let slice2 = IoSlice::new(&data2);
+                    write_half.write_vectored(&[slice1, slice2]).await.unwrap();
+                    write_half.flush().await.unwrap();
+                    write_half.shutdown().await.unwrap();
+
+                    let n = read_half.read(&mut buf).await.expect("server read err");
+                    assert_eq!(n, 6);
+                    assert_eq!(
+                        buf,
+                        [6, 5, 4, 3, 2, 1]
+                    );
                     break;
                 }
             }

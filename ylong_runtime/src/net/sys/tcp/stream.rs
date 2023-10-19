@@ -712,4 +712,38 @@ mod test {
             }
         });
     }
+
+    /// UT test cases for `TcpStream`.
+    ///
+    /// # Brief
+    /// 1. Bind `TcpListener` and wait for `accept()`.
+    /// 2. After accept, try to write buf.
+    /// 2. `TcpStream` connect to listener and try to read buf.
+    /// 4. Check result is correct.
+    #[test]
+    fn ut_tcp_stream_try() {
+        fn test_tcp_server() {
+            crate::block_on(async {
+                let addr = "127.0.0.1:9095";
+                let listener = TcpListener::bind(addr).await.unwrap();
+                let (stream, _) = listener.accept().await.unwrap();
+                stream.writable().await.unwrap();
+                stream.try_write(b"hello").unwrap();
+            })
+        }
+        thread::spawn(test_tcp_server);
+
+        crate::block_on(async {
+            let addr = "127.0.0.1:9095";
+            loop {
+                if let Ok(stream) = TcpStream::connect(addr).await {
+                    let mut buf = vec![0; 5];
+                    stream.readable().await.unwrap();
+                    stream.try_read(&mut buf).unwrap();
+                    assert_eq!(buf, b"hello");
+                    break;
+                }
+            }
+        });
+    }
 }

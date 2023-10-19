@@ -42,6 +42,26 @@ fn sdv_unbounded_send_recv_test() {
 ///
 /// # Brief
 /// 1. Create a unbounded mpsc channel.
+/// 2. Send three values to the receiver then drop.
+/// 3. Receive two values successfully.
+#[test]
+fn sdv_unbounded_send_recv_drop_test() {
+    let (tx, mut rx) = unbounded_channel();
+    let handle = ylong_runtime::spawn(async move {
+        assert_eq!(rx.recv().await, Ok(1));
+        assert_eq!(rx.recv().await, Ok(2));
+    });
+    assert!(tx.send(1).is_ok());
+    assert!(tx.send(2).is_ok());
+    assert!(tx.send(3).is_ok());
+    drop(tx);
+    let _ = ylong_runtime::block_on(handle);
+}
+
+/// SDV test cases for `UnboundedSender`.
+///
+/// # Brief
+/// 1. Create a unbounded mpsc channel.
 /// 2. Try receiving before and after sender sends a value.
 /// 3. Try receiving after sender has been dropped.
 #[test]
@@ -92,6 +112,28 @@ fn sdv_bounded_send_recv_test() {
     ylong_runtime::spawn(async move {
         assert!(tx.send(1).await.is_ok());
         assert!(tx.send(2).await.is_ok());
+    });
+    let _ = ylong_runtime::block_on(handle);
+}
+
+/// SDV test cases for `BoundedSender`.
+///
+/// # Brief
+/// 1. Create a bounded mpsc channel with capacity.
+/// 2. Send three value to the receiver.
+/// 3. Receive two values successfully.
+#[test]
+fn sdv_bounded_send_recv_drop_test() {
+    let (tx, mut rx) = bounded_channel::<i32>(3);
+    let handle = ylong_runtime::spawn(async move {
+        assert_eq!(rx.recv().await, Ok(1));
+        assert_eq!(rx.recv().await, Ok(2));
+    });
+
+    ylong_runtime::spawn(async move {
+        assert!(tx.send(1).await.is_ok());
+        assert!(tx.send(2).await.is_ok());
+        assert!(tx.send(3).await.is_ok());
     });
     let _ = ylong_runtime::block_on(handle);
 }

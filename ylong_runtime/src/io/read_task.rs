@@ -474,3 +474,41 @@ where
         poll_fn(|cx| Pin::new(&mut *self).poll_next_line(cx)).await
     }
 }
+
+#[cfg(all(test, feature = "fs"))]
+mod test {
+    use crate::fs::{File, remove_file};
+    use crate::io::AsyncBufReader;
+    use crate::io::async_write::AsyncWriteExt;
+    use crate::io::async_read::AsyncReadExt;
+
+    /// UT test cases for `io_string_result()`.
+    ///
+    /// # Brief
+    /// 1. Create a file and write non-utf8 chars to it.
+    /// 2. Create a AsyncBufReader.
+    /// 3. Call io_string_result() to translate the content of the file to String.
+    /// 4. Check if the test results are expected errors.
+    #[test]
+    fn ut_io_string_result() {
+        let handle = crate::spawn(async move {
+            let file_path = "foo.txt";
+
+            let mut f = File::create(file_path).await.unwrap();
+            let buf = [0, 159, 146, 150];
+            let n = f.write(&buf).await.unwrap();
+            assert_eq!(n, 4);
+
+            let f = File::open(file_path).await.unwrap();
+            let mut reader = AsyncBufReader::new(f);
+            let mut buf = String::new();
+            let res = reader.read_to_string(&mut buf).await;
+            assert!(res.is_err());
+            assert_eq!(res.unwrap_err().kind(), std::io::ErrorKind::InvalidData);
+
+            let res = remove_file(file_path).await;
+            assert!(res.is_ok());
+        });
+        crate::block_on(handle).expect("failed to block on");
+    }
+}
