@@ -11,22 +11,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::cmp;
 use std::convert::TryInto;
 use std::future::Future;
 use std::pin::Pin;
-use std::ptr::NonNull;
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
-
-cfg_not_ffrt!(
-    use std::sync::Arc;
-    use crate::executor::driver::Handle;
-);
-
-use crate::time::Clock;
-#[cfg(feature = "ffrt")]
-use crate::time::TimeDriver;
 
 const TEN_YEARS: Duration = Duration::from_secs(86400 * 365 * 10);
 
@@ -82,96 +71,192 @@ pub struct Sleep {
     // The time at which the structure should end.
     deadline: Instant,
 
-    // Corresponding Timer structure.
-    timer: Clock,
-
-    #[cfg(not(feature = "ffrt"))]
-    handle: Arc<Handle>,
+    inner: SleepInner,
 }
 
-impl Sleep {
-    // Creates a Sleep structure based on the given deadline.
-    fn new_timeout(deadline: Instant) -> Self {
-        #[cfg(not(feature = "ffrt"))]
-        let handle = Handle::get_handle().expect("sleep new out of worker ctx");
+cfg_ffrt!(
+    use crate::ffrt::ffrt_timer::FfrtTimerEntry;
+    use std::task::Waker;
 
-        #[cfg(feature = "ffrt")]
-        let handle = TimeDriver::get_ref();
-
-        let start_time = handle.start_time();
-        let deadline = cmp::max(deadline, start_time);
-
-        let timer = Clock::new();
-        Self {
-            need_insert: true,
-            deadline,
-            timer,
-            #[cfg(not(feature = "ffrt"))]
-            handle,
-        }
+    struct SleepInner {
+        // ffrt timer handle
+        timer: Option<FfrtTimerEntry>,
+        // the waker to wakeup the timer task
+        waker: Option<*mut Waker>,
     }
 
-    // Returns the deadline of the Sleep
-    pub(crate) fn deadline(&self) -> Instant {
-        self.deadline
-    }
+    // FFRT needs this unsafe impl since `Sleep` has a mut pointer in it.
+    // In non-ffrt environment, `Sleep` auto-derives Sync & Send.
+    unsafe impl Send for Sleep {}
+    unsafe impl Sync for Sleep {}
 
-    // Resets the deadline of the Sleep
-    pub(crate) fn reset(&mut self, new_deadline: Instant) {
-        self.need_insert = true;
-        self.deadline = new_deadline;
-        self.timer.set_result(false);
-    }
-
-    // Cancels the Sleep
-    fn cancel(&mut self) {
-        #[cfg(not(feature = "ffrt"))]
-        let driver = &self.handle;
-        #[cfg(feature = "ffrt")]
-        let driver = TimeDriver::get_ref();
-        driver.timer_cancel(NonNull::from(&self.timer));
-    }
-}
-
-impl Future for Sleep {
-    type Output = ();
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = self.get_mut();
-
-        #[cfg(not(feature = "ffrt"))]
-        let driver = &this.handle;
-        #[cfg(feature = "ffrt")]
-        let driver = TimeDriver::get_ref();
-        if this.need_insert {
-            let ms = this
-                .deadline
-                .checked_duration_since(driver.start_time())
-                .unwrap()
-                .as_millis()
-                .try_into()
-                .unwrap_or(u64::MAX);
-            this.timer.set_expiration(ms);
-            this.timer.set_waker(cx.waker().clone());
-
-            match driver.timer_register(NonNull::from(&this.timer)) {
-                Ok(_) => this.need_insert = false,
-                Err(_) => {
-                    // Even if the insertion fails, there is no need to insert again here,
-                    // it is a timeout clock and needs to be triggered immediately at the next poll.
-                    this.need_insert = false;
-                    this.timer.set_result(true);
+    impl Sleep {
+        // Creates a Sleep structure based on the given deadline.
+        fn new_timeout(deadline: Instant) -> Self {
+            Self {
+                need_insert: true,
+                deadline,
+                inner: SleepInner {
+                    timer: None,
+                    waker: None,
                 }
             }
         }
 
-        if this.timer.result() {
-            Poll::Ready(())
-        } else {
-            Poll::Pending
+        // Resets the deadline of the Sleep
+        pub(crate) fn reset(&mut self, new_deadline: Instant) {
+            self.need_insert = true;
+            self.deadline = new_deadline;
+
+            if let Some(waker) = self.inner.waker.take() {
+                unsafe {
+                    drop(Box::from_raw(waker as *mut Waker));
+                }
+            }
+        }
+
+        // Cancels the Sleep
+        fn cancel(&mut self) {
+            if let Some(timer) = self.inner.timer.take() {
+                timer.timer_deregister();
+            }
+            if let Some(waker) = self.inner.waker.take() {
+                unsafe {
+                    drop(Box::from_raw(waker as *mut Waker));
+                }
+            }
         }
     }
+
+    impl Future for Sleep {
+        type Output = ();
+
+        fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+            let this = self.get_mut();
+
+            if this.need_insert {
+                if let Some(duration) = this.deadline.checked_duration_since(Instant::now()) {
+                    let ms = duration.as_millis()
+                    .try_into()
+                    .unwrap_or(u64::MAX);
+
+                    let waker = Box::new(cx.waker().clone());
+                    let waker_ptr = Box::into_raw(waker);
+
+                    if let Some(waker) = this.inner.waker.take() {
+                        unsafe { drop(Box::from_raw(waker as *mut Waker)); }
+                    }
+
+                    this.inner.waker = Some(waker_ptr);
+                    this.inner.timer = Some(FfrtTimerEntry::timer_register(waker_ptr, ms));
+                    this.need_insert = false;
+                } else {
+                    return Poll::Ready(());
+                }
+            }
+
+            // this unwrap is safe since we have already insert the timer into the entry
+            let timer = this.inner.timer.as_ref().unwrap();
+            if timer.result() {
+                Poll::Ready(())
+            } else {
+                Poll::Pending
+            }
+        }
+    }
+);
+
+impl Sleep {
+    // Returns the deadline of the Sleep
+    pub(crate) fn deadline(&self) -> Instant {
+        self.deadline
+    }
 }
+
+cfg_not_ffrt!(
+    use crate::executor::driver::Handle;
+    use crate::time::Clock;
+    use std::sync::Arc;
+    use std::cmp;
+    use std::ptr::NonNull;
+
+    struct SleepInner {
+        // Corresponding Timer structure.
+        timer: Clock,
+        // Timer driver handle
+        handle: Arc<Handle>,
+    }
+
+    impl Sleep {
+        // Creates a Sleep structure based on the given deadline.
+        fn new_timeout(deadline: Instant) -> Self {
+            let handle = Handle::get_handle().expect("sleep new out of worker ctx");
+
+            let start_time = handle.start_time();
+            let deadline = cmp::max(deadline, start_time);
+
+            let timer = Clock::new();
+            Self {
+                need_insert: true,
+                deadline,
+                inner: SleepInner {
+                    timer,
+                    handle,
+                }
+            }
+        }
+
+        // Resets the deadline of the Sleep
+        pub(crate) fn reset(&mut self, new_deadline: Instant) {
+            self.need_insert = true;
+            self.deadline = new_deadline;
+            self.inner.timer.set_result(false);
+        }
+
+        // Cancels the Sleep
+        fn cancel(&mut self) {
+            let driver = &self.inner.handle;
+            driver.timer_cancel(NonNull::from(&self.inner.timer));
+        }
+    }
+
+    impl Future for Sleep {
+        type Output = ();
+
+        fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+            let this = self.get_mut();
+            let driver = &this.inner.handle;
+
+            if this.need_insert {
+                let ms = this
+                    .deadline
+                    .checked_duration_since(driver.start_time())
+                    .unwrap()
+                    .as_millis()
+                    .try_into()
+                    .unwrap_or(u64::MAX);
+                this.inner.timer.set_expiration(ms);
+                this.inner.timer.set_waker(cx.waker().clone());
+
+                match driver.timer_register(NonNull::from(&this.inner.timer)) {
+                    Ok(_) => this.need_insert = false,
+                    Err(_) => {
+                        // Even if the insertion fails, there is no need to insert again here,
+                        // it is a timeout clock and needs to be triggered immediately at the next poll.
+                        this.need_insert = false;
+                        this.inner.timer.set_result(true);
+                    }
+                }
+            }
+
+            if this.inner.timer.result() {
+                Poll::Ready(())
+            } else {
+                Poll::Pending
+            }
+        }
+    }
+);
 
 impl Drop for Sleep {
     fn drop(&mut self) {

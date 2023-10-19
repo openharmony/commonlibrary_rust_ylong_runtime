@@ -19,8 +19,6 @@ pub(crate) mod blocking_pool;
 #[cfg(feature = "current_thread_runtime")]
 pub(crate) mod current_thread;
 
-#[cfg(all(any(feature = "time", feature = "net"), feature = "ffrt"))]
-pub(crate) mod netpoller;
 use std::future::Future;
 use std::mem::MaybeUninit;
 use std::sync::Once;
@@ -33,7 +31,6 @@ use crate::executor::current_thread::CurrentThreadSpawner;
 use crate::task::TaskBuilder;
 use crate::{JoinHandle, Task};
 cfg_ffrt! {
-    use crate::builder::initialize_ffrt_spawner;
     use crate::ffrt::spawner::spawn;
 }
 cfg_not_ffrt! {
@@ -115,11 +112,8 @@ pub(crate) fn global_default_async() -> &'static Runtime {
                 Err(e) => panic!("initialize runtime failed: {:?}", e),
             };
             #[cfg(feature = "ffrt")]
-            let runtime = match initialize_ffrt_spawner(global_builder.as_ref().unwrap()) {
-                Ok(()) => Runtime {
-                    async_spawner: AsyncHandle::FfrtMultiThread,
-                },
-                Err(e) => panic!("initialize runtime failed: {:?}", e),
+            let runtime = Runtime {
+                async_spawner: AsyncHandle::FfrtMultiThread,
             };
             GLOBAL_DEFAULT_ASYNC = MaybeUninit::new(runtime);
         });

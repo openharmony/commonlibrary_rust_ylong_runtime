@@ -18,6 +18,8 @@
 //! memory validity of pointers within the node. Users need to manage the memory
 //! of the instances associated with each node themselves.
 
+#![cfg_attr(feature = "ffrt", allow(unused))]
+
 use std::ptr::NonNull;
 
 #[derive(Default)]

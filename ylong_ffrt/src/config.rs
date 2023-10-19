@@ -11,12 +11,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use libc::c_uint;
+use libc::{c_uint, c_ulong};
 
 use crate::Qos;
 
 #[link(name = "ffrt")]
 // config.h
 extern "C" {
+    /// Configs the maximum worker number for a specific QoS group
     pub fn ffrt_set_cpu_worker_max_num(qos: Qos, num: c_uint);
+
+    /// Configs the worker thread stack size for a specific QoS group
+    pub fn ffrt_set_worker_stack_size(qos: Qos, num: c_ulong);
 }

@@ -21,10 +21,6 @@ use std::time::{Duration, Instant};
 
 use crate::time::wheel::{TimeOut, Wheel};
 use crate::time::Clock;
-cfg_ffrt! {
-    use std::mem::MaybeUninit;
-    use std::sync::Once;
-}
 
 // Time Driver
 pub(crate) struct TimeDriver {
@@ -37,7 +33,6 @@ pub(crate) struct TimeHandle {
 }
 
 impl TimeDriver {
-    #[cfg(not(feature = "ffrt"))]
     pub(crate) fn initialize() -> (TimeHandle, Arc<TimeDriver>) {
         let driver = Arc::new(TimeDriver {
             start_time: Instant::now(),
@@ -49,23 +44,6 @@ impl TimeDriver {
             },
             driver,
         )
-    }
-
-    #[cfg(feature = "ffrt")]
-    pub(crate) fn get_ref() -> &'static Self {
-        static mut DRIVER: MaybeUninit<TimeDriver> = MaybeUninit::uninit();
-        static ONCE: Once = Once::new();
-
-        unsafe {
-            ONCE.call_once(|| {
-                DRIVER.write(Self {
-                    start_time: Instant::now(),
-                    wheel: Mutex::new(Wheel::new()),
-                });
-            });
-
-            &*DRIVER.as_ptr()
-        }
     }
 
     pub(crate) fn start_time(&self) -> Instant {

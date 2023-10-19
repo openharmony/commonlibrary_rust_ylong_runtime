@@ -12,4 +12,5 @@
 // limitations under the License.
 
 pub mod ffrt_task;
+pub mod ffrt_timer;
 pub mod spawner;

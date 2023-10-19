@@ -13,79 +13,32 @@
 
 #![cfg(all(feature = "time", feature = "sync"))]
 
-use std::collections::HashMap;
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use ylong_runtime::time::{sleep, sleep_until};
 
-type AppId = usize;
+async fn download() {
+    const TOTAL_SIZE: usize = 100 * 1024;
+    const RECV_SIZE: usize = 1024;
 
-struct Manager {
-    map: HashMap<AppId, Arc<Worker>>,
-}
-
-impl Manager {
-    fn new() -> Self {
-        Self {
-            map: HashMap::new(),
+    let mut left = TOTAL_SIZE;
+    loop {
+        let recv = RECV_SIZE;
+        left -= recv;
+        if left == 0 {
+            break;
         }
-    }
-}
-
-struct Task {}
-
-impl Task {
-    async fn download(self) {
-        const TOTAL_SIZE: usize = 100 * 1024;
-        const RECV_SIZE: usize = 1024;
-
-        let mut left = TOTAL_SIZE;
-        loop {
-            let recv = RECV_SIZE;
-            left -= recv;
-            if left == 0 {
-                break;
-            }
-            sleep(Duration::from_millis(50)).await;
-        }
-    }
-}
-
-struct Worker {}
-
-impl Worker {
-    fn new() -> Self {
-        Self {}
-    }
-
-    async fn execute(&self, task: Task) {
-        task.download().await;
+        sleep(Duration::from_millis(50)).await;
     }
 }
 
 async fn simulate() {
-    const APPS_NUM: usize = 10;
-    const TASKS_NUM: usize = 5;
-
-    let mut manager = Manager::new();
-
     let mut handles = Vec::new();
 
-    for i in 0..APPS_NUM {
-        manager
-            .map
-            .entry(i)
-            .or_insert_with(|| Arc::new(Worker::new()));
-        let worker = manager.map.get(&i).unwrap();
-
-        for _ in 0..TASKS_NUM {
-            let task = Task {};
-            let worker = worker.clone();
-            handles.push(ylong_runtime::spawn(async move {
-                worker.execute(task).await;
-            }));
-        }
+    for _ in 0..50 {
+        handles.push(ylong_runtime::spawn(async move {
+            download().await;
+        }));
     }
 
     for handle in handles {

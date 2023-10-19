@@ -177,3 +177,86 @@ fn sdv_tcp_drop_out_context() {
     drop(server);
     drop(client);
 }
+
+/// SDV case for canceling TcpStream and then reconnecting on the same port
+///
+/// # Breif
+/// 1. Starts a TCP connection using port 8201
+/// 2. Cancels the TCP connection before its finished
+/// 3. Starts another TCP connection using the same port 8201
+/// 4. checks if the connection is successful.
+#[cfg(feature = "time")]
+#[test]
+fn sdv_tcp_cancel() {
+    use std::time::Duration;
+
+    use ylong_runtime::time::sleep;
+
+    let server = ylong_runtime::spawn(async move {
+        let addr = "127.0.0.1:8201";
+        let tcp = TcpListener::bind(addr).await.unwrap();
+        let (mut stream, _) = tcp.accept().await.unwrap();
+        sleep(Duration::from_secs(10000)).await;
+
+        let mut buf = [0; 100];
+        stream.read_exact(&mut buf).await.unwrap();
+        assert_eq!(buf, [3; 100]);
+
+        let buf = [2; 100];
+        stream.write_all(&buf).await.unwrap();
+    });
+
+    let client = ylong_runtime::spawn(async move {
+        let addr = "127.0.0.1:8201";
+        let mut tcp = TcpStream::connect(addr).await;
+        while tcp.is_err() {
+            tcp = TcpStream::connect(addr).await;
+        }
+        sleep(Duration::from_secs(10000)).await;
+        let mut tcp = tcp.unwrap();
+        let buf = [3; 100];
+        tcp.write_all(&buf).await.unwrap();
+
+        let mut buf = [0; 100];
+        tcp.read_exact(&mut buf).await.unwrap();
+        assert_eq!(buf, [2; 100]);
+    });
+
+    server.cancel();
+    client.cancel();
+    let ret = ylong_runtime::block_on(server);
+    assert!(ret.is_err());
+    let ret = ylong_runtime::block_on(client);
+    assert!(ret.is_err());
+
+    let server = ylong_runtime::spawn(async move {
+        let addr = "127.0.0.1:8201";
+        let tcp = TcpListener::bind(addr).await.unwrap();
+        let (mut stream, _) = tcp.accept().await.unwrap();
+
+        let mut buf = [0; 100];
+        stream.read_exact(&mut buf).await.unwrap();
+        assert_eq!(buf, [3; 100]);
+
+        let buf = [2; 100];
+        stream.write_all(&buf).await.unwrap();
+    });
+
+    let client = ylong_runtime::spawn(async move {
+        let addr = "127.0.0.1:8201";
+        let mut tcp = TcpStream::connect(addr).await;
+        while tcp.is_err() {
+            tcp = TcpStream::connect(addr).await;
+        }
+        let mut tcp = tcp.unwrap();
+        let buf = [3; 100];
+        tcp.write_all(&buf).await.unwrap();
+
+        let mut buf = [0; 100];
+        tcp.read_exact(&mut buf).await.unwrap();
+        assert_eq!(buf, [2; 100]);
+    });
+
+    ylong_runtime::block_on(server).unwrap();
+    ylong_runtime::block_on(client).unwrap();
+}

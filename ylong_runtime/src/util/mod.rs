@@ -24,5 +24,6 @@ pub(crate) mod linked_list;
 #[cfg(feature = "sync")]
 pub(crate) mod slots;
 
+#[cfg(not(feature = "ffrt"))]
 pub(crate) mod core_affinity;
 pub(crate) mod num_cpus;
