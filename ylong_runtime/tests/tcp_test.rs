@@ -74,7 +74,7 @@ fn sdv_tcp_global_runtime() {
         loop {
             let mut buf = [0_u8; 12];
             let _ = match socket.read(&mut buf).await {
-                Ok(n) if n == 0 => break,
+                Ok(0) => break,
                 Ok(n) => {
                     assert_eq!(
                         std::str::from_utf8(&buf).unwrap(),

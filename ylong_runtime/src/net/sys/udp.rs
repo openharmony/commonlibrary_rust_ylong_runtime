@@ -1477,10 +1477,14 @@ mod tests {
             sender.set_multicast_ttl_v4(42).unwrap();
             assert_eq!(sender.multicast_ttl_v4().unwrap(), 42);
 
-            let multi_addr = Ipv4Addr::new(224, 0, 0, 1);
+            let multi_addr = Ipv4Addr::new(224, 0, 0, 110);
             let interface = Ipv4Addr::new(0, 0, 0, 0);
-            sender.join_multicast_v4(&multi_addr, &interface).expect("Cannot join the multicast group");
-            sender.leave_multicast_v4(&multi_addr, &interface).expect("Cannot leave the multicast group");
+            sender
+                .join_multicast_v4(&multi_addr, &interface)
+                .expect("Cannot join the multicast group");
+            sender
+                .leave_multicast_v4(&multi_addr, &interface)
+                .expect("Cannot leave the multicast group");
 
             let connected_sender = sender.connect(receiver_addr).await.unwrap();
             let _connected_receiver = receiver.connect(sender_addr).await.unwrap();
@@ -1493,8 +1497,12 @@ mod tests {
             connected_sender.set_multicast_ttl_v4(42).unwrap();
             assert_eq!(connected_sender.multicast_ttl_v4().unwrap(), 42);
 
-            connected_sender.join_multicast_v4(&multi_addr, &interface).expect("Cannot join the multicast group");
-            connected_sender.leave_multicast_v4(&multi_addr, &interface).expect("Cannot leave the multicast group");
+            connected_sender
+                .join_multicast_v4(&multi_addr, &interface)
+                .expect("Cannot join the multicast group");
+            connected_sender
+                .leave_multicast_v4(&multi_addr, &interface)
+                .expect("Cannot leave the multicast group");
         });
     }
 
@@ -1527,10 +1535,14 @@ mod tests {
             sender.set_multicast_loop_v6(false).unwrap();
             assert!(!sender.multicast_loop_v6().unwrap());
 
-            let multi_addr = Ipv6Addr::new(0xFF02, 0, 0, 0, 0, 0, 0, 1);
+            let multi_addr = Ipv6Addr::new(0xFF02, 0, 0, 0, 0, 0, 0, 110);
             let interface = 0_u32;
-            sender.join_multicast_v6(&multi_addr, interface).expect("Cannot join the multicast group");
-            sender.leave_multicast_v6(&multi_addr, interface).expect("Cannot leave the multicast group");
+            sender
+                .join_multicast_v6(&multi_addr, interface)
+                .expect("Cannot join the multicast group");
+            sender
+                .leave_multicast_v6(&multi_addr, interface)
+                .expect("Cannot leave the multicast group");
 
             let connected_sender = sender.connect(receiver_addr).await.unwrap();
             let _connected_receiver = receiver.connect(sender_addr).await.unwrap();
@@ -1538,8 +1550,12 @@ mod tests {
             connected_sender.set_multicast_loop_v6(false).unwrap();
             assert!(!connected_sender.multicast_loop_v6().unwrap());
 
-            connected_sender.join_multicast_v6(&multi_addr, interface).expect("Cannot join the multicast group");
-            connected_sender.leave_multicast_v6(&multi_addr, interface).expect("Cannot leave the multicast group");
+            connected_sender
+                .join_multicast_v6(&multi_addr, interface)
+                .expect("Cannot join the multicast group");
+            connected_sender
+                .leave_multicast_v6(&multi_addr, interface)
+                .expect("Cannot leave the multicast group");
         });
     }
 
@@ -1555,11 +1571,21 @@ mod tests {
         let sender_addr = "127.0.0.1:8083";
         let receiver_addr = "127.0.0.1:8084";
         let handle = spawn(async move {
-            let sender = UdpSocket::bind(sender_addr).await.expect("Bind Socket Failed");
-            let receiver = UdpSocket::bind(receiver_addr).await.expect("Bind Socket Failed");
+            let sender = UdpSocket::bind(sender_addr)
+                .await
+                .expect("Bind Socket Failed");
+            let receiver = UdpSocket::bind(receiver_addr)
+                .await
+                .expect("Bind Socket Failed");
 
-            let connected_sender = sender.connect(receiver_addr).await.expect("Connect Socket Failed");
-            let connected_receiver = receiver.connect(sender_addr).await.expect("Connect Socket Failed");
+            let connected_sender = sender
+                .connect(receiver_addr)
+                .await
+                .expect("Connect Socket Failed");
+            let connected_receiver = receiver
+                .connect(sender_addr)
+                .await
+                .expect("Connect Socket Failed");
 
             let n = poll_fn(|cx| connected_sender.poll_send(cx, b"Hello"))
                 .await
@@ -1591,8 +1617,12 @@ mod tests {
         let receiver_addr = "127.0.0.1:8088";
         let receiver_addr_socket = "127.0.0.1:8088".parse().unwrap();
         let handle = spawn(async move {
-            let sender = UdpSocket::bind(sender_addr).await.expect("Bind Socket Failed");
-            let receiver = UdpSocket::bind(receiver_addr).await.expect("Bind Socket Failed");
+            let sender = UdpSocket::bind(sender_addr)
+                .await
+                .expect("Bind Socket Failed");
+            let receiver = UdpSocket::bind(receiver_addr)
+                .await
+                .expect("Bind Socket Failed");
 
             let n = poll_fn(|cx| sender.poll_send_to(cx, b"Hello", receiver_addr_socket))
                 .await
@@ -1622,7 +1652,9 @@ mod tests {
         let local_addr = "127.0.0.1:8091";
 
         let handle = spawn(async move {
-            let broadcast_socket = UdpSocket::bind(local_addr).await.expect("Bind Socket Failed");
+            let broadcast_socket = UdpSocket::bind(local_addr)
+                .await
+                .expect("Bind Socket Failed");
             broadcast_socket
                 .set_broadcast(true)
                 .expect("set_broadcast failed");
@@ -1655,8 +1687,13 @@ mod tests {
         let remote_addr = "127.0.0.1:8094";
 
         let handle = spawn(async move {
-            let sock = UdpSocket::bind(local_addr).await.expect("Bind Socket Failed");
-            let connected_sock = sock.connect(remote_addr).await.expect("Connect Socket Failed");
+            let sock = UdpSocket::bind(local_addr)
+                .await
+                .expect("Bind Socket Failed");
+            let connected_sock = sock
+                .connect(remote_addr)
+                .await
+                .expect("Connect Socket Failed");
             let local_addr1 = connected_sock.local_addr().expect("local_addr failed");
             assert_eq!(local_addr1, local_addr.parse().unwrap());
         });
@@ -1675,8 +1712,13 @@ mod tests {
         let local_addr = "127.0.0.1:8095";
         let peer_addr = "127.0.0.1:8096";
         let handle = spawn(async move {
-            let sock = UdpSocket::bind(local_addr).await.expect("Bind Socket Failed");
-            let connected_sock = sock.connect(peer_addr).await.expect("Connect Socket Failed");
+            let sock = UdpSocket::bind(local_addr)
+                .await
+                .expect("Bind Socket Failed");
+            let connected_sock = sock
+                .connect(peer_addr)
+                .await
+                .expect("Connect Socket Failed");
             assert_eq!(
                 connected_sock.peer_addr().expect("peer_addr failed"),
                 peer_addr.parse().unwrap()
@@ -1688,12 +1730,19 @@ mod tests {
     macro_rules! socket_addr {
         ($sender_addr:ident, $receiver_addr:ident) => {
             let handle = spawn(async move {
-                let sender = UdpSocket::bind($sender_addr).await.expect("Bind Socket Failed");
-                let connected_sender = sender.connect($receiver_addr).await.expect("Connect Socket Failed");
+                let sender = UdpSocket::bind($sender_addr)
+                    .await
+                    .expect("Bind Socket Failed");
+                let connected_sender = sender
+                    .connect($receiver_addr)
+                    .await
+                    .expect("Connect Socket Failed");
 
-                let n = connected_sender.send(b"Hello").await.expect("send message Failed");
+                let n = connected_sender
+                    .send(b"Hello")
+                    .await
+                    .expect("send message Failed");
                 assert_eq!(n, 5);
-
             });
             block_on(handle).expect("block_on failed");
         };
@@ -1781,7 +1830,8 @@ mod tests {
     /// # Brief
     /// 1. Create UdpSocket.
     /// 2. Sender calls send_to() to send message to the specified address.
-    /// 3. Receiver calls peek_from() to receive message and return the number of bytes peeked.
+    /// 3. Receiver calls peek_from() to receive message and return the number
+    ///    of bytes peeked.
     /// 4. Check if the test results are correct.
     #[test]
     fn ut_send_to_peek_from() {
@@ -1789,14 +1839,24 @@ mod tests {
         let receiver_addr = "127.0.0.1:8126";
 
         let handle = spawn(async move {
-            let sender = UdpSocket::bind(sender_addr).await.expect("Bind Socket Failed");
-            let receiver = UdpSocket::bind(receiver_addr).await.expect("Bind Socket Failed");
+            let sender = UdpSocket::bind(sender_addr)
+                .await
+                .expect("Bind Socket Failed");
+            let receiver = UdpSocket::bind(receiver_addr)
+                .await
+                .expect("Bind Socket Failed");
 
             let buf = [2; 6];
-            sender.send_to(&buf, receiver_addr).await.expect("Send data Failed");
+            sender
+                .send_to(&buf, receiver_addr)
+                .await
+                .expect("Send data Failed");
 
             let mut buf = [0; 10];
-            let (number_of_bytes, _) = receiver.peek_from(&mut buf).await.expect("Didn't receive data");
+            let (number_of_bytes, _) = receiver
+                .peek_from(&mut buf)
+                .await
+                .expect("Didn't receive data");
 
             assert_eq!(number_of_bytes, 6);
         });
@@ -1810,7 +1870,8 @@ mod tests {
     /// 1. Create UdpSocket.
     /// 2. Sender calls send_to() to send message to the specified address.
     /// 3. Receiver calls readable() to wait for the socket to become readable.
-    /// 4. Receiver calls try_peek_from() to receive message and return the number of bytes peeked.
+    /// 4. Receiver calls try_peek_from() to receive message and return the
+    ///    number of bytes peeked.
     /// 5. Check if the test results are correct.
     #[test]
     fn ut_send_to_try_peek_from() {
@@ -1818,16 +1879,26 @@ mod tests {
         let receiver_addr = "127.0.0.1:8118";
 
         let handle = spawn(async move {
-            let sender = UdpSocket::bind(sender_addr).await.expect("Bind Socket Failed");
-            let receiver = UdpSocket::bind(receiver_addr).await.expect("Bind Socket Failed");
+            let sender = UdpSocket::bind(sender_addr)
+                .await
+                .expect("Bind Socket Failed");
+            let receiver = UdpSocket::bind(receiver_addr)
+                .await
+                .expect("Bind Socket Failed");
 
             let buf = [2; 6];
-            let number_of_bytes = sender.send_to(&buf, receiver_addr).await.expect("Send data Failed");
+            let number_of_bytes = sender
+                .send_to(&buf, receiver_addr)
+                .await
+                .expect("Send data Failed");
             assert_eq!(number_of_bytes, 6);
 
             let mut buf = [0; 10];
             receiver.readable().await.expect("Receiver isn't readable");
-            let (number_of_bytes, _) = receiver.try_peek_from(&mut buf).await.expect("Didn't receive data");
+            let (number_of_bytes, _) = receiver
+                .try_peek_from(&mut buf)
+                .await
+                .expect("Didn't receive data");
             assert_eq!(number_of_bytes, 6);
         });
 
@@ -1848,8 +1919,12 @@ mod tests {
         let receiver_addr = "127.0.0.1:8120";
         let receiver_addr_socket = "127.0.0.1:8120".parse().unwrap();
         let handle = spawn(async move {
-            let sender = UdpSocket::bind(sender_addr).await.expect("Bind Socket Failed");
-            let receiver = UdpSocket::bind(receiver_addr).await.expect("Bind Socket Failed");
+            let sender = UdpSocket::bind(sender_addr)
+                .await
+                .expect("Bind Socket Failed");
+            let receiver = UdpSocket::bind(receiver_addr)
+                .await
+                .expect("Bind Socket Failed");
 
             let n = poll_fn(|cx| sender.poll_send_to(cx, b"Hello", receiver_addr_socket))
                 .await
@@ -1881,15 +1956,25 @@ mod tests {
         let receiver_addr = "127.0.0.1:8122";
 
         let handle = spawn(async move {
-            let sender = UdpSocket::bind(sender_addr).await.expect("Bind Socket Failed");
-            let receiver = UdpSocket::bind(receiver_addr).await.expect("Bind Socket Failed");
+            let sender = UdpSocket::bind(sender_addr)
+                .await
+                .expect("Bind Socket Failed");
+            let receiver = UdpSocket::bind(receiver_addr)
+                .await
+                .expect("Bind Socket Failed");
             let connect_socket = receiver.connect(sender_addr).await.unwrap();
 
             let send_buf = [2; 6];
-            sender.send_to(&send_buf, receiver_addr).await.expect("Send data Failed");
+            sender
+                .send_to(&send_buf, receiver_addr)
+                .await
+                .expect("Send data Failed");
 
             let mut buf = [0; 10];
-            let number_of_bytes = connect_socket.peek(&mut buf).await.expect("Didn't receive data");
+            let number_of_bytes = connect_socket
+                .peek(&mut buf)
+                .await
+                .expect("Didn't receive data");
 
             assert_eq!(number_of_bytes, 6);
         });
@@ -1903,7 +1988,8 @@ mod tests {
     /// 1. Create UdpSocket.
     /// 2. Sender calls send_to() to send message to the specified address.
     /// 3. Receiver calls connect() to create a ConnectedUdpSocket.
-    /// 4. ConnectedUdpSocket waits to be readable, then calls try_peek() to receive message.
+    /// 4. ConnectedUdpSocket waits to be readable, then calls try_peek() to
+    ///    receive message.
     /// 5. Check if the test results are correct.
     #[test]
     fn ut_connected_try_peek() {
@@ -1911,16 +1997,25 @@ mod tests {
         let receiver_addr = "127.0.0.1:8124";
 
         let handle = spawn(async move {
-            let sender = UdpSocket::bind(sender_addr).await.expect("Bind Socket Failed");
-            let receiver = UdpSocket::bind(receiver_addr).await.expect("Bind Socket Failed");
+            let sender = UdpSocket::bind(sender_addr)
+                .await
+                .expect("Bind Socket Failed");
+            let receiver = UdpSocket::bind(receiver_addr)
+                .await
+                .expect("Bind Socket Failed");
             let connect_socket = receiver.connect(sender_addr).await.unwrap();
 
             let send_buf = [2; 6];
-            sender.send_to(&send_buf, receiver_addr).await.expect("Send data Failed");
+            sender
+                .send_to(&send_buf, receiver_addr)
+                .await
+                .expect("Send data Failed");
 
             let mut buf = [0; 10];
             connect_socket.readable().await.unwrap();
-            let number_of_bytes = connect_socket.try_peek(&mut buf).expect("Didn't receive data");
+            let number_of_bytes = connect_socket
+                .try_peek(&mut buf)
+                .expect("Didn't receive data");
 
             assert_eq!(number_of_bytes, 6);
         });

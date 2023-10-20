@@ -477,17 +477,18 @@ where
 
 #[cfg(all(test, feature = "fs"))]
 mod test {
-    use crate::fs::{File, remove_file};
-    use crate::io::AsyncBufReader;
-    use crate::io::async_write::AsyncWriteExt;
+    use crate::fs::{remove_file, File};
     use crate::io::async_read::AsyncReadExt;
+    use crate::io::async_write::AsyncWriteExt;
+    use crate::io::AsyncBufReader;
 
     /// UT test cases for `io_string_result()`.
     ///
     /// # Brief
     /// 1. Create a file and write non-utf8 chars to it.
     /// 2. Create a AsyncBufReader.
-    /// 3. Call io_string_result() to translate the content of the file to String.
+    /// 3. Call io_string_result() to translate the content of the file to
+    ///    String.
     /// 4. Check if the test results are expected errors.
     #[test]
     fn ut_io_string_result() {

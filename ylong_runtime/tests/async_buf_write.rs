@@ -151,7 +151,6 @@ fn sdv_buf_writer_seek() {
     assert!(fs::remove_file("buf_writer_seek_file").is_ok());
 }
 
-
 /// SDV test cases for AsyncBufWriter `write_vectored`
 ///
 /// # Brief

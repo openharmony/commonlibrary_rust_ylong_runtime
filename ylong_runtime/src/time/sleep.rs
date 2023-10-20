@@ -59,10 +59,9 @@ pub fn sleep(duration: Duration) -> Sleep {
     }
 }
 
-/// [`Sleep`](Sleep) is a structure that implements Future.
+/// A structure that implements Future. returned by func [`sleep`].
 ///
-/// [`Sleep`](Sleep) will be returned by func ['sleep'](sleep).
-///
+/// [`sleep`]: sleep
 /// # Examples
 ///
 /// ```

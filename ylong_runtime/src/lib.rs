@@ -13,6 +13,7 @@
 
 //! # ylong_runtime
 //! A runtime for writing IO-bounded and CPU-bounded applications.
+#![deny(missing_docs)]
 
 #[cfg(all(
     feature = "ffrt",
