@@ -99,7 +99,7 @@ async fn simulate() {
 /// 1. Creates multi threads and multi timers.
 /// 2. Checks if the test results are correct.
 #[test]
-fn test_multi_timer() {
+fn sdv_multi_timer() {
     ylong_runtime::block_on(simulate());
 }
 
