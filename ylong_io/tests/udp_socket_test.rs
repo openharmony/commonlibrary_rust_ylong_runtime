@@ -23,7 +23,7 @@ use ylong_io::UdpSocket;
 /// 3. Receiver receives message.
 /// 4. Check if the test results are correct.
 #[test]
-fn test_send_recv() {
+fn sdv_send_recv() {
     let sender_addr = "127.0.0.1:8081".parse().unwrap();
     let receiver_addr = "127.0.0.1:8082".parse().unwrap();
 
@@ -83,7 +83,7 @@ fn test_send_recv() {
 /// 3. Receiver receives message and return the address the message from.
 /// 4. Check if the test results are correct.
 #[test]
-fn test_send_to_recv_from() {
+fn sdv_send_to_recv_from() {
     let sender_addr = "127.0.0.1:8085".parse().unwrap();
     let receiver_addr = "127.0.0.1:8086".parse().unwrap();
 
