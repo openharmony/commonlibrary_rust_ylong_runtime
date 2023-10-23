@@ -304,13 +304,13 @@ mod tests {
         list.push_front(node2_ptr);
         list.push_front(node3_ptr);
         unsafe {
-            assert!(list.remove(node3_ptr).is_some());
+            assert_eq!(get_val(list.remove(node3_ptr).unwrap()), 3);
             assert!(list.remove(node3_ptr).is_none());
             assert_eq!(Some(node1_ptr), node2.node.next);
             assert_eq!(Some(node2_ptr), node1.node.prev);
-            assert!(list.remove(node1_ptr).is_some());
+            assert_eq!(get_val(list.remove(node1_ptr).unwrap()), 1);
             assert!(list.remove(node1_ptr).is_none());
-            assert!(list.remove(node2_ptr).is_some());
+            assert_eq!(get_val(list.remove(node2_ptr).unwrap()), 2);
             assert!(list.remove(node2_ptr).is_none());
         }
     }

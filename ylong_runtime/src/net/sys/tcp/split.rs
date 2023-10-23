@@ -114,12 +114,12 @@ impl AsyncWrite for SplitWriteHalf {
 
 #[cfg(test)]
 mod test {
-    use std::net::{SocketAddr, Ipv6Addr};
+    use std::io::IoSlice;
+    use std::net::{Ipv6Addr, SocketAddr};
     use std::thread;
 
     use crate::io::{AsyncReadExt, AsyncWriteExt};
     use crate::net::{TcpListener, TcpStream};
-    use std::io::IoSlice;
 
     /// UT test cases for `TcpStream` of split().
     ///
@@ -231,10 +231,7 @@ mod test {
                 let mut buf = [0; 6];
                 let n = stream.read(&mut buf).await.expect("server read err");
                 assert_eq!(n, 6);
-                assert_eq!(
-                    buf,
-                    [1, 2, 3, 4, 5, 6]
-                );
+                assert_eq!(buf, [1, 2, 3, 4, 5, 6]);
                 let data1 = [6, 5, 4];
                 let data2 = [3, 2, 1];
                 let slice1 = IoSlice::new(&data1);
@@ -259,10 +256,7 @@ mod test {
 
                     let n = read_half.read(&mut buf).await.expect("server read err");
                     assert_eq!(n, 6);
-                    assert_eq!(
-                        buf,
-                        [6, 5, 4, 3, 2, 1]
-                    );
+                    assert_eq!(buf, [6, 5, 4, 3, 2, 1]);
                     break;
                 }
             }
@@ -281,16 +275,16 @@ mod test {
     fn ut_test_owned_half_vector() {
         thread::spawn(|| {
             crate::block_on(async {
-                let addr = SocketAddr::new(std::net::IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), 8128);
+                let addr = SocketAddr::new(
+                    std::net::IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)),
+                    8128,
+                );
                 let listener = TcpListener::bind(addr).await.unwrap();
                 let (mut stream, _) = listener.accept().await.unwrap();
                 let mut buf = [0; 6];
                 let n = stream.read(&mut buf).await.expect("server read err");
                 assert_eq!(n, 6);
-                assert_eq!(
-                    buf,
-                    [1, 2, 3, 4, 5, 6]
-                );
+                assert_eq!(buf, [1, 2, 3, 4, 5, 6]);
                 let data1 = [6, 5, 4];
                 let data2 = [3, 2, 1];
                 let slice1 = IoSlice::new(&data1);
@@ -300,7 +294,10 @@ mod test {
         });
 
         crate::block_on(async {
-            let addr = SocketAddr::new(std::net::IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), 8128);
+            let addr = SocketAddr::new(
+                std::net::IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)),
+                8128,
+            );
             loop {
                 if let Ok(stream) = TcpStream::connect(addr).await {
                     let (mut read_half, mut write_half) = stream.into_split();
@@ -315,10 +312,7 @@ mod test {
 
                     let n = read_half.read(&mut buf).await.expect("server read err");
                     assert_eq!(n, 6);
-                    assert_eq!(
-                        buf,
-                        [6, 5, 4, 3, 2, 1]
-                    );
+                    assert_eq!(buf, [6, 5, 4, 3, 2, 1]);
                     break;
                 }
             }

@@ -49,9 +49,9 @@ where
     Timeout::new(future, sleep)
 }
 
-/// [`Timeout`](Timeout) is a structure that implements Future.
+/// A structure that implements Future. returned by func [`timeout`].
 ///
-/// [`Timeout`](Timeout) will be returned by func ['timeout'](timeout).
+/// [`timeout`]: timeout
 pub struct Timeout<T> {
     value: T,
     sleep: Sleep,
