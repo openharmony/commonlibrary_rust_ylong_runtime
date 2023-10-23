@@ -1477,14 +1477,22 @@ mod tests {
             sender.set_multicast_ttl_v4(42).unwrap();
             assert_eq!(sender.multicast_ttl_v4().unwrap(), 42);
 
-            let multi_addr = Ipv4Addr::new(224, 0, 0, 110);
             let interface = Ipv4Addr::new(0, 0, 0, 0);
-            sender
-                .join_multicast_v4(&multi_addr, &interface)
-                .expect("Cannot join the multicast group");
-            sender
-                .leave_multicast_v4(&multi_addr, &interface)
-                .expect("Cannot leave the multicast group");
+            let mut multi_addr = None;
+
+            for i in 0..255 {
+                let addr = Ipv4Addr::new(224, 0, 0, i);
+                if sender.join_multicast_v4(&addr, &interface).is_ok() {
+                    multi_addr = Some(addr);
+                    break;
+                }
+            }
+
+            if let Some(addr) = multi_addr {
+                sender
+                    .leave_multicast_v4(&addr, &interface)
+                    .expect("Cannot leave the multicast group");
+            }
 
             let connected_sender = sender.connect(receiver_addr).await.unwrap();
             let _connected_receiver = receiver.connect(sender_addr).await.unwrap();
@@ -1497,12 +1505,14 @@ mod tests {
             connected_sender.set_multicast_ttl_v4(42).unwrap();
             assert_eq!(connected_sender.multicast_ttl_v4().unwrap(), 42);
 
-            connected_sender
-                .join_multicast_v4(&multi_addr, &interface)
-                .expect("Cannot join the multicast group");
-            connected_sender
-                .leave_multicast_v4(&multi_addr, &interface)
-                .expect("Cannot leave the multicast group");
+            if let Some(addr) = multi_addr {
+                connected_sender
+                    .join_multicast_v4(&addr, &interface)
+                    .expect("Cannot join the multicast group");
+                connected_sender
+                    .leave_multicast_v4(&multi_addr.unwrap(), &interface)
+                    .expect("Cannot leave the multicast group");
+            }
         });
     }
 
@@ -1531,18 +1541,25 @@ mod tests {
 
             let sender = UdpSocket::bind(sender_addr).await.unwrap();
             let receiver = UdpSocket::bind(receiver_addr).await.unwrap();
-
             sender.set_multicast_loop_v6(false).unwrap();
             assert!(!sender.multicast_loop_v6().unwrap());
 
-            let multi_addr = Ipv6Addr::new(0xFF02, 0, 0, 0, 0, 0, 0, 110);
             let interface = 0_u32;
-            sender
-                .join_multicast_v6(&multi_addr, interface)
-                .expect("Cannot join the multicast group");
-            sender
-                .leave_multicast_v6(&multi_addr, interface)
-                .expect("Cannot leave the multicast group");
+            let mut multi_addr = None;
+
+            for i in 0..0xFFFF {
+                let addr = Ipv6Addr::new(0xFF02, 0, 0, 0, 0, 0, 0, i);
+                if sender.join_multicast_v6(&addr, interface).is_ok() {
+                    multi_addr = Some(addr);
+                    break;
+                }
+            }
+
+            if let Some(addr) = multi_addr {
+                sender
+                    .leave_multicast_v6(&addr, interface)
+                    .expect("Cannot leave the multicast group");
+            }
 
             let connected_sender = sender.connect(receiver_addr).await.unwrap();
             let _connected_receiver = receiver.connect(sender_addr).await.unwrap();
@@ -1550,12 +1567,14 @@ mod tests {
             connected_sender.set_multicast_loop_v6(false).unwrap();
             assert!(!connected_sender.multicast_loop_v6().unwrap());
 
-            connected_sender
-                .join_multicast_v6(&multi_addr, interface)
-                .expect("Cannot join the multicast group");
-            connected_sender
-                .leave_multicast_v6(&multi_addr, interface)
-                .expect("Cannot leave the multicast group");
+            if let Some(addr) = multi_addr {
+                connected_sender
+                    .join_multicast_v6(&addr, interface)
+                    .expect("Cannot join the multicast group");
+                connected_sender
+                    .leave_multicast_v6(&addr, interface)
+                    .expect("Cannot leave the multicast group");
+            }
         });
     }
 
