@@ -19,11 +19,11 @@ use std::ptr::NonNull;
 use std::sync::Weak;
 use std::task::{Context, Poll, Waker};
 
+use crate::error::ScheduleError;
 use crate::executor::Schedule;
 use crate::task::state::TaskState;
 use crate::task::task_handle::TaskHandle;
 use crate::task::{TaskBuilder, VirtualTableType};
-use crate::ScheduleError;
 
 cfg_ffrt! {
     use crate::ffrt::ffrt_task::FfrtTaskCtx;

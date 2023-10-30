@@ -28,10 +28,9 @@ use super::{worker, Schedule};
 use crate::builder::multi_thread_builder::MultiThreadBuilder;
 use crate::builder::CallbackHook;
 use crate::fastrand::fast_random;
-use crate::task::{Task, TaskBuilder, VirtualTableType};
+use crate::task::{JoinHandle, Task, TaskBuilder, VirtualTableType};
 use crate::util::core_affinity::set_current_affinity;
 use crate::util::num_cpus::get_cpu_num;
-use crate::JoinHandle;
 
 const ASYNC_THREAD_QUIT_WAIT_TIME: Duration = Duration::from_secs(3);
 pub(crate) const GLOBAL_POLL_INTERVAL: u8 = 61;

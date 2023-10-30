@@ -26,7 +26,7 @@ use std::task::{Context, Poll};
 use crate::fs::{async_op, poll_ready};
 use crate::futures::poll_fn;
 use crate::spawn::spawn_blocking;
-use crate::{JoinHandle, TaskBuilder};
+use crate::task::{JoinHandle, TaskBuilder};
 
 const BLOCK_SIZE: usize = 32;
 

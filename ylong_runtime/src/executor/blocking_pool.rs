@@ -23,8 +23,8 @@ use std::time::Duration;
 use crate::builder::{CallbackHook, CommonBuilder};
 use crate::error::{ErrorKind, ScheduleError};
 use crate::executor::PlaceholderScheduler;
-use crate::task::{TaskBuilder, VirtualTableType};
-use crate::{task, JoinHandle};
+use crate::task;
+use crate::task::{JoinHandle, TaskBuilder, VirtualTableType};
 
 pub(crate) const BLOCKING_THREAD_QUIT_WAIT_TIME: Duration = Duration::from_secs(3);
 

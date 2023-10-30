@@ -21,8 +21,7 @@
 use std::future::Future;
 
 use crate::spawn::{spawn_async, spawn_blocking};
-use crate::task::Qos;
-use crate::JoinHandle;
+use crate::task::{JoinHandle, Qos};
 
 /// Tasks attribute
 #[derive(Clone)]

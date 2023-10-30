@@ -21,10 +21,10 @@ use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 
+use crate::error::ScheduleError;
 use crate::spawn::spawn_async;
 use crate::task::join_handle::CancelHandle;
-use crate::task::Qos;
-use crate::{JoinHandle, ScheduleError, TaskBuilder};
+use crate::task::{JoinHandle, Qos, TaskBuilder};
 
 /// A collection of tasks get spawned on a Ylong runtime
 ///
