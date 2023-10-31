@@ -337,7 +337,7 @@ mod test {
         use crate::time::TimeDriver;
         use crate::time::{sleep, timeout};
         use crate::net::UdpSocket;
-        use crate::JoinHandle;
+        use crate::task::JoinHandle;
         use std::net::SocketAddr;
         use std::time::Duration;
     );

@@ -134,3 +134,32 @@ impl Drop for Task {
         self.0.drop_ref()
     }
 }
+
+/// Using the default task setting, spawns a task onto the global runtime.
+pub fn spawn<T, R>(task: T) -> JoinHandle<R>
+where
+    T: Future<Output = R>,
+    T: Send + 'static,
+    R: Send + 'static,
+{
+    TaskBuilder::new().spawn(task)
+}
+
+/// Using the default task setting, spawns a blocking task.
+pub fn spawn_blocking<T, R>(task: T) -> JoinHandle<R>
+where
+    T: FnOnce() -> R,
+    T: Send + 'static,
+    R: Send + 'static,
+{
+    TaskBuilder::new().spawn_blocking(task)
+}
+
+/// Blocks the current thread until the `Future` passed in is completed.
+pub fn block_on<T>(task: T) -> T::Output
+where
+    T: Future,
+{
+    let rt = crate::executor::global_default_async();
+    rt.block_on(task)
+}

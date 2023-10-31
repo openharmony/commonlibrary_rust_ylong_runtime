@@ -30,8 +30,7 @@ use crate::builder::{initialize_blocking_spawner, RuntimeBuilder};
 use crate::executor::blocking_pool::BlockPoolSpawner;
 #[cfg(feature = "current_thread_runtime")]
 use crate::executor::current_thread::CurrentThreadSpawner;
-use crate::task::TaskBuilder;
-use crate::{JoinHandle, Task};
+use crate::task::{JoinHandle, Task, TaskBuilder};
 cfg_ffrt! {
     use crate::builder::initialize_ffrt_spawner;
     use crate::ffrt::spawner::spawn;

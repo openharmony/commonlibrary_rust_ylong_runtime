@@ -11,9 +11,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#![warn(missing_docs)]
+#![cfg_attr(doc_cfg, feature(doc_cfg))]
+
 //! # ylong_runtime
 //! A runtime for writing IO-bounded and CPU-bounded applications.
-#![deny(missing_docs)]
 
 #[cfg(all(
     feature = "ffrt",
@@ -29,12 +31,8 @@ compile_error!("Feature ffrt can not be enabled with feature metrics");
 
 extern crate core;
 
-use std::future::Future;
 #[macro_use]
-pub(crate) mod macros;
-
-use crate::error::ScheduleError;
-use crate::task::{JoinHandle, Task, TaskBuilder};
+mod macros;
 
 pub mod builder;
 pub mod error;
@@ -43,59 +41,39 @@ pub mod fastrand;
 pub mod futures;
 pub mod io;
 pub mod iter;
-
-#[cfg(feature = "ffrt")]
-pub(crate) mod ffrt;
-#[cfg(feature = "fs")]
-pub mod fs;
-#[cfg(feature = "macros")]
-mod select;
-#[cfg(feature = "macros")]
-pub use ylong_runtime_macros::tuple_form;
-pub(crate) mod spawn;
-#[cfg(feature = "sync")]
-pub mod sync;
 pub mod task;
+
+pub use crate::task::{block_on, spawn, spawn_blocking};
+
+mod spawn;
+mod util;
+
+cfg_ffrt! {
+    pub(crate) mod ffrt;
+}
+
+cfg_macros! {
+    mod select;
+    pub use ylong_runtime_macros::tuple_form;
+}
 
 cfg_time! {
     pub mod time;
 }
 
-mod util;
-cfg_metrics!(
+cfg_sync! {
+    pub mod sync;
+}
+
+cfg_metrics! {
     mod metrics;
     pub use metrics::Metrics;
-);
+}
+
+cfg_fs! {
+    pub mod fs;
+}
 
 cfg_net! {
     pub mod net;
-}
-
-/// Using the default task setting, spawns a task onto the global runtime.
-pub fn spawn<T, R>(task: T) -> JoinHandle<R>
-where
-    T: Future<Output = R>,
-    T: Send + 'static,
-    R: Send + 'static,
-{
-    TaskBuilder::new().spawn(task)
-}
-
-/// Using the default task setting, spawns a blocking task.
-pub fn spawn_blocking<T, R>(task: T) -> JoinHandle<R>
-where
-    T: FnOnce() -> R,
-    T: Send + 'static,
-    R: Send + 'static,
-{
-    TaskBuilder::new().spawn_blocking(task)
-}
-
-/// Blocks the current thread until the `Future` passed in is completed.
-pub fn block_on<T>(task: T) -> T::Output
-where
-    T: Future,
-{
-    let rt = executor::global_default_async();
-    rt.block_on(task)
 }
