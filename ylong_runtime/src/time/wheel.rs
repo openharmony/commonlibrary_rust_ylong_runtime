@@ -87,12 +87,17 @@ impl Wheel {
 
     // Compare the timing wheel elapsed with the expiration,
     // from which to decide which level to insert.
-    pub(crate) fn find_level(&self, expiration: u64) -> usize {
+    pub(crate) fn find_level(expiration: u64, elapsed: u64) -> usize {
         // 0011 1111
         const SLOT_MASK: u64 = (1 << 6) - 1;
 
         // Use the time difference value to find at which level.
-        let mut masked = (expiration - self.elapsed()) | SLOT_MASK;
+        // Use XOR to determine the insertion of inspiration currently need to be
+        // inserted into the level, using binary operations to determine which bit has
+        // changed, and further determine which level. If don't use XOR, it will lead to
+        // the re-insertion of the level of the calculation error, and insert to an
+        // incorrect level.
+        let mut masked = (expiration ^ elapsed) | SLOT_MASK;
         // 1111 1111 1111 1111 1111 1111 1111 1111 1111
         if masked >= MAX_DURATION {
             masked = MAX_DURATION - 1;
@@ -118,12 +123,12 @@ impl Wheel {
             return Err(Error);
         }
 
-        let level = self.find_level(expiration);
+        let level = Self::find_level(expiration, self.elapsed());
         // Unsafe access to clock_entry is only unsafe when Sleep Drop,
         // `Sleep` here does not go into `Ready`.
         unsafe { clock_entry.as_mut().set_level(level) };
 
-        self.levels[level].insert(clock_entry, self.elapsed);
+        self.levels[level].insert(clock_entry);
 
         Ok(expiration)
     }
@@ -158,27 +163,11 @@ impl Wheel {
         while let Some(mut item) = handles.pop_back() {
             let expected_expiration = unsafe { item.as_ref().expiration() };
             if expected_expiration > expiration.deadline {
-                // 0011_1111
-                const SLOT_MASK: u64 = (1 << 6) - 1;
-
-                // When inserting the remaining data again,
-                // the level of insertion should be determined by the expiration time of each
-                // insertion.
-                let mut masked = (expected_expiration - expiration.deadline) | SLOT_MASK;
-                if masked >= MAX_DURATION {
-                    masked = MAX_DURATION - 1;
-                }
-                let leading_zeros = masked.leading_zeros() as usize;
-                // Calculate how many valid bits there are.
-                // Leading zeros have up to 63 bits.
-                let significant = 63 - leading_zeros;
-
-                // One level per 6 bit.
-                let level = significant / 6;
+                let level = Self::find_level(expected_expiration, expiration.deadline);
 
                 unsafe { item.as_mut().set_level(level) };
 
-                self.levels[level].insert(item, expiration.deadline);
+                self.levels[level].insert(item);
             } else {
                 self.trigger.push_front(item);
             }
@@ -200,7 +189,7 @@ impl Wheel {
                 }
                 Some(ref expiration) => {
                     self.process_expiration(expiration);
-                    self.set_elapsed(now);
+                    self.set_elapsed(expiration.deadline);
                 }
                 None => {
                     self.set_elapsed(now);
@@ -252,11 +241,10 @@ impl Level {
     // Based on the elapsed which the current time wheel is running,
     // and the expected expiration time of the clock_entry,
     // find the corresponding slot and insert it.
-    pub(crate) fn insert(&mut self, mut clock_entry: NonNull<Clock>, elapsed: u64) {
+    pub(crate) fn insert(&mut self, mut clock_entry: NonNull<Clock>) {
         // This duration represents how long it takes for the current slot to complete,
-        // at least 0. If you don't reduce it with saturating_sub, the slot will
-        // loop to a very large number, resulting in a slot insertion error.
-        let duration = unsafe { clock_entry.as_ref().expiration() }.saturating_sub(elapsed);
+        // at least 0.
+        let duration = unsafe { clock_entry.as_ref().expiration() };
 
         // Unsafe access to clock_entry is only unsafe when Sleep Drop,
         // `Sleep` here does not go into `Ready`.
@@ -291,16 +279,28 @@ impl Level {
     pub(crate) fn next_expiration(&self, now: u64) -> Option<Expiration> {
         let slot = self.next_occupied_slot(now)?;
 
-        let slot_range = slot_range(self.level);
-
-        // Add the time of the last slot at this level to represent a time period.
-        let deadline = now + slot as u64 * slot_range;
+        let deadline = Self::calculate_deadline(slot, self.level, now);
 
         Some(Expiration {
             level: self.level,
             slot,
             deadline,
         })
+    }
+
+    fn calculate_deadline(slot: usize, level: usize, now: u64) -> u64 {
+        let slot_range = slot_range(level);
+        let level_range = slot_range * SLOTS_NUM as u64;
+        let level_start = now & !(level_range - 1);
+        // Add the time of the last slot at this level to represent a time period.
+        let mut deadline = level_start + slot as u64 * slot_range;
+
+        if deadline <= now {
+            // This only happened when Duration > MAX_DURATION
+            deadline += level_range;
+        }
+
+        deadline
     }
 
     // Find the next slot that needs to be executed.
@@ -331,7 +331,7 @@ fn slot_range(level: usize) -> u64 {
 
 #[cfg(test)]
 mod test {
-    use crate::time::wheel::{Wheel, LEVELS_NUM};
+    use crate::time::wheel::{Level, Wheel, LEVELS_NUM};
     cfg_net!(
         #[cfg(feature = "ffrt")]
         use crate::time::TimeDriver;
@@ -396,5 +396,30 @@ mod test {
         for slot in lock.levels[1].slots.iter() {
             assert!(slot.is_empty());
         }
+    }
+
+    /// UT test cases for Level::calculate_deadline
+    ///
+    /// # Brief
+    /// 1. Use Level::calculate_deadline() to calculate Level.
+    /// 2. Verify the deadline is right.
+    #[test]
+    fn ut_wheel_calculate_deadline() {
+        let deadline = Level::calculate_deadline(36, 0, 95);
+        assert_eq!(deadline, 100);
+        let deadline = Level::calculate_deadline(1, 1, 63);
+        assert_eq!(deadline, 64);
+        let deadline = Level::calculate_deadline(37, 0, 79);
+        assert_eq!(deadline, 101);
+        let deadline = Level::calculate_deadline(31, 1, 960);
+        assert_eq!(deadline, 1984);
+        let deadline = Level::calculate_deadline(61, 1, 7001);
+        assert_eq!(deadline, 8000);
+        let deadline = Level::calculate_deadline(2, 2, 8001);
+        assert_eq!(deadline, 8192);
+        let deadline = Level::calculate_deadline(12, 1, 8192);
+        assert_eq!(deadline, 8960);
+        let deadline = Level::calculate_deadline(40, 0, 8960);
+        assert_eq!(deadline, 9000);
     }
 }
