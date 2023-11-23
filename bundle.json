@@ -25,7 +25,9 @@
     "rom": "100KB",
     "ram": "~200KB",
     "deps": {
-      "components": [],
+      "components": [
+        "ffrt"
+      ],
       "third_party": []
     },
     "build": {
