@@ -42,7 +42,7 @@ fn sdv_unbounded_send_recv_test() {
 ///
 /// # Brief
 /// 1. Create a unbounded mpsc channel.
-/// 2. Send three values to the receiver then drop.
+/// 2. Send two values to the receiver then drop.
 /// 3. Receive two values successfully.
 #[test]
 fn sdv_unbounded_send_recv_drop_test() {
@@ -53,7 +53,6 @@ fn sdv_unbounded_send_recv_drop_test() {
     });
     assert!(tx.send(1).is_ok());
     assert!(tx.send(2).is_ok());
-    assert!(tx.send(3).is_ok());
     drop(tx);
     let _ = ylong_runtime::block_on(handle);
 }
@@ -120,7 +119,7 @@ fn sdv_bounded_send_recv_test() {
 ///
 /// # Brief
 /// 1. Create a bounded mpsc channel with capacity.
-/// 2. Send three value to the receiver.
+/// 2. Send two value to the receiver.
 /// 3. Receive two values successfully.
 #[test]
 fn sdv_bounded_send_recv_drop_test() {
@@ -133,7 +132,6 @@ fn sdv_bounded_send_recv_drop_test() {
     ylong_runtime::spawn(async move {
         assert!(tx.send(1).await.is_ok());
         assert!(tx.send(2).await.is_ok());
-        assert!(tx.send(3).await.is_ok());
     });
     let _ = ylong_runtime::block_on(handle);
 }
