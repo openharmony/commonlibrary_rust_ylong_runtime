@@ -15,9 +15,9 @@ use std::io;
 use std::sync::Mutex;
 
 cfg_ffrt!(
-    use ylong_ffrt::{ffrt_set_cpu_worker_max_num, Qos};
+    use ylong_ffrt::{ffrt_set_cpu_worker_max_num, ffrt_set_worker_stack_size, Qos};
     use std::collections::HashMap;
-    use libc::c_uint;
+    use libc::{c_uint, c_ulong};
 );
 
 use crate::builder::common_builder::impl_common;
@@ -39,6 +39,10 @@ pub struct MultiThreadBuilder {
     #[cfg(feature = "ffrt")]
     /// Thread number for each qos
     pub(crate) thread_num_by_qos: HashMap<Qos, u32>,
+
+    #[cfg(feature = "ffrt")]
+    /// Thread stack size for each qos
+    pub(crate) stack_size_by_qos: HashMap<Qos, usize>,
 }
 
 impl MultiThreadBuilder {
@@ -49,6 +53,8 @@ impl MultiThreadBuilder {
             core_thread_size: None,
             #[cfg(feature = "ffrt")]
             thread_num_by_qos: HashMap::new(),
+            #[cfg(feature = "ffrt")]
+            stack_size_by_qos: HashMap::new(),
         }
     }
 
@@ -64,11 +70,13 @@ impl MultiThreadBuilder {
         }
 
         #[cfg(feature = "ffrt")]
-        {
+        unsafe {
             for (qos, worker_num) in self.thread_num_by_qos.iter() {
-                unsafe {
-                    ffrt_set_cpu_worker_max_num(*qos, worker_num.clone() as c_uint);
-                }
+                ffrt_set_cpu_worker_max_num(*qos, *worker_num as c_uint);
+            }
+
+            for (qos, stack_size) in self.thread_num_by_qos.iter() {
+                ffrt_set_worker_stack_size(*qos, *stack_size as c_ulong);
             }
         }
 
@@ -96,6 +104,25 @@ impl MultiThreadBuilder {
             n => n,
         };
         self.thread_num_by_qos.insert(qos, worker);
+        self
+    }
+
+    /// Sets the thread stack size for a specific qos group.
+    ///
+    /// If a stack size has already been set for a qos, calling the method
+    /// with the same qos will overwrite the old value
+    ///
+    /// # Error
+    /// The lowest accepted stack size is 16k. If a value under 16k is passed
+    /// in, then the stack size will be set to 16k instead.
+    pub fn stack_size_by_qos(mut self, qos: Qos, stack_size: usize) -> Self {
+        const PTHREAD_STACK_MIN: usize = 16 * 1000;
+
+        let stack_size = match stack_size {
+            n if n < PTHREAD_STACK_MIN => PTHREAD_STACK_MIN,
+            n => n,
+        };
+        self.stack_size_by_qos.insert(qos, stack_size);
         self
     }
 }
@@ -183,12 +210,11 @@ mod test {
 #[cfg(feature = "ffrt")]
 #[cfg(test)]
 mod ffrt_test {
-    use ylong_ffrt::Qos::{Default, UserInteractive};
+    use ylong_ffrt::Qos::{Default, UserInitiated, UserInteractive};
 
     use crate::builder::MultiThreadBuilder;
 
     /// UT test cases for max_worker_num_by_qos
-    /// runtime.
     ///
     /// # Brief
     /// 1. Sets UserInteractive qos group to have 0 maximum worker number.
@@ -212,5 +238,39 @@ mod ffrt_test {
         let builder = MultiThreadBuilder::new().max_worker_num_by_qos(Default, 8);
         let num = builder.thread_num_by_qos.get(&Default).unwrap();
         assert_eq!(*num, 8);
+    }
+
+    /// UT cases for stack_size_by_qos
+    ///
+    /// # Brief
+    /// 1. Sets UserInitiated qos group's stack size to 16k - 1
+    /// 2. Checks if the actual stack size is 16k
+    /// 3. Sets UserInteractive qos group's stack size to 16k
+    /// 4. Checks if the actual stack size is 16k
+    /// 5. Sets Default qos group's stack size to 16M
+    /// 6. Checks if the actual stack size is 16M
+    /// 7. Sets UserInteractive qos group's stack size to 16k + 1
+    /// 8. Checks if the actual stack size is 16k + 1
+    #[test]
+    fn ut_set_stack_size() {
+        let builder = MultiThreadBuilder::new();
+        let builder = builder.stack_size_by_qos(UserInitiated, 16 * 1000 - 1);
+        let num = builder.stack_size_by_qos.get(&UserInitiated).unwrap();
+        assert_eq!(*num, 16 * 1000);
+
+        let builder = MultiThreadBuilder::new();
+        let builder = builder.stack_size_by_qos(UserInteractive, 16 * 1000);
+        let num = builder.stack_size_by_qos.get(&UserInteractive).unwrap();
+        assert_eq!(*num, 16 * 1000);
+
+        let builder = MultiThreadBuilder::new();
+        let builder = builder.stack_size_by_qos(Default, 16 * 1000 * 1000);
+        let num = builder.stack_size_by_qos.get(&Default).unwrap();
+        assert_eq!(*num, 16 * 1000 * 1000);
+
+        let builder = MultiThreadBuilder::new();
+        let builder = builder.stack_size_by_qos(UserInteractive, 16 * 1000 + 1);
+        let num = builder.stack_size_by_qos.get(&UserInteractive).unwrap();
+        assert_eq!(*num, 16 * 1000 + 1);
     }
 }

@@ -30,10 +30,7 @@ pub(crate) mod current_thread_builder;
 pub(crate) mod multi_thread_builder;
 
 use std::fmt::Debug;
-use std::io;
 use std::sync::Arc;
-#[cfg(all(any(feature = "time", feature = "net"), feature = "ffrt"))]
-use std::sync::Once;
 
 #[cfg(feature = "current_thread_runtime")]
 pub use current_thread_builder::CurrentThreadBuilder;
@@ -42,11 +39,10 @@ pub use multi_thread_builder::MultiThreadBuilder;
 pub(crate) use crate::builder::common_builder::CommonBuilder;
 use crate::error::ScheduleError;
 use crate::executor::blocking_pool::BlockPoolSpawner;
-#[cfg(all(feature = "time", feature = "ffrt"))]
-use crate::executor::netpoller::NetLooper;
 
 cfg_not_ffrt!(
     use crate::executor::async_pool::AsyncPoolSpawner;
+    use std::io;
 );
 
 /// A callback function to be executed in different stages of a thread's
@@ -134,30 +130,12 @@ pub(crate) fn initialize_async_spawner(
     AsyncPoolSpawner::new(builder)
 }
 
-#[cfg(feature = "ffrt")]
-pub(crate) fn initialize_ffrt_spawner(_builder: &MultiThreadBuilder) -> io::Result<()> {
-    // initialize reactor
-    #[cfg(any(feature = "time", feature = "net"))]
-    initialize_reactor()?;
-    Ok(())
-}
-
 pub(crate) fn initialize_blocking_spawner(
     builder: &CommonBuilder,
 ) -> Result<BlockPoolSpawner, ScheduleError> {
     let blocking_spawner = BlockPoolSpawner::new(builder);
     blocking_spawner.create_permanent_threads()?;
     Ok(blocking_spawner)
-}
-
-#[cfg(all(feature = "time", feature = "ffrt"))]
-pub(crate) fn initialize_reactor() -> io::Result<()> {
-    static ONCE: Once = Once::new();
-    ONCE.call_once(|| {
-        let net_poller = NetLooper::new();
-        net_poller.create_net_poller_thread();
-    });
-    Ok(())
 }
 
 #[cfg(test)]

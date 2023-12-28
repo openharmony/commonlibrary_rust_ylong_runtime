@@ -11,13 +11,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use libc::{c_int, c_uchar, c_uint, c_void};
+use libc::{c_int, c_uchar, c_uint, c_ulonglong, c_void};
 
 // Unstable interface, rust encapsulation temporarily not provided
 
 type FfrtSysEventHandleT = *mut c_void;
 type DestroyFunc = extern "C" fn(*mut c_void);
 type FfrtFdCallBack = extern "C" fn(*const c_void, c_uint, c_uchar);
+type FfrtExecHook = extern "C" fn(*mut c_void);
+type FfrtTimerHandle = *mut c_void;
 
 #[link(name = "ffrt")]
 // sys_event.h
@@ -38,4 +40,23 @@ extern "C" {
 
     /// Deregisters the fd from ffrt's epoll.
     pub fn ffrt_poller_deregister(fd: c_int) -> c_int;
+
+    /// Registers a timer to ffrt's timer poller. Callback will be called when
+    /// timer events arrived.
+    pub fn ffrt_timer_start(
+        duration: c_ulonglong,
+        waker: *mut c_void,
+        callback: FfrtExecHook,
+    ) -> FfrtTimerHandle;
+
+    /// Deregisters the timer from ffrt's timer poller
+    pub fn ffrt_timer_stop(handle: FfrtTimerHandle);
+
+    /// Checks whether the timer has expired. A returned value of 1 indicates
+    /// the timer has reached its deadline, otherwise, the timer has not expired
+    /// yet.
+    pub fn ffrt_timer_query(handle: FfrtTimerHandle) -> c_int;
+
+    /// Wakes up the poller to poll timer/io events.
+    pub fn ffrt_poller_wakeup();
 }
