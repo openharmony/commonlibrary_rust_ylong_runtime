@@ -4,5 +4,6 @@ members = [
     "ylong_ffrt",
     "ylong_io",
     "ylong_runtime",
-    "ylong_runtime_macros"
+    "ylong_runtime_macros",
+    "ylong_signal"
 ]
