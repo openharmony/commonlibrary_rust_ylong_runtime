@@ -29,6 +29,8 @@ use crate::executor::blocking_pool::BlockPoolSpawner;
 #[cfg(feature = "current_thread_runtime")]
 use crate::executor::current_thread::CurrentThreadSpawner;
 use crate::task::{JoinHandle, Task, TaskBuilder};
+mod driver_handle;
+pub(crate) use driver_handle::Handle;
 cfg_ffrt! {
     use crate::ffrt::spawner::spawn;
 }
@@ -39,7 +41,6 @@ cfg_not_ffrt! {
     mod sleeper;
     pub(crate) mod worker;
     pub(crate) mod driver;
-    use crate::executor::driver::Handle;
     use crate::builder::initialize_async_spawner;
     use crate::executor::async_pool::AsyncPoolSpawner;
 }

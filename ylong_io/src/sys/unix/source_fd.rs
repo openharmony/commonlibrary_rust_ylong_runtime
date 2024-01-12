@@ -12,41 +12,38 @@
 // limitations under the License.
 
 use std::io;
+use std::os::unix::io::RawFd;
 
-use crate::{Interest, Selector, Token};
+use crate::{Fd, Interest, Selector, Source, Token};
 
-/// Source::as_raw_fd() return
-#[cfg(target_os = "linux")]
-pub type Fd = i32;
+/// SourceFd allows any type of FD to register with Poll.
+#[derive(Debug)]
+pub struct SourceFd<'a>(pub &'a RawFd);
 
-/// Source::as_raw_fd() return
-#[cfg(target_os = "windows")]
-pub type Fd = std::os::windows::io::RawSocket;
-
-/// Source Trait that every connection requires async polling in [`crate::Poll`]
-/// needs to implement. [`crate::Poll`] will asynchronously poll out
-/// connections, and handle it.
-pub trait Source {
-    /// Registers the connection into [`crate::Poll`]
+impl<'a> Source for SourceFd<'a> {
     fn register(
         &mut self,
         selector: &Selector,
         token: Token,
         interests: Interest,
-    ) -> io::Result<()>;
+    ) -> io::Result<()> {
+        selector.register(self.as_raw_fd(), token, interests)
+    }
 
-    /// Reregisters the connection into [`crate::Poll`], this can change
-    /// [`Interest`].
     fn reregister(
         &mut self,
         selector: &Selector,
         token: Token,
         interests: Interest,
-    ) -> io::Result<()>;
+    ) -> io::Result<()> {
+        selector.reregister(self.as_raw_fd(), token, interests)
+    }
 
-    /// Deregisters the connection from [`crate::Poll`].
-    fn deregister(&mut self, selector: &Selector) -> io::Result<()>;
+    fn deregister(&mut self, selector: &Selector) -> io::Result<()> {
+        selector.deregister(self.as_raw_fd())
+    }
 
-    /// Returns the raw fd of this IO.
-    fn as_raw_fd(&self) -> Fd;
+    fn as_raw_fd(&self) -> Fd {
+        *self.0
+    }
 }

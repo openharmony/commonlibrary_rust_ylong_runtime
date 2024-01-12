@@ -28,11 +28,17 @@ pub use sys::{SocketAddr, UnixDatagram, UnixListener, UnixStream};
 #[cfg(feature = "tcp")]
 pub use sys::{TcpListener, TcpStream};
 
+/// unix-specific
+#[cfg(unix)]
+pub mod unix {
+    pub use crate::sys::SourceFd;
+}
+
 mod interest;
 pub use interest::Interest;
 
 mod source;
-pub use source::Source;
+pub use source::{Fd, Source};
 
 mod waker;
 pub use waker::Waker;

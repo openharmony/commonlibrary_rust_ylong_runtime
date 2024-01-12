@@ -17,6 +17,7 @@ full = [
     "signal",
     "sync",
     "time",
+    "process",
     "fs",
     "macros",
 ]
@@ -26,6 +27,7 @@ ffrt_full = [
     "signal",
     "sync",
     "time",
+    "process",
     "fs",
     "ffrt",
     "macros",
@@ -63,6 +65,9 @@ macros = ["ylong_runtime_macros"]
 
 # Metrics component
 metrics = []
+
+# Process component
+process = ["signal"]
 
 [dependencies]
 libc = "0.2.134"

@@ -51,6 +51,16 @@ macro_rules! cfg_signal {
     }
 }
 
+macro_rules! cfg_process {
+    ($($item:item)*) => {
+        $(
+            #[cfg(feature = "process")]
+            #[cfg_attr(doc_cfg, doc(cfg(feature = "process")))]
+            $item
+        )*
+    }
+}
+
 macro_rules! cfg_sync {
     ($($item:item)*) => {
         $(

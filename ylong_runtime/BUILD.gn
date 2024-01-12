@@ -24,6 +24,7 @@ ohos_rust_shared_library("ylong_runtime") {
     "fs",
     "macros",
     "net",
+    "process",
     "signal",
     "sync",
     "time",

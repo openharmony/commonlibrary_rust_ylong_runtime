@@ -321,6 +321,8 @@ extern "C" fn ffrt_dispatch_signal_event(data: *const c_void, _ready: c_uint, _n
     let token = Token::from_usize(data as usize);
     if token == SIGNAL_TOKEN {
         SignalDriver::get_mut_ref().broadcast();
+        #[cfg(feature = "process")]
+        crate::process::GlobalZombieChild::get_instance().release_zombie();
     }
 }
 

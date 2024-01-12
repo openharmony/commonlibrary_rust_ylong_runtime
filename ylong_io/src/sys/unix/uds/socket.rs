@@ -78,8 +78,10 @@ pub(crate) fn datagram_pair() -> io::Result<(net::UnixDatagram, net::UnixDatagra
 
 fn pair<T: FromRawFd>(flag: libc::c_int) -> io::Result<(T, T)> {
     let socket_type = flag | SOCK_NONBLOCK | SOCK_CLOEXEC;
+    // uninitialized fd
     let mut fds = [-1; 2];
     syscall!(socketpair(AF_UNIX, socket_type, 0, fds.as_mut_ptr()))?;
 
+    // Safety: socketpair() success means fd is valid.
     Ok(unsafe { (T::from_raw_fd(fds[0]), T::from_raw_fd(fds[1])) })
 }
