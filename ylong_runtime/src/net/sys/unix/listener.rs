@@ -116,7 +116,7 @@ impl fmt::Debug for UnixListener {
 
 impl AsRawFd for UnixListener {
     fn as_raw_fd(&self) -> RawFd {
-        self.source.as_raw_fd()
+        self.source.get_fd()
     }
 }
 

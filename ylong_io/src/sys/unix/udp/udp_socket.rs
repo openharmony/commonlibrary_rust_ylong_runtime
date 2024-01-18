@@ -763,7 +763,7 @@ impl Source for UdpSocket {
         token: Token,
         interests: Interest,
     ) -> io::Result<()> {
-        selector.register(self.as_raw_fd(), token, interests)
+        selector.register(self.get_fd(), token, interests)
     }
 
     fn reregister(
@@ -772,14 +772,14 @@ impl Source for UdpSocket {
         token: Token,
         interests: Interest,
     ) -> io::Result<()> {
-        selector.reregister(self.as_raw_fd(), token, interests)
+        selector.reregister(self.get_fd(), token, interests)
     }
 
     fn deregister(&mut self, selector: &Selector) -> io::Result<()> {
-        selector.deregister(self.as_raw_fd())
+        selector.deregister(self.get_fd())
     }
 
-    fn as_raw_fd(&self) -> Fd {
+    fn get_fd(&self) -> Fd {
         self.inner.as_raw_fd()
     }
 }
@@ -791,7 +791,7 @@ impl Source for ConnectedUdpSocket {
         token: Token,
         interests: Interest,
     ) -> io::Result<()> {
-        selector.register(self.as_raw_fd(), token, interests)
+        selector.register(self.get_fd(), token, interests)
     }
 
     fn reregister(
@@ -800,14 +800,14 @@ impl Source for ConnectedUdpSocket {
         token: Token,
         interests: Interest,
     ) -> io::Result<()> {
-        selector.reregister(self.as_raw_fd(), token, interests)
+        selector.reregister(self.get_fd(), token, interests)
     }
 
     fn deregister(&mut self, selector: &Selector) -> io::Result<()> {
-        selector.deregister(self.as_raw_fd())
+        selector.deregister(self.get_fd())
     }
 
-    fn as_raw_fd(&self) -> Fd {
+    fn get_fd(&self) -> Fd {
         self.inner.as_raw_fd()
     }
 }

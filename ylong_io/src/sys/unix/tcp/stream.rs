@@ -131,7 +131,7 @@ impl TcpStream {
     /// println!("{:?}", stream.linger());
     /// ```
     pub fn linger(&self) -> io::Result<Option<Duration>> {
-        get_sock_linger(self.as_raw_fd())
+        get_sock_linger(self.get_fd())
     }
 
     /// Sets the value of the linger on this socket by setting `SO_LINGER`
@@ -152,7 +152,7 @@ impl TcpStream {
     /// stream.set_linger(None).expect("Sets linger fail.");
     /// ```
     pub fn set_linger(&self, linger: Option<Duration>) -> io::Result<()> {
-        set_sock_linger(self.as_raw_fd(), linger)
+        set_sock_linger(self.get_fd(), linger)
     }
 
     /// Sets the value for the `IP_TTL`.
@@ -283,7 +283,7 @@ impl Source for TcpStream {
         token: Token,
         interests: Interest,
     ) -> io::Result<()> {
-        selector.register(self.as_raw_fd(), token, interests)
+        selector.register(self.get_fd(), token, interests)
     }
 
     fn reregister(
@@ -292,14 +292,14 @@ impl Source for TcpStream {
         token: Token,
         interests: Interest,
     ) -> io::Result<()> {
-        selector.reregister(self.as_raw_fd(), token, interests)
+        selector.reregister(self.get_fd(), token, interests)
     }
 
     fn deregister(&mut self, selector: &Selector) -> io::Result<()> {
-        selector.deregister(self.as_raw_fd())
+        selector.deregister(self.get_fd())
     }
 
-    fn as_raw_fd(&self) -> Fd {
+    fn get_fd(&self) -> Fd {
         self.inner.as_raw_fd()
     }
 }

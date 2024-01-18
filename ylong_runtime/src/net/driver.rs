@@ -410,7 +410,7 @@ impl Inner {
         let event = interest.into_io_event();
         unsafe {
             ylong_ffrt::ffrt_poller_register(
-                io.as_raw_fd() as c_int,
+                io.get_fd() as c_int,
                 event,
                 token.0 as *const c_void,
                 ffrt_dispatch_signal_event,
@@ -431,7 +431,7 @@ impl Inner {
         let event = interest.into_io_event();
         unsafe {
             ylong_ffrt::ffrt_poller_register(
-                io.as_raw_fd() as c_int,
+                io.get_fd() as c_int,
                 event,
                 token as *const c_void,
                 ffrt_dispatch_event,

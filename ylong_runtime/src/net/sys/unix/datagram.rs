@@ -439,7 +439,7 @@ impl fmt::Debug for UnixDatagram {
 
 impl AsRawFd for UnixDatagram {
     fn as_raw_fd(&self) -> RawFd {
-        self.source.as_raw_fd()
+        self.source.get_fd()
     }
 }
 
