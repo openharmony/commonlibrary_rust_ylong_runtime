@@ -486,7 +486,7 @@ mod tests {
     ///
     /// # Brief
     /// 1. Call channel to create a sender and a receiver handle pair.
-    /// 2. Sender sends message in ont thread.
+    /// 2. Sender sends message in one thread.
     /// 3. Receiver receives message in another thread.
     /// 4. Check if the test results are correct.
     #[test]

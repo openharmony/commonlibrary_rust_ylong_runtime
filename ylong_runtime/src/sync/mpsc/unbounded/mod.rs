@@ -142,7 +142,7 @@ impl<T> UnboundedSender<T> {
         self.channel.is_close()
     }
 
-    /// Checks whether the sender and another sender belong to the same channel
+    /// Checks whether the sender and another sender belong to the same channel.
     ///
     /// # Examples
     ///
@@ -266,7 +266,7 @@ impl<T> UnboundedReceiver<T> {
     /// return pending, and the waker from the Context will receive a
     /// wakeup when the message arrives or when the channel is closed. Multiple
     /// calls to this method, only the waker from the last call will receive a
-    /// wakeup
+    /// wakeup.
     ///
     /// # Return value
     /// * `Poll::Pending` if no messages in the channel now, but the channel is

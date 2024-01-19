@@ -23,6 +23,7 @@ pub mod semaphore;
 pub(crate) mod semaphore_inner;
 pub mod waiter;
 mod wake_list;
+pub mod watch;
 
 pub use mutex::{LockError, Mutex, MutexGuard};
 pub use rwlock::{RwLock, RwLockReadGuard, RwLockWriteGuard};
