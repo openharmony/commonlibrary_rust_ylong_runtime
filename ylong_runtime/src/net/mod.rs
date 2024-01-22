@@ -29,6 +29,8 @@ cfg_net! {
     pub use sys::{TcpListener, TcpStream};
     pub use sys::{UdpSocket, ConnectedUdpSocket};
     pub use sys::{SplitReadHalf, SplitWriteHalf, BorrowReadHalf, BorrowWriteHalf};
+    #[cfg(unix)]
+    pub use sys::{UnixListener, UnixStream, UnixDatagram};
     pub use sys::ToSocketAddrs;
 }
 

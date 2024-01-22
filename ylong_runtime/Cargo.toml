@@ -93,6 +93,12 @@ path = "benches/ylong_tokio_udp.rs"
 required-features = ["net"]
 
 [[bench]]
+name = "ylong_tokio_uds"
+path = "benches/ylong_tokio_uds.rs"
+
+required-features = ["net"]
+
+[[bench]]
 name = "ylong_tokio_multi_threaded"
 path = "benches/ylong_tokio_multi_threaded.rs"
 required-features = ["net"]

@@ -16,6 +16,7 @@ use std::num::NonZeroU8;
 /// The interested events, such as readable, writeable.
 #[derive(Copy, PartialEq, Eq, Clone, PartialOrd, Ord)]
 pub struct Interest(NonZeroU8);
+use std::ops;
 
 const READABLE: u8 = 0b0001;
 const WRITABLE: u8 = 0b0010;
@@ -40,5 +41,14 @@ impl Interest {
     /// Checks if the interest is for writeable events.
     pub const fn is_writable(self) -> bool {
         (self.0.get() & WRITABLE) != 0
+    }
+}
+
+impl ops::BitOr for Interest {
+    type Output = Self;
+
+    #[inline]
+    fn bitor(self, other: Self) -> Self {
+        self.add(other)
     }
 }

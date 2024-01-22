@@ -11,18 +11,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod tcp;
-pub use tcp::{
-    BorrowReadHalf, BorrowWriteHalf, SplitReadHalf, SplitWriteHalf, TcpListener, TcpStream,
-};
+mod datagram;
+pub use datagram::UnixDatagram;
 
-mod udp;
-pub use udp::{ConnectedUdpSocket, UdpSocket};
+mod listener;
+pub use listener::UnixListener;
 
-#[cfg(unix)]
-mod unix;
-#[cfg(unix)]
-pub use unix::{UnixDatagram, UnixListener, UnixStream};
-
-mod addr;
-pub use addr::ToSocketAddrs;
+mod stream;
+pub use stream::UnixStream;

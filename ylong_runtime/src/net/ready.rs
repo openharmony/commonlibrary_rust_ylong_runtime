@@ -25,7 +25,7 @@ cfg_not_ffrt! {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd)]
-pub(crate) struct Ready(usize);
+pub struct Ready(usize);
 
 #[derive(Debug)]
 pub(crate) struct ReadyEvent {

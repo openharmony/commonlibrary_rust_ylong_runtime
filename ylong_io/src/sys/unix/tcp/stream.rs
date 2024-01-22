@@ -18,7 +18,7 @@ use std::time::Duration;
 
 use super::TcpSocket;
 use crate::source::Fd;
-use crate::sys::linux::tcp::socket::{get_sock_linger, set_sock_linger};
+use crate::sys::unix::tcp::socket::{get_sock_linger, set_sock_linger};
 use crate::{Interest, Selector, Source, Token};
 
 /// A non-blocking TCP Stream between a local socket and a remote socket.
