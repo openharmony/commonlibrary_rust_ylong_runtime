@@ -41,6 +41,16 @@ macro_rules! cfg_ffrt {
     }
 }
 
+macro_rules! cfg_signal {
+    ($($item:item)*) => {
+        $(
+            #[cfg(feature = "signal")]
+            #[cfg_attr(doc_cfg, doc(cfg(feature = "signal")))]
+            $item
+        )*
+    }
+}
+
 macro_rules! cfg_sync {
     ($($item:item)*) => {
         $(

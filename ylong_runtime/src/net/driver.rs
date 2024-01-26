@@ -24,6 +24,8 @@ use crate::util::bit::{Bit, Mask};
 use crate::util::slab::{Address, Ref, Slab};
 
 cfg_ffrt! {
+    #[cfg(feature = "signal")]
+    use crate::signal::SignalDriver;
     use libc::{c_void, c_int, c_uint, c_uchar};
 }
 
@@ -35,6 +37,8 @@ cfg_not_ffrt! {
     const WAKE_TOKEN: Token = Token(1 << 31);
 }
 
+#[cfg(feature = "signal")]
+const SIGNAL_TOKEN: Token = Token(1);
 const DRIVER_TICK_INIT: u8 = 0;
 
 // Token structure
@@ -60,6 +64,10 @@ pub(crate) struct IoDriver {
     /// Stores IO events that need to be handled
     #[cfg(not(feature = "ffrt"))]
     events: Option<Events>,
+
+    /// Indicate if there is a signal coming
+    #[cfg(all(not(feature = "ffrt"), feature = "signal"))]
+    signal_pending: bool,
 
     /// Save Handle used in metrics.
     #[cfg(feature = "metrics")]
@@ -211,6 +219,8 @@ impl IoDriver {
             poll: arc_poll,
             #[cfg(feature = "metrics")]
             io_handle_inner: inner.clone(),
+            #[cfg(feature = "signal")]
+            signal_pending: false,
         };
 
         (IoHandle::new(inner, waker), driver)
@@ -241,19 +251,21 @@ impl IoDriver {
                 return Err(err);
             }
         };
-
         match self.poll.poll(&mut events, time_out) {
             Ok(_) => {}
             Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {}
             Err(err) => return Err(err),
         }
-
         let has_events = !events.is_empty();
 
         for event in events.iter() {
             let token = event.token();
             if token == WAKE_TOKEN {
                 continue;
+            }
+            #[cfg(feature = "signal")]
+            if token == SIGNAL_TOKEN {
+                self.signal_pending = true;
             }
             let ready = Ready::from_event(event);
             self.dispatch(token, ready);
@@ -266,6 +278,13 @@ impl IoDriver {
 
         self.events = Some(events);
         Ok(has_events)
+    }
+
+    #[cfg(feature = "signal")]
+    pub(crate) fn process_signal(&mut self) -> bool {
+        let pending = self.signal_pending;
+        self.signal_pending = false;
+        pending
     }
 }
 
@@ -297,6 +316,14 @@ impl IoDriver {
     }
 }
 
+#[cfg(all(feature = "ffrt", feature = "signal"))]
+extern "C" fn ffrt_dispatch_signal_event(data: *const c_void, _ready: c_uint, _new_tick: c_uchar) {
+    let token = Token::from_usize(data as usize);
+    if token == SIGNAL_TOKEN {
+        SignalDriver::get_mut_ref().broadcast();
+    }
+}
+
 #[cfg(feature = "ffrt")]
 extern "C" fn ffrt_dispatch_event(data: *const c_void, ready: c_uint, new_tick: c_uchar) {
     const COMPACT_INTERVAL: u8 = 255;
@@ -316,8 +343,35 @@ extern "C" fn ffrt_dispatch_event(data: *const c_void, ready: c_uint, new_tick: 
 }
 
 impl Inner {
+    fn allocate_schedule_io_pair(&self) -> io::Result<(Ref<ScheduleIO>, usize)> {
+        let (addr, schedule_io) = unsafe {
+            self.allocator.allocate().ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::Other,
+                    "driver at max registered I/O resources.",
+                )
+            })?
+        };
+        let mut base = Bit::from_usize(0);
+        base.set_by_mask(GENERATION, schedule_io.generation());
+        base.set_by_mask(ADDRESS, addr.as_usize());
+        Ok((schedule_io, base.as_usize()))
+    }
+}
+
+#[cfg(not(feature = "ffrt"))]
+impl Inner {
+    #[cfg(feature = "signal")]
+    pub(crate) fn register_source_with_token(
+        &self,
+        io: &mut impl Source,
+        token: Token,
+        interest: Interest,
+    ) -> io::Result<()> {
+        self.registry.register(io, token, interest)
+    }
+
     /// Registers the fd of the `Source` object
-    #[cfg(not(feature = "ffrt"))]
     pub(crate) fn register_source(
         &self,
         io: &mut impl Source,
@@ -336,23 +390,33 @@ impl Inner {
         Ok(schedule_io)
     }
 
-    fn allocate_schedule_io_pair(&self) -> io::Result<(Ref<ScheduleIO>, usize)> {
-        let (addr, schedule_io) = unsafe {
-            self.allocator.allocate().ok_or_else(|| {
-                io::Error::new(
-                    io::ErrorKind::Other,
-                    "driver at max registered I/O resources.",
-                )
-            })?
-        };
-        let mut base = Bit::from_usize(0);
-        base.set_by_mask(GENERATION, schedule_io.generation());
-        base.set_by_mask(ADDRESS, addr.as_usize());
-        Ok((schedule_io, base.as_usize()))
+    /// Deregisters the fd of the `Source` object.
+    pub(crate) fn deregister_source(&self, io: &mut impl Source) -> io::Result<()> {
+        self.registry.deregister(io)
+    }
+}
+
+#[cfg(feature = "ffrt")]
+impl Inner {
+    #[cfg(feature = "signal")]
+    pub(crate) fn register_source_with_token(
+        &self,
+        io: &mut impl Source,
+        token: Token,
+        interest: Interest,
+    ) {
+        let event = interest.into_io_event();
+        unsafe {
+            ylong_ffrt::ffrt_poller_register(
+                io.as_raw_fd() as c_int,
+                event,
+                token.0 as *const c_void,
+                ffrt_dispatch_signal_event,
+            );
+        }
     }
 
     /// Registers the fd of the `Source` object
-    #[cfg(feature = "ffrt")]
     pub(crate) fn register_source(
         &self,
         io: &mut impl Source,
@@ -362,22 +426,7 @@ impl Inner {
         // returned
         let (schedule_io, token) = self.allocate_schedule_io_pair()?;
 
-        fn interests_to_io_event(interests: Interest) -> c_uint {
-            let mut io_event = libc::EPOLLET as u32;
-
-            if interests.is_readable() {
-                io_event |= libc::EPOLLIN as u32;
-                io_event |= libc::EPOLLRDHUP as u32;
-            }
-
-            if interests.is_writable() {
-                io_event |= libc::EPOLLOUT as u32;
-            }
-
-            io_event as c_uint
-        }
-
-        let event = interests_to_io_event(interest);
+        let event = interest.into_io_event();
         unsafe {
             ylong_ffrt::ffrt_poller_register(
                 io.as_raw_fd() as c_int,
@@ -388,12 +437,6 @@ impl Inner {
         }
 
         Ok(schedule_io)
-    }
-
-    /// Deregisters the fd of the `Source` object.
-    #[cfg(not(feature = "ffrt"))]
-    pub(crate) fn deregister_source(&self, io: &mut impl Source) -> io::Result<()> {
-        self.registry.deregister(io)
     }
 }
 

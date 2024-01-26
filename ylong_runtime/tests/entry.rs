@@ -26,6 +26,7 @@ mod mpsc_test;
 mod mutex;
 mod par_iter;
 mod semaphore_test;
+mod signal;
 mod singleton_runtime;
 mod spawn;
 mod spawn_blocking;

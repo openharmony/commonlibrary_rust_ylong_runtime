@@ -32,7 +32,8 @@
     },
     "build": {
       "sub_component": [
-        "//commonlibrary/rust/ylong_runtime/ylong_io:ylong_io"
+        "//commonlibrary/rust/ylong_runtime/ylong_io:ylong_io",
+        "//commonlibrary/rust/ylong_runtime/ylong_runtime_signal:ylong_runtime_signal"
       ],
       "inner_kits": [
         {

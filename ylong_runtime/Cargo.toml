@@ -14,6 +14,7 @@ full = [
     "net",
     "multi_instance_runtime",
     "current_thread_runtime",
+    "signal",
     "sync",
     "time",
     "fs",
@@ -22,6 +23,7 @@ full = [
 
 ffrt_full = [
     "net",
+    "signal",
     "sync",
     "time",
     "fs",
@@ -53,6 +55,9 @@ time = []
 # Async IO components
 net = ["ylong_io/tcp", "ylong_io/udp"]
 
+# Signal component
+signal = ["ylong_signal", "net", "sync"]
+
 # Macro components
 macros = ["ylong_runtime_macros"]
 
@@ -61,6 +66,7 @@ metrics = []
 
 [dependencies]
 libc = "0.2.134"
+ylong_signal = { path = "../ylong_signal", optional = true }
 ylong_io = { path = "../ylong_io", optional = true }
 ylong_ffrt = { path = "../ylong_ffrt", optional = true }
 ylong_runtime_macros = { path = "../ylong_runtime_macros", optional = true }
@@ -132,6 +138,11 @@ required-features = ["sync"]
 name = "ylong_runtime_tcp"
 path = "./examples/ylong_runtime_tcp.rs"
 required-features = ["net"]
+
+[[example]]
+name = "ylong_runtime_signal"
+path = "./examples/ylong_runtime_signal.rs"
+required-features = ["signal"]
 
 [[example]]
 name = "ylong_runtime_multi_runtimes"
