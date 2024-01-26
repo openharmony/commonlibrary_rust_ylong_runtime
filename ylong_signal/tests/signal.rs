@@ -11,14 +11,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![cfg(feature = "linux")]
-
+use std::io;
 use std::mem::MaybeUninit;
 use std::os::raw::c_int;
-use std::ptr::null_mut;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Once};
-use std::{io, mem, thread};
+
+/// SDV test cases
+///
+/// Because the following tests cannot be executed in parallel for
+/// there are only a few signals in windows that we have to use the same signal
+/// in different test case, so there is a test all case which execute all tests
+/// serially.
+#[test]
+fn sdv_test_all() {
+    sdv_signal_register_succeed();
+    sdv_signal_register_failed();
+    sdv_signal_register_with_old();
+    #[cfg(not(windows))]
+    sdv_signal_register_multi();
+}
 
 /// SDV cases for signal register
 ///
@@ -28,13 +40,10 @@ use std::{io, mem, thread};
 /// 2. Manually raises the two signals, checks if the registered action behave
 ///    correctly.
 /// 3. Deregisters the action of the two signals
-/// 4. Manually raises the two signals, the actions should not be executed, and
-///    the program should not be terminated
-/// 5. Registers the same action for one of the signals again
-/// 6. Manually raises the signal, checks if the registered action behave
+/// 4. Registers the same action for one of the signals again
+/// 5. Manually raises the signal, checks if the registered action behave
 ///    correctly
-/// 7. Deregisters both signal's handler hook, checks if the return is ok.
-#[test]
+/// 6. Deregisters both signal's handler hook, checks if the return is ok.
 fn sdv_signal_register_succeed() {
     let value = Arc::new(AtomicUsize::new(0));
     let value_cpy = value.clone();
@@ -50,12 +59,12 @@ fn sdv_signal_register_succeed() {
     };
     assert!(res.is_ok());
 
-    let res2 = unsafe {
+    let res = unsafe {
         ylong_signal::register_signal_action(libc::SIGTERM, move || {
             value2_cpy.fetch_add(10, Ordering::Relaxed);
         })
     };
-    assert!(res2.is_ok());
+    assert!(res.is_ok());
     assert_eq!(value.load(Ordering::Relaxed), 0);
 
     unsafe { libc::raise(libc::SIGINT) };
@@ -66,26 +75,26 @@ fn sdv_signal_register_succeed() {
     assert_eq!(value.load(Ordering::Relaxed), 1);
     assert_eq!(value2.load(Ordering::Relaxed), 20);
 
-    ylong_signal::deregister_signal_action(libc::SIGTERM);
-    unsafe { libc::raise(libc::SIGTERM) };
-    assert_eq!(value2.load(Ordering::Relaxed), 20);
+    let res = ylong_signal::deregister_signal_action(libc::SIGTERM);
+    assert!(res.is_ok());
 
-    ylong_signal::deregister_signal_action(libc::SIGINT);
+    ylong_signal::deregister_signal_action(libc::SIGINT).unwrap();
 
-    let res3 = unsafe {
+    let res = unsafe {
         ylong_signal::register_signal_action(libc::SIGTERM, move || {
             value2_cpy2.fetch_add(20, Ordering::Relaxed);
         })
     };
-    assert!(res3.is_ok());
+    assert!(res.is_ok());
+
     unsafe { libc::raise(libc::SIGTERM) };
     assert_eq!(value2.load(Ordering::Relaxed), 40);
 
-    let res4 = ylong_signal::deregister_signal_hook(libc::SIGTERM);
-    assert!(res4.is_ok());
+    let res = ylong_signal::deregister_signal_hook(libc::SIGTERM);
+    assert!(res.is_ok());
 
-    let res5 = ylong_signal::deregister_signal_hook(libc::SIGINT);
-    assert!(res5.is_ok());
+    let res = ylong_signal::deregister_signal_hook(libc::SIGINT);
+    assert!(res.is_ok());
 }
 
 /// SDV cases for signal register error handling
@@ -102,21 +111,22 @@ fn sdv_signal_register_succeed() {
 /// 9. Deregisters the signal action of an unregistered signal
 /// 10. Deregisters the signal handler of an unregistered signal
 /// 11. Checks if the return value is Ok
-#[test]
 fn sdv_signal_register_failed() {
     let res = unsafe { ylong_signal::register_signal_action(libc::SIGSEGV, move || {}) };
     assert_eq!(res.unwrap_err().kind(), io::ErrorKind::InvalidInput);
 
-    let res = unsafe { ylong_signal::register_signal_action(libc::SIGQUIT, move || {}) };
+    let res = unsafe { ylong_signal::register_signal_action(libc::SIGTERM, move || {}) };
     assert!(res.is_ok());
-    let res = unsafe { ylong_signal::register_signal_action(libc::SIGQUIT, move || {}) };
+    let res = unsafe { ylong_signal::register_signal_action(libc::SIGTERM, move || {}) };
     assert_eq!(res.unwrap_err().kind(), io::ErrorKind::AlreadyExists);
 
-    let res = ylong_signal::deregister_signal_hook(libc::SIGQUIT);
+    let res = ylong_signal::deregister_signal_hook(libc::SIGTERM);
     assert!(res.is_ok());
 
-    ylong_signal::deregister_signal_action(libc::SIG_UNBLOCK);
-    let res = ylong_signal::deregister_signal_hook(libc::SIG_UNBLOCK);
+    let res = ylong_signal::deregister_signal_action(libc::SIGSEGV);
+    assert!(res.is_ok());
+
+    let res = ylong_signal::deregister_signal_hook(libc::SIGSEGV);
     assert!(res.is_ok());
 }
 
@@ -126,44 +136,53 @@ fn sdv_signal_register_failed() {
 /// 1. Registers a signal handler using libc syscall
 /// 2. Registers a signal handler using ylong_signal::register_signal_action
 /// 3. Manually raises the signal
-/// 4. Checks if the old handler and the new action both get executed correctly
+/// 4. Checks if the the new action get executed correctly
 /// 5. Deregisters the signal action
 /// 6. Manually raises the signal
 /// 7. Checks if the old handler gets executed correctly
 /// 8. Deregister the hook.
-#[test]
 fn sdv_signal_register_with_old() {
-    let mut new_act: libc::sigaction = unsafe { mem::zeroed() };
-    new_act.sa_sigaction = test_handler as usize;
-    unsafe {
-        libc::sigaction(libc::SIGCONT, &new_act, null_mut());
+    #[cfg(not(windows))]
+    {
+        let mut new_act: libc::sigaction = unsafe { std::mem::zeroed() };
+        new_act.sa_sigaction = test_handler as usize;
+        unsafe {
+            libc::sigaction(libc::SIGINT, &new_act, std::ptr::null_mut());
+        }
+    }
+
+    #[cfg(windows)]
+    {
+        unsafe {
+            libc::signal(libc::SIGINT, test_handler as usize);
+        }
     }
 
     let res = unsafe {
-        ylong_signal::register_signal_action(libc::SIGCONT, move || {
+        ylong_signal::register_signal_action(libc::SIGINT, move || {
             let global = Global::get_instance();
-            assert_eq!(global.value.load(Ordering::Relaxed), 1);
+            assert_eq!(global.value.load(Ordering::Relaxed), 0);
             global.value.fetch_add(2, Ordering::Relaxed);
         })
     };
     assert!(res.is_ok());
-    unsafe {
-        libc::raise(libc::SIGCONT);
-    }
-    let global = Global::get_instance();
-    assert_eq!(global.value.load(Ordering::Relaxed), 3);
 
-    ylong_signal::deregister_signal_action(libc::SIGCONT);
     unsafe {
-        libc::raise(libc::SIGCONT);
+        libc::raise(libc::SIGINT);
     }
-    assert_eq!(global.value.load(Ordering::Relaxed), 4);
-    let res = ylong_signal::deregister_signal_hook(libc::SIGCONT);
+
+    let global = Global::get_instance();
+    assert_eq!(global.value.load(Ordering::Relaxed), 2);
+
+    let res = ylong_signal::deregister_signal_action(libc::SIGINT);
     assert!(res.is_ok());
 
     unsafe {
-        libc::raise(libc::SIGCONT);
+        libc::raise(libc::SIGINT);
     }
+    assert_eq!(global.value.load(Ordering::Relaxed), 3);
+    let res = ylong_signal::deregister_signal_hook(libc::SIGINT);
+    assert!(res.is_ok());
 }
 
 pub struct Global {
@@ -198,7 +217,7 @@ extern "C" fn test_handler(_sig_num: c_int) {
 /// 2. Spawns another thread to raise the signal
 /// 3. Raises the same signal on the main thread
 /// 4. All execution should return OK
-#[test]
+#[cfg(not(windows))]
 fn sdv_signal_register_multi() {
     for i in 0..1000 {
         let res = unsafe {
@@ -208,7 +227,7 @@ fn sdv_signal_register_multi() {
                 assert_eq!(data, 100 + i);
             })
         };
-        thread::spawn(move || {
+        std::thread::spawn(move || {
             unsafe { libc::raise(libc::SIGCHLD) };
         });
         assert!(res.is_ok());
@@ -216,10 +235,11 @@ fn sdv_signal_register_multi() {
             libc::raise(libc::SIGCHLD);
         }
 
-        ylong_signal::deregister_signal_action(libc::SIGCHLD);
+        let res = ylong_signal::deregister_signal_action(libc::SIGCHLD);
+        assert!(res.is_ok());
+
         unsafe {
             libc::raise(libc::SIGCHLD);
         }
-        assert!(res.is_ok());
     }
 }

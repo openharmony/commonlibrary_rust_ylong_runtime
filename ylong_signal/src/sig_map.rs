@@ -14,55 +14,34 @@
 use std::collections::HashMap;
 use std::mem::MaybeUninit;
 use std::sync::Once;
-use std::{io, mem, ptr};
 
-use libc::{c_int, sigaction};
+use libc::c_int;
 
-use crate::linux::signal::Signal;
+use crate::common::{SigAction, Signal};
 use crate::spin_rwlock::SpinningRwLock;
 
-pub(crate) struct SigAction {
-    pub(crate) sig_num: c_int,
-    pub(crate) act: sigaction,
-}
-
-impl SigAction {
-    pub(crate) fn get_old_action(sig_num: c_int) -> io::Result<Self> {
-        let mut old_act: libc::sigaction = unsafe { mem::zeroed() };
-        unsafe {
-            if libc::sigaction(sig_num, ptr::null(), &mut old_act) != 0 {
-                return Err(io::Error::last_os_error());
-            }
-        }
-        Ok(SigAction {
-            sig_num,
-            act: old_act,
-        })
-    }
-}
-
-pub(crate) struct SignalManager {
+pub(crate) struct SigMap {
     pub(crate) data: SpinningRwLock<HashMap<c_int, Signal>>,
     pub(crate) race_old: SpinningRwLock<Option<SigAction>>,
 }
 
-impl SignalManager {
+impl SigMap {
     // This function will be called inside a signal handler.
     // Although a mutex Once is used, but the mutex will only be locked for once
     // when initializing the SignalManager, which is outside of the signal
     // handler.
-    pub(crate) fn get_instance() -> &'static SignalManager {
+    pub(crate) fn get_instance() -> &'static SigMap {
         static ONCE: Once = Once::new();
-        static mut GLOBAL_SIG_MANAGER: MaybeUninit<SignalManager> = MaybeUninit::uninit();
+        static mut GLOBAL_SIG_MAP: MaybeUninit<SigMap> = MaybeUninit::uninit();
 
         unsafe {
             ONCE.call_once(|| {
-                GLOBAL_SIG_MANAGER = MaybeUninit::new(SignalManager {
+                GLOBAL_SIG_MAP = MaybeUninit::new(SigMap {
                     data: SpinningRwLock::new(HashMap::new()),
                     race_old: SpinningRwLock::new(None),
                 });
             });
-            &*GLOBAL_SIG_MANAGER.as_ptr()
+            GLOBAL_SIG_MAP.assume_init_ref()
         }
     }
 }
