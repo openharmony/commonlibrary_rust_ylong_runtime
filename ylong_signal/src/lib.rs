@@ -11,28 +11,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![cfg(target_os = "linux")]
+#![warn(missing_docs)]
 
 //! # ylong_signal
-//! Provides methods to set or unset an action for signal handler. Currently the
-//! crate only supports linux platform.
+//! Provides methods to set or unset an action for signal handler.
 
-pub(crate) mod linux;
-pub(crate) mod spin_rwlock;
+mod common;
+pub use common::SIGNAL_BLOCK_LIST;
+
+mod sig_map;
+mod spin_rwlock;
+#[cfg(windows)]
+mod windows;
+
+#[cfg(not(windows))]
+mod linux;
 
 use std::io;
-use std::os::raw::c_int;
 
-use crate::linux::signal::Signal;
+use libc::c_int;
 
 /// Registers a user-defined function for the signal action.
 ///
 /// Currently this function only supports registering one action for each
-/// signal. However, if another component in the process sets a signal action
-/// without using this method, this old action will not be overwritten by the
-/// new registered action. Instead, the newly set signal hook will execute the
-/// old action, then the new action.
-///
+/// signal. If another component in the process sets a signal action
+/// without using this method, this old action will be overwritten by the
+/// new registered action. After unregistering this old action will
+/// in turn overwrite the new registered ation.
 /// # Errors
 ///
 /// Calling this fuction twice on the same signal without a call to
@@ -68,7 +73,7 @@ pub unsafe fn register_signal_action<F>(sig_num: c_int, handler: F) -> io::Resul
 where
     F: Fn() + Sync + Send + 'static,
 {
-    Signal::register_action(sig_num, move |_| handler())
+    common::Signal::register_action(sig_num, move |_| handler())
 }
 
 /// Deregisters the signal action set to a specific signal by a previous call to
@@ -78,9 +83,9 @@ where
 /// [`register_signal_action`], this function will do nothing.
 ///
 /// If the signal passed in has been set before by [`register_signal_action`],
-/// then the action of the signal will be dropped, but the signal handler still
-/// exists, which means the program will not execute the default signal handler
-/// when signals come; this signal will just be ignored.
+/// then the action of the signal will be dropped, and the overwritten old
+/// action will take its place. The overwrite action may fail and return an
+/// error.
 ///
 /// After calling this function, you could call [`register_signal_action`] again
 /// on the same signal.
@@ -89,8 +94,8 @@ where
 /// ```no run
 /// ylong_signal::deregister_signal_action(libc::SIGTERM);
 /// ```
-pub fn deregister_signal_action(sig_num: c_int) {
-    Signal::deregister_action(sig_num);
+pub fn deregister_signal_action(sig_num: c_int) -> io::Result<()> {
+    common::Signal::deregister_action(sig_num)
 }
 
 /// Deregisters the signal handler of a signal along with all its previous
@@ -105,5 +110,5 @@ pub fn deregister_signal_action(sig_num: c_int) {
 /// assert!(res.is_ok());
 /// ```
 pub fn deregister_signal_hook(sig_num: c_int) -> io::Result<()> {
-    Signal::deregister_hook(sig_num)
+    common::Signal::deregister_hook(sig_num)
 }
