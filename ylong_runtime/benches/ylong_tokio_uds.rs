@@ -108,6 +108,7 @@ macro_rules! ylong_uds_task {
 
         #[bench]
         fn $bench(b: &mut Bencher) {
+            ylong_runtime_init();
             b.iter(black_box(|| {
                 let mut handlers = Vec::new();
                 for i in 0..$task_num {
@@ -139,7 +140,7 @@ mod uds_bench {
     use ylong_runtime::io::{AsyncReadExt, AsyncWriteExt};
     use ylong_runtime::net::{UnixListener, UnixStream};
 
-    pub use crate::task_helpers::tokio_runtime;
+    pub use crate::task_helpers::{tokio_runtime, ylong_runtime_init};
 
     ylong_uds_task!(
         ylong_uds_10_1000_100,

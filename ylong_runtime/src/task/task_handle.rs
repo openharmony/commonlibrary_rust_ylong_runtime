@@ -267,23 +267,6 @@ where
     T: Future,
     S: Schedule,
 {
-    fn ffrt_finish(self, state: usize, output: Result<T::Output, ScheduleError>) {
-        if state::is_care_join_handle(state) {
-            self.inner().send_result(output);
-        } else {
-            self.inner().turning_to_used_data();
-        }
-
-        let cur = match self.header().state.turning_to_finish() {
-            Ok(cur) => cur,
-            Err(e) => panic!("{}", e.as_str()),
-        };
-
-        if state::is_set_waker(cur) {
-            self.inner().wake_join();
-        }
-    }
-
     pub(crate) fn ffrt_run(self) -> bool {
         self.inner().get_task_ctx();
 
@@ -291,7 +274,7 @@ where
             StateAction::Failed(state) => panic!("turning to running failed: {:b}", state),
             StateAction::Canceled(cur) => {
                 let output = self.ffrt_get_canceled();
-                self.ffrt_finish(cur, Err(output));
+                self.finish(cur, Err(output));
                 return true;
             }
             _ => {}
@@ -308,7 +291,7 @@ where
         match res {
             Ok(Poll::Ready(output)) => {
                 // send result if the JoinHandle is not dropped
-                self.ffrt_finish(cur, output);
+                self.finish(cur, output);
                 true
             }
 
@@ -321,7 +304,7 @@ where
                 StateAction::Failed(state) => panic!("task state invalid: {:b}", state),
                 StateAction::Canceled(state) => {
                     let output = self.ffrt_get_canceled();
-                    self.ffrt_finish(state, Err(output));
+                    self.finish(state, Err(output));
                     true
                 }
                 _ => false,
@@ -329,7 +312,7 @@ where
 
             Err(_) => {
                 let output = Err(ScheduleError::new(ErrorKind::Panic, "panic happen"));
-                self.ffrt_finish(cur, output);
+                self.finish(cur, output);
                 true
             }
         }

@@ -56,6 +56,12 @@ pub fn tokio_runtime() -> tokio::runtime::Runtime {
         .unwrap()
 }
 
+pub fn ylong_runtime_init() {
+    let handle = ylong_runtime::spawn(async move { 1 });
+    let res = ylong_runtime::block_on(handle).unwrap();
+    assert_eq!(res, 1);
+}
+
 pub fn tokio_runtime_set_threads(threads_count: usize) -> tokio::runtime::Runtime {
     tokio::runtime::Builder::new_multi_thread()
         .worker_threads(threads_count)

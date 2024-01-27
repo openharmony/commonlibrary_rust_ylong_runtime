@@ -543,7 +543,8 @@ mod test {
     use crate::executor::async_pool::MultiThreadScheduler;
     use crate::executor::driver::Driver;
     use crate::executor::queue::{GlobalQueue, InnerBuffer, LocalQueue, LOCAL_QUEUE_CAP};
-    use crate::task::{Task, TaskBuilder, VirtualTableType};
+    use crate::executor::Schedule;
+    use crate::task::{JoinHandle, Task, TaskBuilder, VirtualTableType};
 
     #[cfg(any(not(feature = "metrics"), feature = "ffrt"))]
     impl InnerBuffer {
@@ -616,16 +617,30 @@ mod test {
         assert_eq!(inner_buffer.buffer.len(), LOCAL_QUEUE_CAP);
     }
 
-    // InnerBuffer::is_empty() UT test cases
-    //
+    pub(crate) fn create_task<T, S>(
+        builder: &TaskBuilder,
+        scheduler: std::sync::Weak<S>,
+        task: T,
+        virtual_table_type: VirtualTableType,
+    ) -> (Task, JoinHandle<T::Output>)
+    where
+        T: Future + Send + 'static,
+        T::Output: Send + 'static,
+        S: Schedule,
+    {
+        let (task, handle) = Task::create_task(builder, scheduler, task, virtual_table_type);
+        task.0.drop_ref();
+        (task, handle)
+    }
 
+    /// InnerBuffer::is_empty() UT test cases
+    ///
     /// # Brief
-    // case execution         1. Checking the parameters after initialization is
-    // completed         2. After entering a task into the queue space,
-    // determine again whether it is empty or not, and it should be non-empty
-    //
-    // property value should be related to the entry after the initialization is
-    // completed
+    /// case execution
+    /// 1. Checking the parameters after initialization iscompleted
+    /// 2. After entering a task into the queue space, determine again whether
+    ///    it is empty or not, and it should be non-empty property value should
+    ///    be related to the entry after the initialization is completed
     fn ut_inner_buffer_is_empty() {
         let inner_buffer = InnerBuffer::new(LOCAL_QUEUE_CAP as u16);
         assert!(inner_buffer.is_empty());
@@ -635,7 +650,7 @@ mod test {
         let (arc_handle, _) = Driver::initialize();
 
         let exe_scheduler = Arc::downgrade(&Arc::new(MultiThreadScheduler::new(1, arc_handle)));
-        let (task, _) = Task::create_task(
+        let (task, _) = create_task(
             &builder,
             exe_scheduler,
             test_future(),
@@ -647,17 +662,17 @@ mod test {
         assert!(!inner_buffer.is_empty());
     }
 
-    // InnerBuffer::len() UT test cases
-    //
-
+    /// InnerBuffer::len() UT test cases
+    ///
     /// # Brief
-    // case execution         1. Checking the parameters after initialization is
-    // completed         2. Insert tasks up to their capacity into the local
-    // queue, checking the local queue length         3. Insert tasks into the
-    // local queue that exceed its capacity, checking the local queue length as well
-    // as the global queue length
-    // value, no exception branch, and the property value should be related to the
-    // entry after the initialization is completed
+    /// case execution
+    /// 1. Checking the parameters after initialization is completed
+    /// 2. Insert tasks up to their capacity into the local queue, checking the
+    ///    local queue length
+    /// 3. Insert tasks into the local queue that exceed its capacity, checking
+    ///    the local queue length as well as the global queue length value, no
+    ///    exception branch, and the property value should be related to the
+    ///    entry after the initialization is completed
     fn ut_inner_buffer_len() {
         let inner_buffer = InnerBuffer::new(LOCAL_QUEUE_CAP as u16);
         assert_eq!(inner_buffer.len(), 0);
@@ -670,7 +685,7 @@ mod test {
 
         let exe_scheduler =
             Arc::downgrade(&Arc::new(MultiThreadScheduler::new(1, arc_handle.clone())));
-        let (task, _) = Task::create_task(
+        let (task, _) = create_task(
             &builder,
             exe_scheduler,
             test_future(),
@@ -684,7 +699,7 @@ mod test {
         for _ in 0..LOCAL_QUEUE_CAP + 1 {
             let exe_scheduler =
                 Arc::downgrade(&Arc::new(MultiThreadScheduler::new(1, arc_handle.clone())));
-            let (task, _) = Task::create_task(
+            let (task, _) = create_task(
                 &builder,
                 exe_scheduler,
                 test_future(),
@@ -699,16 +714,16 @@ mod test {
         assert_eq!(global_queue.len.load(Acquire), 1 + LOCAL_QUEUE_CAP / 2);
     }
 
-    // InnerBuffer::push_back() UT test cases
-    //
-
+    /// InnerBuffer::push_back() UT test cases
+    ///
     /// # Brief
-    // case execution         1. Insert tasks up to capacity into the local
-    // queue, verifying that they are functionally correct         2. Insert
-    // tasks that exceed the capacity into the local queue and verify that they are
-    // functionally correct
-    // there is an exception branch, after the initialization is completed the
-    // property value should be related to the entry
+    /// case execution
+    /// 1. Insert tasks up to capacity into the local queue, verifying that they
+    ///    are functionally correct
+    /// 2. Insert tasks that exceed the capacity into the local queue and verify
+    ///    that they are functionally correct there is an exception branch,
+    ///    after the initialization is completed the property value should be
+    ///    related to the entry
     fn ut_inner_buffer_push_back() {
         // 1. Insert tasks up to capacity into the local queue, verifying that they are
         // functionally correct
@@ -721,7 +736,7 @@ mod test {
         for _ in 0..LOCAL_QUEUE_CAP / 2 {
             let exe_scheduler =
                 Arc::downgrade(&Arc::new(MultiThreadScheduler::new(2, arc_handle.clone())));
-            let (task, _) = Task::create_task(
+            let (task, _) = create_task(
                 &builder,
                 exe_scheduler,
                 test_future(),
@@ -733,7 +748,7 @@ mod test {
         for _ in 0..LOCAL_QUEUE_CAP / 2 {
             let exe_scheduler =
                 Arc::downgrade(&Arc::new(MultiThreadScheduler::new(2, arc_handle.clone())));
-            let (task, _) = Task::create_task(
+            let (task, _) = create_task(
                 &builder,
                 exe_scheduler,
                 test_future(),
@@ -754,7 +769,7 @@ mod test {
         for _ in 0..LOCAL_QUEUE_CAP / 2 + 1 {
             let exe_scheduler =
                 Arc::downgrade(&Arc::new(MultiThreadScheduler::new(2, arc_handle.clone())));
-            let (task, _) = Task::create_task(
+            let (task, _) = create_task(
                 &builder,
                 exe_scheduler,
                 test_future(),
@@ -766,7 +781,7 @@ mod test {
         for _ in 0..LOCAL_QUEUE_CAP / 2 {
             let exe_scheduler =
                 Arc::downgrade(&Arc::new(MultiThreadScheduler::new(2, arc_handle.clone())));
-            let (task, _) = Task::create_task(
+            let (task, _) = create_task(
                 &builder,
                 exe_scheduler,
                 test_future(),
@@ -782,19 +797,19 @@ mod test {
         assert_eq!(global_queue.len.load(Acquire), 1 + LOCAL_QUEUE_CAP / 2);
     }
 
-    // InnerBuffer::pop_front() UT test cases
-    //
-
+    /// InnerBuffer::pop_front() UT test cases
+    ///
     /// # Brief
-    // case execution         1. Multi-threaded take out task operation with
-    // empty local queue, check if the function is correct         2. If the
-    // local queue is not empty, multi-threaded take out operations up to the number
-    // of existing tasks and check if the function is correct         3. If the
-    // local queue is not empty, the multi-threaded operation to take out more than
-    // the number of existing tasks, check whether the function is correct
-    //
-    // should be related to the entry after the initialization is completed
-    //
+    /// case execution
+    /// 1. Multi-threaded take out task operation with empty local queue, check
+    ///    if the function is correct
+    /// 2. If the local queue is not empty, multi-threaded take out operations
+    ///    up to the number of existing tasks and check if the function is
+    ///    correct
+    /// 3. If the local queue is not empty, the multi-threaded operation to take
+    ///    out more than the number of existing tasks, check whether the
+    ///    function is correct should be related to the entry after the
+    ///    initialization is completed
     fn ut_inner_buffer_pop_front() {
         // 1. Multi-threaded take out task operation with empty local queue, check if
         // the function is correct
@@ -812,7 +827,7 @@ mod test {
         for _ in 0..LOCAL_QUEUE_CAP {
             let exe_scheduler =
                 Arc::downgrade(&Arc::new(MultiThreadScheduler::new(2, arc_handle.clone())));
-            let (task, _) = Task::create_task(
+            let (task, _) = create_task(
                 &builder,
                 exe_scheduler,
                 test_future(),
@@ -850,7 +865,7 @@ mod test {
         for _ in 0..LOCAL_QUEUE_CAP {
             let exe_scheduler =
                 Arc::downgrade(&Arc::new(MultiThreadScheduler::new(2, arc_handle.clone())));
-            let (task, _) = Task::create_task(
+            let (task, _) = create_task(
                 &builder,
                 exe_scheduler,
                 test_future(),
@@ -880,25 +895,25 @@ mod test {
         assert!(local_queue.is_empty());
     }
 
-    // InnerBuffer::steal_into() UT test cases
-    //
-
+    /// InnerBuffer::steal_into() UT test cases
+    ///
     /// # Brief
-    // case execution         1. In the single-threaded case, the local queue
-    // has more than half the number of tasks, steal from other local queues, the
-    // number of steals is 0, check whether the function is completed
-    //         2. In the single-threaded case, the number of tasks already in the
-    // local queue is not more than half, steal from other local queues, the number
-    // of steals is 0, check whether the function is completed         3. In the
-    // single-threaded case, the number of tasks already in the local queue is not
-    // more than half, steal from other local queues, the number of steals is not 0,
-    // check whether the function is completed         4. Multi-threaded case,
-    // other queues are doing take out operations, but steal from this queue to see
-    // if the function is completed         5. In the multi-threaded case, other
-    // queues are being stolen by non-local queues, steal from that stolen queue and
-    // see if the function is completed
-    // invalid value, and the property value should be related to the entry after
-    // the initialization is completed
+    /// case execution
+    /// 1. In the single-threaded case, the local queue has more than half the
+    ///    number of tasks, steal from other local queues, the
+    /// number of steals is 0, check whether the function is completed
+    /// 2. In the single-threaded case, the number of tasks already in the local
+    ///    queue is not more than half, steal from other local queues, the
+    ///    number of steals is 0, check whether the function is completed
+    /// 3. In the single-threaded case, the number of tasks already in the local
+    ///    queue is not more than half, steal from other local queues, the
+    ///    number of steals is not 0, check whether the function is completed
+    /// 4. Multi-threaded case, other queues are doing take out operations, but
+    ///    steal from this queue to see if the function is completed
+    /// 5. In the multi-threaded case, other queues are being stolen by
+    ///    non-local queues, steal from that stolen queue and see if the
+    ///    function is completed invalid value, and the property value should be
+    ///    related to the entry after the initialization is completed
     fn ut_inner_buffer_steal_into() {
         // 1. In the single-threaded case, the local queue has more than half the number
         // of tasks, steal from other local queues, the number of steals is 0, check
@@ -913,7 +928,7 @@ mod test {
         for _ in 0..LOCAL_QUEUE_CAP {
             let exe_scheduler =
                 Arc::downgrade(&Arc::new(MultiThreadScheduler::new(1, arc_handle.clone())));
-            let (task, _) = Task::create_task(
+            let (task, _) = create_task(
                 &builder,
                 exe_scheduler,
                 test_future(),
@@ -926,7 +941,7 @@ mod test {
         for _ in 0..LOCAL_QUEUE_CAP {
             let exe_scheduler =
                 Arc::downgrade(&Arc::new(MultiThreadScheduler::new(1, arc_handle.clone())));
-            let (task, _) = Task::create_task(
+            let (task, _) = create_task(
                 &builder,
                 exe_scheduler,
                 test_future(),
@@ -956,7 +971,7 @@ mod test {
         for _ in 0..LOCAL_QUEUE_CAP {
             let exe_scheduler =
                 Arc::downgrade(&Arc::new(MultiThreadScheduler::new(1, arc_handle.clone())));
-            let (task, _) = Task::create_task(
+            let (task, _) = create_task(
                 &builder,
                 exe_scheduler,
                 test_future(),
@@ -984,7 +999,7 @@ mod test {
         for _ in 0..LOCAL_QUEUE_CAP {
             let exe_scheduler =
                 Arc::downgrade(&Arc::new(MultiThreadScheduler::new(1, arc_handle.clone())));
-            let (task, _) = Task::create_task(
+            let (task, _) = create_task(
                 &builder,
                 exe_scheduler,
                 test_future(),
@@ -1027,7 +1042,7 @@ mod test {
         for _ in 0..LOCAL_QUEUE_CAP {
             let exe_scheduler =
                 Arc::downgrade(&Arc::new(MultiThreadScheduler::new(1, arc_handle.clone())));
-            let (task, _) = Task::create_task(
+            let (task, _) = create_task(
                 &builder,
                 exe_scheduler,
                 test_future(),
