@@ -18,7 +18,6 @@ cfg_net! {
     pub(crate) mod slab;
 }
 
-#[cfg(any(feature = "time", feature = "net"))]
 pub(crate) mod linked_list;
 
 #[cfg(feature = "sync")]

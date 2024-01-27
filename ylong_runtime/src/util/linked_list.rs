@@ -106,7 +106,6 @@ impl<L: Link + Default> LinkedList<L> {
     }
 
     /// Pops an element from the back of the list.
-    #[cfg(feature = "time")]
     pub(crate) fn pop_back(&mut self) -> Option<NonNull<L>> {
         unsafe {
             let head = L::node(self.head).as_mut();
@@ -127,12 +126,12 @@ impl<L: Link + Default> LinkedList<L> {
     /// This method can be safely used when the node is in a guarded linked list
     /// that the caller has unique access to or the node is not in any
     /// linked list.
+    #[cfg(any(feature = "time", feature = "net"))]
     pub(crate) unsafe fn remove(&mut self, node: NonNull<L>) -> Option<NonNull<L>> {
         Node::remove_node(node)
     }
 
     /// Checks whether the list is empty.
-    #[cfg(feature = "time")]
     pub(crate) fn is_empty(&self) -> bool {
         unsafe { L::node(self.head).as_ref().next == Some(self.head) }
     }
@@ -219,7 +218,6 @@ mod tests {
     /// list.
     /// 3. Check if the list is empty before and after clear the list.
     #[test]
-    #[cfg(feature = "time")]
     fn ut_link_list_is_empty() {
         let mut list = LinkedList::<Entry>::new();
         assert!(list.is_empty());
@@ -236,7 +234,6 @@ mod tests {
     /// 2. Push nodes into the list.
     /// 3. Pop nodes from the list and check the value.
     #[test]
-    #[cfg(feature = "time")]
     fn ut_link_list_push_and_pop() {
         let mut list = LinkedList::<Entry>::new();
         assert!(list.is_empty());
@@ -265,6 +262,7 @@ mod tests {
     /// 3. Remove the first node from the list and check the list.
     /// 4. Remove the second node from the list and check the list.
     /// 5. Remove the third node from the list and check the list.
+    #[cfg(any(feature = "time", feature = "net"))]
     #[test]
     fn ut_link_list_remove() {
         let mut list = LinkedList::<Entry>::new();

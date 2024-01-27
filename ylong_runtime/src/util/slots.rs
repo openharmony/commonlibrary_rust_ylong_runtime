@@ -15,7 +15,6 @@
 
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
-use std::option::Option::Some;
 use std::{fmt, ops};
 
 // Index tag of empty slot, vector will panic if the new capacity exceeds

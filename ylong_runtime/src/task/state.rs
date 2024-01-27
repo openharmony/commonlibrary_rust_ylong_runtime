@@ -321,20 +321,6 @@ impl TaskState {
         let new = (INIT - REF_ONE) & !CARE_JOIN_HANDLE;
         self.0.compare_exchange(old, new, Relaxed, Relaxed) == Ok(old)
     }
-
-    cfg_not_ffrt! {
-        /// Turns the task state into canceled. Returns the old state value.
-        #[inline]
-        pub(crate) fn set_cancel(&self) -> usize {
-            self.0.fetch_or(CANCELED, AcqRel)
-        }
-
-        /// Turns the task state into running. Returns the old state value.
-        #[inline]
-        pub(crate) fn set_running(&self) {
-            self.0.fetch_or(RUNNING, AcqRel);
-        }
-    }
 }
 
 #[cfg(test)]

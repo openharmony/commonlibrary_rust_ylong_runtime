@@ -139,33 +139,6 @@ impl Worker {
 
             self.check_cancel(inner);
         }
-        self.pre_shutdown(inner, worker_ctx);
-    }
-
-    fn pre_shutdown(&self, inner: &mut Inner, worker_ctx: &WorkerContext) {
-        // drop all tasks in the local queue
-        loop {
-            if let Some(task) = self.get_task(inner, worker_ctx) {
-                task.shutdown();
-                continue;
-            }
-            if self.scheduler.has_no_work() {
-                break;
-            }
-        }
-        // thread 0 is responsible for dropping the tasks inside the global queue
-        if self.index == 0 {
-            let mut global = self.scheduler.get_global().get_global().lock().unwrap();
-            loop {
-                if let Some(task) = global.pop_front() {
-                    task.shutdown();
-                    continue;
-                }
-                if global.is_empty() {
-                    break;
-                }
-            }
-        }
     }
 
     fn get_task(&self, inner: &mut Inner, worker_ctx: &WorkerContext) -> Option<Task> {

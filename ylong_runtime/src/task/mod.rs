@@ -31,7 +31,7 @@ pub use join_set::JoinSet;
 pub use yield_now::yield_now;
 
 use crate::executor::Schedule;
-use crate::task::raw::{Header, RawTask, TaskMngInfo};
+pub(crate) use crate::task::raw::{Header, RawTask, TaskMngInfo};
 
 pub(crate) enum VirtualTableType {
     #[cfg(not(feature = "ffrt"))]
@@ -72,14 +72,22 @@ unsafe impl Sync for Task {}
 
 #[cfg(not(feature = "ffrt"))]
 impl Task {
+    #[inline]
     pub(crate) fn run(self) {
         self.0.run();
     }
 
+    #[inline]
     pub(crate) fn shutdown(self) {
         self.0.shutdown();
     }
 
+    #[inline]
+    pub(crate) fn into_header(self) -> NonNull<Header> {
+        self.0.ptr
+    }
+
+    #[inline]
     pub(crate) unsafe fn from_raw(ptr: NonNull<Header>) -> Task {
         Task(RawTask::form_raw(ptr))
     }

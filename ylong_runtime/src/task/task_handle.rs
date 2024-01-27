@@ -25,7 +25,6 @@ use crate::task::waker::WakerRefHeader;
 
 cfg_not_ffrt! {
     use crate::task::Task;
-    use crate::task::raw::Stage;
 }
 
 pub(crate) struct TaskHandle<T: Future, S: Schedule> {
@@ -207,19 +206,13 @@ where
     }
 
     pub(crate) unsafe fn shutdown(self) {
-        self.header().state.set_cancel();
         // Check if the JoinHandle gets dropped already. If JoinHandle is still there,
         // wakes the JoinHandle.
-        let cur = self.header().state.get_current_state();
-        if state::is_care_join_handle(cur) {
-            let stage = self.inner().stage.get();
-            *stage = Stage::StoreData(Err(ErrorKind::TaskCanceled.into()));
-            self.header().state.set_running();
-            let _ = self.header().state.turning_to_finish();
-            if state::is_set_waker(cur) {
-                self.inner().wake_join();
-            }
-            self.drop_ref();
+        let cur = self.header().state.dec_ref();
+        if state::ref_count(cur) > 0 && state::is_care_join_handle(cur) {
+            self.set_canceled();
+        } else {
+            self.release();
         }
     }
 

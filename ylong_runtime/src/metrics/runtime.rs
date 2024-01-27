@@ -214,7 +214,7 @@ impl Metrics<'_> {
         match &self.runtime.async_spawner {
             #[cfg(feature = "current_thread_runtime")]
             AsyncHandle::CurrentThread(spawner) => spawner.scheduler.inner.lock().unwrap().len(),
-            AsyncHandle::MultiThread(spawner) => spawner.exe_mng_info.get_global().get_len(),
+            AsyncHandle::MultiThread(spawner) => spawner.exe_mng_info.global.get_len(),
         }
     }
 
@@ -240,7 +240,7 @@ impl Metrics<'_> {
                 .scheduler
                 .count
                 .load(std::sync::atomic::Ordering::Acquire),
-            AsyncHandle::MultiThread(spawner) => spawner.exe_mng_info.get_global().get_count(),
+            AsyncHandle::MultiThread(spawner) => spawner.exe_mng_info.global.get_count(),
         }
     }
 
