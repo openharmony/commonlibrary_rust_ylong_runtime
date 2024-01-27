@@ -33,7 +33,7 @@ ohos_rust_shared_library("ylong_runtime") {
   deps = [
     "../ylong_io:ylong_io",
     "../ylong_runtime_macros:ylong_runtime_macros(${host_toolchain})",
-    "../ylong_runtime_signal:ylong_runtime_signal",
+    "../ylong_signal:ylong_signal",
     "//third_party/rust/crates/libc:lib",
   ]
 }

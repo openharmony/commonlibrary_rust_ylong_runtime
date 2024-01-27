@@ -13,11 +13,11 @@
 
 import("//build/ohos.gni")
 
-ohos_rust_proc_macro("ylong_runtime_signal") {
+ohos_rust_static_library("ylong_signal") {
   part_name = "ylong_runtime"
   subsystem_name = "commonlibrary"
 
-  crate_name = "ylong_runtime_signal"
+  crate_name = "ylong_signal"
   edition = "2021"
 
   sources = [ "src/lib.rs" ]

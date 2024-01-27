@@ -38,7 +38,7 @@ cfg_not_ffrt! {
 }
 
 #[cfg(feature = "signal")]
-const SIGNAL_TOKEN: Token = Token(1);
+pub(crate) const SIGNAL_TOKEN: Token = Token((1 << 31) + 1);
 const DRIVER_TICK_INIT: u8 = 0;
 
 // Token structure
@@ -266,6 +266,7 @@ impl IoDriver {
             #[cfg(feature = "signal")]
             if token == SIGNAL_TOKEN {
                 self.signal_pending = true;
+                continue;
             }
             let ready = Ready::from_event(event);
             self.dispatch(token, ready);

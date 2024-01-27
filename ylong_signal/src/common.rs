@@ -24,6 +24,9 @@ use crate::sig_map::SigMap;
 /// specialness
 #[cfg(windows)]
 pub const SIGNAL_BLOCK_LIST: &[c_int] = &[SIGILL, SIGFPE, SIGSEGV];
+
+/// These signals should not be handled at all due to POSIX settings or their
+/// specialness
 #[cfg(not(windows))]
 pub const SIGNAL_BLOCK_LIST: &[c_int] = &[SIGSEGV, SIGKILL, SIGSTOP, SIGILL, SIGFPE];
 

@@ -13,13 +13,12 @@
 
 use std::io::{ErrorKind, Read};
 
-use ylong_io::{Interest, Token, UnixStream};
+use ylong_io::{Interest, UnixStream};
 
 #[cfg(not(feature = "ffrt"))]
 use crate::executor::driver::Handle;
+use crate::net::driver::SIGNAL_TOKEN;
 use crate::signal::registry::get_global_registry;
-
-const SIGNAL_TOKEN: Token = Token(1);
 
 pub(crate) struct SignalDriver {
     receiver: UnixStream,
