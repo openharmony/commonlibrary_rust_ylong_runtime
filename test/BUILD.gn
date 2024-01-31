@@ -21,6 +21,7 @@ ohos_rust_unittest("rust_ylong_runtime_test_ut") {
     "--cfg=feature=\"macros\"",
     "--cfg=feature=\"net\"",
     "--cfg=feature=\"sync\"",
+    "--cfg=feature=\"signal\"",
     "--cfg=feature=\"time\"",
   ]
 
@@ -41,11 +42,27 @@ ohos_rust_systemtest("rust_ylong_runtime_test_sdv") {
     "--cfg=feature=\"macros\"",
     "--cfg=feature=\"net\"",
     "--cfg=feature=\"sync\"",
+    "--cfg=feature=\"signal\"",
     "--cfg=feature=\"time\"",
   ]
 
   sources = [ "../ylong_runtime/tests/entry.rs" ]
-  deps = [ "../ylong_runtime:ylong_runtime" ]
+  deps = [
+    "../ylong_runtime:ylong_runtime",
+    "//third_party/rust/crates/libc:lib",
+  ]
+}
+
+ohos_rust_systemtest("rust_ylong_signal_test_sdv") {
+  module_out_path = "ylong_runtime/ylong_runtime"
+
+  rustflags = [ "--cfg=gn_test" ]
+
+  sources = [ "../ylong_signal/tests/entry.rs" ]
+  deps = [
+    "../ylong_signal:ylong_signal",
+    "//third_party/rust/crates/libc:lib",
+  ]
 }
 
 group("unittest") {
@@ -55,5 +72,8 @@ group("unittest") {
 
 group("sdvtest") {
   testonly = true
-  deps = [ ":rust_ylong_runtime_test_sdv" ]
+  deps = [
+    ":rust_ylong_runtime_test_sdv",
+    ":rust_ylong_signal_test_sdv",
+  ]
 }

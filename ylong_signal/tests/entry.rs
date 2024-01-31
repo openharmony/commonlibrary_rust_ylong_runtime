@@ -13,25 +13,4 @@
 
 #![cfg(gn_test)]
 
-mod async_buf_read;
-mod async_buf_write;
-mod async_dir;
-mod async_fs;
-mod async_pool;
-mod async_read;
-mod block_on;
-mod builder;
-mod join_set;
-mod mpsc_test;
-mod mutex;
-mod par_iter;
-mod semaphore_test;
 mod signal;
-mod singleton_runtime;
-mod spawn;
-mod spawn_blocking;
-mod sync;
-mod task_cancel;
-mod tcp_test;
-mod timer_test;
-mod udp_test;

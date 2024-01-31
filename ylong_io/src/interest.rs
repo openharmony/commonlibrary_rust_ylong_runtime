@@ -18,6 +18,8 @@ use std::num::NonZeroU8;
 pub struct Interest(NonZeroU8);
 use std::ops;
 
+use libc::c_uint;
+
 const READABLE: u8 = 0b0001;
 const WRITABLE: u8 = 0b0010;
 
@@ -41,6 +43,23 @@ impl Interest {
     /// Checks if the interest is for writeable events.
     pub const fn is_writable(self) -> bool {
         (self.0.get() & WRITABLE) != 0
+    }
+
+    /// Convert interest to the event value.
+    #[cfg(target_os = "linux")]
+    pub fn into_io_event(self) -> c_uint {
+        let mut io_event = libc::EPOLLET as u32;
+
+        if self.is_readable() {
+            io_event |= libc::EPOLLIN as u32;
+            io_event |= libc::EPOLLRDHUP as u32;
+        }
+
+        if self.is_writable() {
+            io_event |= libc::EPOLLOUT as u32;
+        }
+
+        io_event as c_uint
     }
 }
 

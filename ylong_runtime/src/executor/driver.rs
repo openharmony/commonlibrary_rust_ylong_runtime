@@ -32,6 +32,11 @@ cfg_net! {
     use crate::net::ScheduleIO;
 }
 
+cfg_signal! {
+    use ylong_io::Token;
+    use crate::signal::SignalDriver;
+}
+
 // Flag used to identify whether to park on condvar.
 pub(crate) enum ParkFlag {
     NotPark,
@@ -42,6 +47,8 @@ pub(crate) enum ParkFlag {
 pub(crate) struct Driver {
     #[cfg(feature = "net")]
     io: IoDriver,
+    #[cfg(feature = "signal")]
+    signal: SignalDriver,
     #[cfg(feature = "time")]
     time: Arc<TimeDriver>,
 }
@@ -65,9 +72,13 @@ impl Driver {
             #[cfg(feature = "time")]
             time: time_handle,
         };
+        #[cfg(feature = "signal")]
+        let signal_driver = SignalDriver::initialize(&handle);
         let driver = Driver {
             #[cfg(feature = "net")]
             io: io_driver,
+            #[cfg(feature = "signal")]
+            signal: signal_driver,
             #[cfg(feature = "time")]
             time: time_driver,
         };
@@ -80,6 +91,10 @@ impl Driver {
         let _duration = self.time.run();
         #[cfg(feature = "net")]
         self.io.drive(_duration).expect("io driver running failed");
+        #[cfg(feature = "signal")]
+        if self.io.process_signal() {
+            self.signal.broadcast();
+        }
         if cfg!(feature = "net") {
             ParkFlag::NotPark
         } else {
@@ -98,6 +113,10 @@ impl Driver {
         self.io
             .drive(Some(Duration::from_millis(0)))
             .expect("io driver running failed");
+        #[cfg(feature = "signal")]
+        if self.io.process_signal() {
+            self.signal.broadcast();
+        }
     }
 }
 
@@ -154,5 +173,17 @@ impl Handle {
 
     pub(crate) fn timer_cancel(&self, clock_entry: NonNull<Clock>) {
         self.time.timer_cancel(clock_entry);
+    }
+}
+
+#[cfg(feature = "signal")]
+impl Handle {
+    pub(crate) fn io_register_with_token(
+        &self,
+        io: &mut impl Source,
+        token: Token,
+        interest: Interest,
+    ) -> io::Result<()> {
+        self.io.register_source_with_token(io, token, interest)
     }
 }

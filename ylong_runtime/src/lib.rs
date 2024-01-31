@@ -61,6 +61,10 @@ cfg_time! {
     pub mod time;
 }
 
+cfg_signal! {
+    pub mod signal;
+}
+
 cfg_sync! {
     pub mod sync;
 }
