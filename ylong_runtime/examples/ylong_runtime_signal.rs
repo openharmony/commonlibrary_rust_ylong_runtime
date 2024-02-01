@@ -16,6 +16,8 @@ use std::sync::atomic::Ordering::{Acquire, Release};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+#[cfg(target_os = "windows")]
+use windows_sys::Win32::System::Console::{GenerateConsoleCtrlEvent, CTRL_C_EVENT};
 use ylong_runtime::signal::{signal, SignalKind};
 
 fn print_time(duration: Duration) {
@@ -26,6 +28,7 @@ fn print_time(duration: Duration) {
     println!("duration : {:?}", formatted_time);
 }
 
+#[cfg(target_os = "linux")]
 fn run_multi_thread_signal() {
     let num = Arc::new(AtomicUsize::new(0));
     let mut handles = Vec::new();
@@ -39,6 +42,25 @@ fn run_multi_thread_signal() {
     }
     while num.load(Acquire) < 10 {}
     unsafe { libc::raise(libc::SIGCHLD) };
+    for handle in handles {
+        let _ = ylong_runtime::block_on(handle);
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn run_multi_thread_signal() {
+    let num = Arc::new(AtomicUsize::new(0));
+    let mut handles = Vec::new();
+    for _ in 0..10 {
+        let num_clone = num.clone();
+        handles.push(ylong_runtime::spawn(async move {
+            let mut stream = signal(SignalKind::ctrl_c()).unwrap();
+            num_clone.fetch_add(1, Release);
+            stream.recv().await;
+        }));
+    }
+    while num.load(Acquire) < 10 {}
+    unsafe { GenerateConsoleCtrlEvent(CTRL_C_EVENT, 0) };
     for handle in handles {
         let _ = ylong_runtime::block_on(handle);
     }

@@ -18,6 +18,7 @@ use std::num::NonZeroU8;
 pub struct Interest(NonZeroU8);
 use std::ops;
 
+#[cfg(target_os = "linux")]
 use libc::c_uint;
 
 const READABLE: u8 = 0b0001;

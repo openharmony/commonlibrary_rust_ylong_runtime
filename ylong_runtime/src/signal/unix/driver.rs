@@ -18,7 +18,7 @@ use ylong_io::{Interest, UnixStream};
 #[cfg(not(feature = "ffrt"))]
 use crate::executor::driver::Handle;
 use crate::net::driver::SIGNAL_TOKEN;
-use crate::signal::registry::get_global_registry;
+use crate::signal::unix::registry::Registry;
 
 pub(crate) struct SignalDriver {
     receiver: UnixStream,
@@ -40,7 +40,7 @@ impl SignalDriver {
                 Err(e) => panic!("Error occurs in signal stream: {}", e),
             }
         }
-        get_global_registry().broadcast();
+        Registry::get_instance().broadcast();
     }
 }
 
@@ -50,7 +50,7 @@ impl SignalDriver {
         // panic will occur when some errors like fds reaches the maximum limit
         // or insufficient memory occur. For more detailed errors, please refer to
         // `libc::fcntl`.
-        let mut receiver = get_global_registry()
+        let mut receiver = Registry::get_instance()
             .try_clone_stream()
             .expect("Signal failed to clone UnixStream");
         let _ = handle.io_register_with_token(
@@ -72,7 +72,7 @@ impl SignalDriver {
     pub(crate) fn initialize() {
         static ONCE: std::sync::Once = std::sync::Once::new();
         ONCE.call_once(|| unsafe {
-            let mut receiver = get_global_registry()
+            let mut receiver = Registry::get_instance()
                 .try_clone_stream()
                 .expect("Signal failed to clone UnixStream");
             let inner = crate::net::IoHandle::get_ref();

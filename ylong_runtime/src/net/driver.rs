@@ -24,8 +24,8 @@ use crate::util::bit::{Bit, Mask};
 use crate::util::slab::{Address, Ref, Slab};
 
 cfg_ffrt! {
-    #[cfg(feature = "signal")]
-    use crate::signal::SignalDriver;
+    #[cfg(all(feature = "signal", target_os = "linux"))]
+    use crate::signal::unix::SignalDriver;
     use libc::{c_void, c_int, c_uint, c_uchar};
 }
 
@@ -37,7 +37,7 @@ cfg_not_ffrt! {
     const WAKE_TOKEN: Token = Token(1 << 31);
 }
 
-#[cfg(feature = "signal")]
+#[cfg(all(feature = "signal", target_os = "linux"))]
 pub(crate) const SIGNAL_TOKEN: Token = Token((1 << 31) + 1);
 const DRIVER_TICK_INIT: u8 = 0;
 
@@ -66,7 +66,7 @@ pub(crate) struct IoDriver {
     events: Option<Events>,
 
     /// Indicate if there is a signal coming
-    #[cfg(all(not(feature = "ffrt"), feature = "signal"))]
+    #[cfg(all(not(feature = "ffrt"), feature = "signal", target_os = "linux"))]
     signal_pending: bool,
 
     /// Save Handle used in metrics.
@@ -219,7 +219,7 @@ impl IoDriver {
             poll: arc_poll,
             #[cfg(feature = "metrics")]
             io_handle_inner: inner.clone(),
-            #[cfg(feature = "signal")]
+            #[cfg(all(feature = "signal", target_os = "linux"))]
             signal_pending: false,
         };
 
@@ -263,10 +263,9 @@ impl IoDriver {
             if token == WAKE_TOKEN {
                 continue;
             }
-            #[cfg(feature = "signal")]
+            #[cfg(all(feature = "signal", target_os = "linux"))]
             if token == SIGNAL_TOKEN {
                 self.signal_pending = true;
-                continue;
             }
             let ready = Ready::from_event(event);
             self.dispatch(token, ready);
@@ -281,7 +280,7 @@ impl IoDriver {
         Ok(has_events)
     }
 
-    #[cfg(feature = "signal")]
+    #[cfg(all(feature = "signal", target_os = "linux"))]
     pub(crate) fn process_signal(&mut self) -> bool {
         let pending = self.signal_pending;
         self.signal_pending = false;
@@ -317,7 +316,7 @@ impl IoDriver {
     }
 }
 
-#[cfg(all(feature = "ffrt", feature = "signal"))]
+#[cfg(all(feature = "ffrt", feature = "signal", target_os = "linux"))]
 extern "C" fn ffrt_dispatch_signal_event(data: *const c_void, _ready: c_uint, _new_tick: c_uchar) {
     let token = Token::from_usize(data as usize);
     if token == SIGNAL_TOKEN {
@@ -362,7 +361,7 @@ impl Inner {
 
 #[cfg(not(feature = "ffrt"))]
 impl Inner {
-    #[cfg(feature = "signal")]
+    #[cfg(all(feature = "signal", target_os = "linux"))]
     pub(crate) fn register_source_with_token(
         &self,
         io: &mut impl Source,
@@ -399,7 +398,7 @@ impl Inner {
 
 #[cfg(feature = "ffrt")]
 impl Inner {
-    #[cfg(feature = "signal")]
+    #[cfg(all(feature = "signal", target_os = "linux"))]
     pub(crate) fn register_source_with_token(
         &self,
         io: &mut impl Source,
