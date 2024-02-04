@@ -29,6 +29,7 @@ use crate::builder::multi_thread_builder::MultiThreadBuilder;
 use crate::builder::CallbackHook;
 use crate::fastrand::fast_random;
 use crate::task::{JoinHandle, Task, TaskBuilder, VirtualTableType};
+#[cfg(not(target_os = "macos"))]
 use crate::util::core_affinity::set_current_affinity;
 use crate::util::num_cpus::get_cpu_num;
 
@@ -303,6 +304,7 @@ pub(crate) struct Inner {
     /// Number of total threads
     pub(crate) total: usize,
     /// Core-affinity setting of the threads
+    #[cfg_attr(target_os = "macos", allow(unused))]
     is_affinity: bool,
     /// Handle for shutting down the pool
     shutdown_handle: Arc<(Mutex<usize>, Condvar)>,
@@ -403,11 +405,12 @@ impl AsyncPoolSpawner {
 
             let inner = self.inner.clone();
 
+            #[cfg(not(target_os = "macos"))]
             if self.inner.is_affinity {
                 builder.spawn(move || {
                     let cpu_core_num = get_cpu_core();
                     let cpu_id = worker_id % cpu_core_num;
-                    set_current_affinity(cpu_id).expect("set_current_affinity() fail!");
+                    let _ = set_current_affinity(cpu_id);
                     async_thread_proc(inner, worker, work_arc_handle);
                 })?;
             } else {
@@ -415,6 +418,11 @@ impl AsyncPoolSpawner {
                     async_thread_proc(inner, worker, work_arc_handle);
                 })?;
             }
+
+            #[cfg(target_os = "macos")]
+            builder.spawn(move || {
+                async_thread_proc(inner, worker, work_arc_handle);
+            })?;
         }
         Ok(())
     }

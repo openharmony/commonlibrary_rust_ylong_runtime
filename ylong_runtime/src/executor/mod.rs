@@ -109,7 +109,7 @@ pub(crate) fn global_default_async() -> &'static Runtime {
                 Ok(s) => Runtime {
                     async_spawner: AsyncHandle::MultiThread(s),
                 },
-                Err(e) => panic!("initialize runtime failed: {:?}", e),
+                Err(e) => panic!("initialize runtime failed: {e:?}"),
             };
             #[cfg(feature = "ffrt")]
             let runtime = Runtime {
@@ -135,7 +135,7 @@ pub(crate) fn global_default_blocking() -> &'static BlockPoolSpawner {
             }
             match initialize_blocking_spawner(&global_builder.as_ref().unwrap().common) {
                 Ok(bps) => GLOBAL_DEFAULT_BLOCKING = MaybeUninit::new(bps),
-                Err(e) => panic!("initialize blocking pool failed: {:?}", e),
+                Err(e) => panic!("initialize blocking pool failed: {e:?}"),
             }
         });
         &*GLOBAL_DEFAULT_BLOCKING.as_ptr()

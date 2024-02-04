@@ -31,7 +31,7 @@ cfg_not_ffrt!(
         use crate::net::ScheduleIO;
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(target_family = "unix")]
     cfg_signal! {
         use ylong_io::Token;
     }
@@ -99,7 +99,7 @@ cfg_not_ffrt!(
         }
     }
 
-    #[cfg(all(feature = "signal", target_os = "linux"))]
+    #[cfg(all(feature = "signal", target_family = "unix"))]
     impl Handle {
         pub(crate) fn io_register_with_token(
             &self,

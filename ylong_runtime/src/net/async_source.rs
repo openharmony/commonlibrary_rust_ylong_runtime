@@ -87,7 +87,7 @@ impl<E: Source> AsyncSource<E> {
         }
     }
 
-    #[cfg(unix)]
+    #[cfg(target_os = "linux")]
     cfg_process! {
         /// Deregisters the io and return it.
         pub(crate) fn io_take(mut self) -> io::Result<E> {

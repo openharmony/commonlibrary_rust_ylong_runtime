@@ -16,7 +16,7 @@ use std::os::raw::{c_int, c_uint};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
-use crate::{Events, Interest, Token};
+use crate::{EventTrait, Interest, Token};
 
 static NEXT_ID: AtomicUsize = AtomicUsize::new(1);
 
@@ -137,5 +137,43 @@ impl Drop for Selector {
 impl std::fmt::Debug for Selector {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(fmt, "epoll fd: {}, Select id: {}", self.ep, self.id)
+    }
+}
+
+/// A vector of events
+pub type Events = Vec<Event>;
+
+/// An io event
+pub type Event = libc::epoll_event;
+
+impl EventTrait for Event {
+    fn token(&self) -> Token {
+        Token(self.u64 as usize)
+    }
+
+    fn is_readable(&self) -> bool {
+        (self.events as libc::c_int & libc::EPOLLIN) != 0
+            || (self.events as libc::c_int & libc::EPOLLPRI) != 0
+    }
+
+    fn is_writable(&self) -> bool {
+        (self.events as libc::c_int & libc::EPOLLOUT) != 0
+    }
+
+    fn is_read_closed(&self) -> bool {
+        self.events as libc::c_int & libc::EPOLLHUP != 0
+            || (self.events as libc::c_int & libc::EPOLLIN != 0
+                && self.events as libc::c_int & libc::EPOLLRDHUP != 0)
+    }
+
+    fn is_write_closed(&self) -> bool {
+        self.events as libc::c_int & libc::EPOLLHUP != 0
+            || (self.events as libc::c_int & libc::EPOLLOUT != 0
+                && self.events as libc::c_int & libc::EPOLLERR != 0)
+            || self.events as libc::c_int == libc::EPOLLERR
+    }
+
+    fn is_error(&self) -> bool {
+        (self.events as libc::c_int & libc::EPOLLERR) != 0
     }
 }

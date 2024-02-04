@@ -37,7 +37,7 @@ impl SignalDriver {
                 Ok(0) => panic!("EOF occurs in signal stream"),
                 Ok(_) => {}
                 Err(e) if e.kind() == ErrorKind::WouldBlock => break,
-                Err(e) => panic!("Error occurs in signal stream: {}", e),
+                Err(e) => panic!("Error occurs in signal stream: {e}"),
             }
         }
         Registry::get_instance().broadcast();

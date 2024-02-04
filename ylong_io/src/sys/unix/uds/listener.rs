@@ -18,8 +18,10 @@ use std::os::unix::net;
 use std::path::Path;
 
 use crate::source::Fd;
-use crate::sys::unix::{SocketAddr, UnixStream};
-use crate::{Interest, Selector, Source, Token};
+#[cfg(target_os = "macos")]
+use crate::sys::socket::set_non_block;
+use crate::sys::unix::SocketAddr;
+use crate::{Interest, Selector, Source, Token, UnixStream};
 
 /// A UDS server.
 pub struct UnixListener {
@@ -61,18 +63,33 @@ impl UnixListener {
 
         addr.sun_family = libc::AF_UNIX as libc::sa_family_t;
         let mut socklen = mem::size_of_val(&addr) as libc::socklen_t;
-
-        let flags = libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
-        let socket = syscall!(accept4(
-            self.inner.as_raw_fd(),
-            &mut addr as *mut libc::sockaddr_un as *mut libc::sockaddr,
-            &mut socklen,
-            flags
-        ))
-        .map(|socket| unsafe { net::UnixStream::from_raw_fd(socket) })?;
+        #[cfg(target_os = "linux")]
+        let socket = {
+            let flags = libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
+            syscall!(accept4(
+                self.inner.as_raw_fd(),
+                &mut addr as *mut libc::sockaddr_un as *mut libc::sockaddr,
+                &mut socklen,
+                flags
+            ))
+            .map(|socket| unsafe { net::UnixStream::from_raw_fd(socket) })?
+        };
+        #[cfg(target_os = "macos")]
+        let socket = {
+            syscall!(accept(
+                self.inner.as_raw_fd(),
+                &mut addr as *mut libc::sockaddr_un as *mut libc::sockaddr,
+                &mut socklen,
+            ))
+            .map(|socket| {
+                set_non_block(socket)?;
+                let socket = unsafe { net::UnixStream::from_raw_fd(socket) };
+                Ok::<net::UnixStream, io::Error>(socket)
+            })
+        }??;
 
         Ok((
-            crate::UnixStream::from_std(socket),
+            UnixStream::from_std(socket),
             SocketAddr::from_parts(addr, socklen),
         ))
     }

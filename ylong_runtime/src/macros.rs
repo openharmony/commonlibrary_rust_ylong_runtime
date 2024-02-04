@@ -51,7 +51,7 @@ macro_rules! cfg_signal {
     }
 }
 
-#[cfg(unix)]
+#[cfg(target_os = "linux")]
 macro_rules! cfg_process {
     ($($item:item)*) => {
         $(

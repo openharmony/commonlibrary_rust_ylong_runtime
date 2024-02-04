@@ -18,13 +18,14 @@ use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 use std::time::Duration;
 
 use libc::{
-    c_int, c_void, linger, socklen_t, AF_INET, AF_INET6, SOCK_CLOEXEC, SOCK_NONBLOCK, SOCK_STREAM,
-    SOL_SOCKET, SO_LINGER, SO_REUSEADDR,
+    c_int, c_void, linger, socklen_t, AF_INET, AF_INET6, SOCK_STREAM, SOL_SOCKET, SO_LINGER,
+    SO_REUSEADDR,
 };
 
 use super::super::socket_addr::socket_addr_trans;
 use super::{TcpListener, TcpStream};
 use crate::source::Fd;
+use crate::sys::unix::socket::socket_new;
 
 pub(crate) struct TcpSocket {
     socket: c_int,
@@ -40,13 +41,10 @@ impl TcpSocket {
     }
 
     pub(crate) fn create_socket(domain: c_int, socket_type: c_int) -> io::Result<TcpSocket> {
-        let socket_type = socket_type | SOCK_NONBLOCK | SOCK_CLOEXEC;
-        match syscall!(socket(domain, socket_type, 0)) {
-            Ok(socket) => Ok(TcpSocket {
-                socket: socket as c_int,
-            }),
-            Err(err) => Err(err),
-        }
+        let socket = socket_new(domain, socket_type)?;
+        Ok(TcpSocket {
+            socket: socket as c_int,
+        })
     }
 
     pub(crate) fn set_reuse(&self, is_reuse: bool) -> io::Result<()> {

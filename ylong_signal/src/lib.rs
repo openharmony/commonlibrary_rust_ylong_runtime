@@ -25,7 +25,7 @@ mod spin_rwlock;
 mod windows;
 
 #[cfg(not(windows))]
-mod linux;
+mod unix;
 
 use std::io;
 

@@ -38,6 +38,8 @@ pub(crate) fn socket_addr_trans(addr: &SocketAddr) -> (SocketAddrLibC, socklen_t
                     s_addr: u32::from_ne_bytes(addr.ip().octets()),
                 },
                 sin_zero: [0; 8],
+                #[cfg(target_os = "macos")]
+                sin_len: 0,
             };
 
             (
@@ -57,6 +59,8 @@ pub(crate) fn socket_addr_trans(addr: &SocketAddr) -> (SocketAddrLibC, socklen_t
                 sin6_addr,
                 sin6_flowinfo: addr.flowinfo(),
                 sin6_scope_id: addr.scope_id(),
+                #[cfg(target_os = "macos")]
+                sin6_len: 0,
             };
 
             (

@@ -168,7 +168,7 @@ where
                 let output = self.get_canceled();
                 return self.finish(cur, Err(output));
             }
-            StateAction::Failed(state) => panic!("task state invalid: {}", state),
+            StateAction::Failed(state) => panic!("task state invalid: {state}"),
             _ => unreachable!(),
         };
 
@@ -191,7 +191,7 @@ where
                 StateAction::Enqueue => {
                     self.get_scheduled(true);
                 }
-                StateAction::Failed(state) => panic!("task state invalid: {}", state),
+                StateAction::Failed(state) => panic!("task state invalid: {state}"),
                 StateAction::Canceled(state) => {
                     let output = self.get_canceled();
                     self.finish(state, Err(output));

@@ -236,7 +236,7 @@ impl BlockPoolSpawner {
                         shared.worker_id += 1;
                     }
                     Err(e) => {
-                        panic!("os can't spawn worker thread: {}", e);
+                        panic!("os can't spawn worker thread: {e}");
                     }
                 }
             }

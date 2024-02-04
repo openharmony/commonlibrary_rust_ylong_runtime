@@ -37,15 +37,21 @@ cfg_udp! {
 mod uds;
 pub use uds::{SocketAddr, UnixDatagram, UnixListener, UnixStream};
 
+#[cfg(target_os = "linux")]
 mod epoll;
-pub use epoll::Selector;
+#[cfg(target_os = "linux")]
+pub use epoll::{Event, Events, Selector};
 
 mod socket_addr;
 
-mod events;
-pub use events::{Event, Events};
+#[cfg(target_os = "macos")]
+mod kqueue;
+#[cfg(target_os = "macos")]
+pub use kqueue::{Event, Events, Selector};
 
+pub(crate) mod socket;
 mod waker;
+
 pub(crate) use waker::WakerInner;
 
 mod source_fd;

@@ -92,9 +92,10 @@ impl CommonBuilder {
 #[cfg(not(feature = "ffrt"))]
 macro_rules! impl_common {
     ($self:ident) => {
-         use std::time::Duration;
-         use crate::builder::ScheduleAlgo;
-         use std::sync::Arc;
+        use std::sync::Arc;
+        use std::time::Duration;
+
+        use crate::builder::ScheduleAlgo;
 
         impl $self {
             /// Sets the name prefix for all worker threads.
