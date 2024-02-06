@@ -13,351 +13,52 @@
 
 //! Asynchronous signal handling.
 
-mod driver;
-mod registry;
+#[cfg(target_os = "linux")]
+pub mod unix;
+#[cfg(target_os = "linux")]
+pub use unix::{signal, SignalKind};
 
-use std::io;
-use std::io::{Error, ErrorKind};
-use std::os::raw::c_int;
+#[cfg(target_os = "windows")]
+pub mod windows;
 use std::task::{Context, Poll};
 
-pub(crate) use driver::SignalDriver;
-use ylong_signal::SIGNAL_BLOCK_LIST;
+#[cfg(target_os = "windows")]
+pub use windows::{signal, SignalKind};
 
-use crate::signal::registry::get_global_registry;
 use crate::sync::watch::Receiver;
-
-/// Signal kind to listen for.
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
-pub struct SignalKind(c_int);
-
-impl SignalKind {
-    /// Generates [`SignalKind`] from valid numeric value.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use ylong_runtime::signal::{signal, SignalKind};
-    /// async fn io_func() {
-    ///     let signal_kind = SignalKind::from_raw(2);
-    ///     let handle = ylong_runtime::spawn(async move {
-    ///         let mut signal = signal(signal_kind).unwrap();
-    ///         signal.recv().await;
-    ///     });
-    ///     let _ = ylong_runtime::block_on(handle);
-    /// }
-    /// ```
-    pub const fn from_raw(signal_num: c_int) -> SignalKind {
-        SignalKind(signal_num)
-    }
-
-    /// Gets the numeric value.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use ylong_runtime::signal::SignalKind;
-    /// async fn io_func() {
-    ///     let signal_kind = SignalKind::interrupt();
-    ///     assert_eq!(signal_kind.as_raw(), 2);
-    /// }
-    /// ```
-    pub const fn as_raw(&self) -> c_int {
-        self.0
-    }
-
-    /// SIGALRM signal.
-    ///
-    /// # Unix system
-    /// Raised when a timer expires, typically used for timing operations. By
-    /// default, it terminates the process.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use ylong_runtime::signal::{signal, SignalKind};
-    /// async fn io_func() {
-    ///     let handle = ylong_runtime::spawn(async move {
-    ///         let mut signal = signal(SignalKind::alarm()).unwrap();
-    ///         signal.recv().await;
-    ///     });
-    ///     let _ = ylong_runtime::block_on(handle);
-    /// }
-    /// ```
-    pub const fn alarm() -> SignalKind {
-        SignalKind(libc::SIGALRM as c_int)
-    }
-
-    /// SIGCHLD signal.
-    ///
-    /// # Unix system
-    /// Received by the parent process when a child process terminates or stops.
-    /// By default, it is ignored.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use ylong_runtime::signal::{signal, SignalKind};
-    /// async fn io_func() {
-    ///     let handle = ylong_runtime::spawn(async move {
-    ///         let mut signal = signal(SignalKind::child()).unwrap();
-    ///         signal.recv().await;
-    ///     });
-    ///     let _ = ylong_runtime::block_on(handle);
-    /// }
-    /// ```
-    pub const fn child() -> SignalKind {
-        SignalKind(libc::SIGCHLD as c_int)
-    }
-
-    /// SIGHUP signal.
-    ///
-    /// # Unix system
-    /// Raised when the terminal connection is disconnected, usually sent to all
-    /// members of the foreground process group. By default, it is ignored.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use ylong_runtime::signal::{signal, SignalKind};
-    /// async fn io_func() {
-    ///     let handle = ylong_runtime::spawn(async move {
-    ///         let mut signal = signal(SignalKind::hangup()).unwrap();
-    ///         signal.recv().await;
-    ///     });
-    ///     let _ = ylong_runtime::block_on(handle);
-    /// }
-    /// ```
-    pub const fn hangup() -> SignalKind {
-        SignalKind(libc::SIGHUP as c_int)
-    }
-
-    /// SIGINT signal.
-    ///
-    /// # Unix system
-    /// Raised when the user interrupts the process. By default, it terminates
-    /// the process.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use ylong_runtime::signal::{signal, SignalKind};
-    /// async fn io_func() {
-    ///     let handle = ylong_runtime::spawn(async move {
-    ///         let mut signal = signal(SignalKind::interrupt()).unwrap();
-    ///         signal.recv().await;
-    ///     });
-    ///     let _ = ylong_runtime::block_on(handle);
-    /// }
-    /// ```
-    pub const fn interrupt() -> SignalKind {
-        SignalKind(libc::SIGINT as c_int)
-    }
-
-    /// SIGIO signal.
-    ///
-    /// # Unix system
-    /// Sent by the kernel to the process when I/O is available. By default,it
-    /// is ignored.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use ylong_runtime::signal::{signal, SignalKind};
-    /// async fn io_func() {
-    ///     let handle = ylong_runtime::spawn(async move {
-    ///         let mut signal = signal(SignalKind::io()).unwrap();
-    ///         signal.recv().await;
-    ///     });
-    ///     let _ = ylong_runtime::block_on(handle);
-    /// }
-    /// ```
-    pub const fn io() -> SignalKind {
-        SignalKind(libc::SIGIO as c_int)
-    }
-
-    /// SIGPIPE signal.
-    ///
-    /// # Unix system
-    /// Sent by the kernel to the process when writing to a closed pipe or
-    /// socket. By default, it terminates the process.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use ylong_runtime::signal::{signal, SignalKind};
-    /// async fn io_func() {
-    ///     let handle = ylong_runtime::spawn(async move {
-    ///         let mut signal = signal(SignalKind::pipe()).unwrap();
-    ///         signal.recv().await;
-    ///     });
-    ///     let _ = ylong_runtime::block_on(handle);
-    /// }
-    /// ```
-    pub const fn pipe() -> SignalKind {
-        SignalKind(libc::SIGPIPE as c_int)
-    }
-
-    /// SIGQUIT signal.
-    ///
-    /// # Unix system
-    /// Raised when the user requests process termination and generate a core
-    /// dump. By default, it terminates the process.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use ylong_runtime::signal::{signal, SignalKind};
-    /// async fn io_func() {
-    ///     let handle = ylong_runtime::spawn(async move {
-    ///         let mut signal = signal(SignalKind::quit()).unwrap();
-    ///         signal.recv().await;
-    ///     });
-    ///     let _ = ylong_runtime::block_on(handle);
-    /// }
-    /// ```
-    pub const fn quit() -> SignalKind {
-        SignalKind(libc::SIGQUIT as c_int)
-    }
-
-    /// SIGTERM signal.
-    ///
-    /// # Unix system
-    /// A termination signal sent by the user to the process. By default, it
-    /// terminates the process.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use ylong_runtime::signal::{signal, SignalKind};
-    /// async fn io_func() {
-    ///     let handle = ylong_runtime::spawn(async move {
-    ///         let mut signal = signal(SignalKind::terminate()).unwrap();
-    ///         signal.recv().await;
-    ///     });
-    ///     let _ = ylong_runtime::block_on(handle);
-    /// }
-    /// ```
-    pub const fn terminate() -> SignalKind {
-        SignalKind(libc::SIGTERM as c_int)
-    }
-
-    /// SIGUSR1 signal.
-    ///
-    /// # Unix system
-    /// User-defined signal that can be used for custom operations. By default,
-    /// it terminates the process.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use ylong_runtime::signal::{signal, SignalKind};
-    /// async fn io_func() {
-    ///     let handle = ylong_runtime::spawn(async move {
-    ///         let mut signal = signal(SignalKind::user_defined1()).unwrap();
-    ///         signal.recv().await;
-    ///     });
-    ///     let _ = ylong_runtime::block_on(handle);
-    /// }
-    /// ```
-    pub const fn user_defined1() -> SignalKind {
-        SignalKind(libc::SIGUSR1 as c_int)
-    }
-
-    /// SIGUSR2 signal.
-    ///
-    /// # Unix system
-    /// User-defined signal that can be used for custom operations. By default,
-    /// it terminates the process.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use ylong_runtime::signal::{signal, SignalKind};
-    /// async fn io_func() {
-    ///     let handle = ylong_runtime::spawn(async move {
-    ///         let mut signal = signal(SignalKind::user_defined2()).unwrap();
-    ///         signal.recv().await;
-    ///     });
-    ///     let _ = ylong_runtime::block_on(handle);
-    /// }
-    /// ```
-    pub const fn user_defined2() -> SignalKind {
-        SignalKind(libc::SIGUSR2 as c_int)
-    }
-
-    /// SIGWINCH signal.
-    ///
-    /// # Unix system
-    /// Sent by the kernel to all members of the foreground process group when
-    /// the terminal window size changes. By default, it is ignored.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use ylong_runtime::signal::{signal, SignalKind};
-    /// async fn io_func() {
-    ///     let handle = ylong_runtime::spawn(async move {
-    ///         let mut signal = signal(SignalKind::window_change()).unwrap();
-    ///         signal.recv().await;
-    ///     });
-    ///     let _ = ylong_runtime::block_on(handle);
-    /// }
-    /// ```
-    pub const fn window_change() -> SignalKind {
-        SignalKind(libc::SIGWINCH as c_int)
-    }
-
-    /// Checks whether the signal is forbidden.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use ylong_runtime::signal::SignalKind;
-    /// async fn io_func() {
-    ///     // SIGSEGV
-    ///     let signal_kind = SignalKind::from_raw(11);
-    ///     assert!(signal_kind.is_forbidden());
-    /// }
-    /// ```
-    pub fn is_forbidden(&self) -> bool {
-        if self.0 < 0 || self.0 > libc::SIGRTMAX() {
-            return true;
-        }
-        SIGNAL_BLOCK_LIST.contains(&self.0)
-    }
-}
-
-impl From<c_int> for SignalKind {
-    fn from(value: c_int) -> Self {
-        Self::from_raw(value)
-    }
-}
-
-impl From<SignalKind> for c_int {
-    fn from(value: SignalKind) -> Self {
-        value.as_raw()
-    }
-}
 
 /// A listener for monitoring operating system signals.
 ///
+/// # Unix
 /// This listener will merge signals of the same kind and receive them in a
 /// stream, so for multiple triggers of the same signal, the receiver may only
 /// receive one notification, which includes all triggered signal kinds.
 ///
-/// # Notice
 /// When registering a listener for a certain kind of signal for the first time,
 /// it will replace the default platform processing behavior. If some process
 /// termination signals are triggered, the process will not be terminated
 /// immediately, but will merge the signals into the stream and trigger them
 /// uniformly, which will be captured and processed by the corresponding
 /// receiver. Deconstructing the receiver does not reset the default platform
-/// processing behavior
+/// processing behavior.
 ///
 /// # Examples
+/// On Windows system
 ///
-/// ```no_run
+/// ```no run
+/// use ylong_runtime::signal::{signal, SignalKind};
+/// async fn io_func() {
+///     let handle = ylong_runtime::spawn(async move {
+///         let mut signal = signal(SignalKind::ctrl_c()).unwrap();
+///         signal.recv().await;
+///     });
+///     let _ = ylong_runtime::block_on(handle);
+/// }
+/// ```
+///
+/// On Unix system
+///
+/// ```no run
 /// use ylong_runtime::signal::{signal, SignalKind};
 /// async fn io_func() {
 ///     let handle = ylong_runtime::spawn(async move {
@@ -375,8 +76,22 @@ impl Signal {
     /// Waits for signal notification.
     ///
     /// # Examples
+    /// On Windows system
     ///
-    /// ```no_run
+    /// ```no run
+    /// use ylong_runtime::signal::{signal, SignalKind};
+    /// async fn io_func() {
+    ///     let handle = ylong_runtime::spawn(async move {
+    ///         let mut signal = signal(SignalKind::ctrl_c()).unwrap();
+    ///         signal.recv().await;
+    ///     });
+    ///     let _ = ylong_runtime::block_on(handle);
+    /// }
+    /// ```
+    ///
+    /// On Unix system
+    ///
+    /// ```no run
     /// use ylong_runtime::signal::{signal, SignalKind};
     /// async fn io_func() {
     ///     let handle = ylong_runtime::spawn(async move {
@@ -402,14 +117,27 @@ impl Signal {
     /// * `Poll::Ready(())` if receiving a new signal notification.
     ///
     /// # Examples
+    /// On Windows system
     ///
-    /// ```no_run
-    /// use ylong_runtime::futures::poll_fn;
+    /// ```no run
+    /// use ylong_runtime::signal::{signal, SignalKind};
+    /// async fn io_func() {
+    ///     let handle = ylong_runtime::spawn(async move {
+    ///         let mut signal = signal(SignalKind::ctrl_c()).unwrap();
+    ///         signal.recv().await;
+    ///     });
+    ///     let _ = ylong_runtime::block_on(handle);
+    /// }
+    /// ```
+    ///
+    /// On Unix system
+    ///
+    /// ```no run
     /// use ylong_runtime::signal::{signal, SignalKind};
     /// async fn io_func() {
     ///     let handle = ylong_runtime::spawn(async move {
     ///         let mut signal = signal(SignalKind::child()).unwrap();
-    ///         poll_fn(|cx| signal.poll_recv(cx)).await;
+    ///         signal.recv().await;
     ///     });
     ///     let _ = ylong_runtime::block_on(handle);
     /// }
@@ -423,61 +151,4 @@ impl Signal {
             Poll::Pending => Poll::Pending,
         }
     }
-}
-
-/// A callback processing function registered for specific a signal kind.
-///
-/// Operations in this method should be async-signal safe.
-fn signal_action(signal_kind: c_int) {
-    let global = get_global_registry();
-    global.notify_event(signal_kind as usize);
-    let _ = global.write(&[1]);
-}
-
-pub(crate) fn signal_return_watch(kind: SignalKind) -> io::Result<Receiver<()>> {
-    if kind.is_forbidden() {
-        return Err(Error::new(ErrorKind::Other, "Invalid signal kind"));
-    }
-
-    let registry = get_global_registry();
-    let event = registry.get_event(kind.0 as usize);
-    event.register(kind.0, move || signal_action(kind.0))?;
-    Ok(registry.listen_to_event(kind.0 as usize))
-}
-
-/// Creates a listener for the specified signal type.
-///
-/// # Notice
-/// This method will create a streaming listener bound to the runtime, which
-/// will replace the default platform processing behavior and it will not be
-/// reset after the receiver is destroyed. The same signal can be registered
-/// multiple times, and when the signal is triggered, all receivers will receive
-/// a notification.
-///
-/// # Errors
-///
-/// * If signal processing function registration failed.
-/// * If the signal is one of [`SIGNAL_BLOCK_LIST`].
-///
-/// # Panics
-///
-/// This function panics if there is no ylong_runtime in the environment.
-///
-/// # Examples
-///
-/// ```no_run
-/// use ylong_runtime::signal::{signal, SignalKind};
-/// async fn io_func() {
-///     let handle = ylong_runtime::spawn(async move {
-///         let mut signal = signal(SignalKind::child()).unwrap();
-///         signal.recv().await;
-///     });
-///     let _ = ylong_runtime::block_on(handle);
-/// }
-/// ```
-pub fn signal(kind: SignalKind) -> io::Result<Signal> {
-    #[cfg(feature = "ffrt")]
-    let _ = SignalDriver::get_mut_ref();
-    let receiver = signal_return_watch(kind)?;
-    Ok(Signal { inner: receiver })
 }

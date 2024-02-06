@@ -91,6 +91,17 @@ impl Default for Registry {
 }
 
 impl Registry {
+    pub(crate) fn get_instance() -> &'static Registry {
+        static mut REGISTRY: MaybeUninit<Registry> = MaybeUninit::uninit();
+        static REGISTRY_ONCE: Once = Once::new();
+        unsafe {
+            REGISTRY_ONCE.call_once(|| {
+                REGISTRY = MaybeUninit::new(Registry::default());
+            });
+            &*REGISTRY.as_ptr()
+        }
+    }
+
     pub(crate) fn get_event(&self, event_id: usize) -> &Event {
         // Invalid signal kinds have been forbidden, the scope of signal kinds has been
         // protected.
@@ -130,16 +141,5 @@ impl Registry {
 
     pub(crate) fn try_clone_stream(&self) -> io::Result<UnixStream> {
         self.stream.receiver.try_clone()
-    }
-}
-
-pub(crate) fn get_global_registry() -> &'static Registry {
-    static mut REGISTRY: MaybeUninit<Registry> = MaybeUninit::uninit();
-    static ONCE: Once = Once::new();
-    unsafe {
-        ONCE.call_once(|| {
-            REGISTRY = MaybeUninit::new(Registry::default());
-        });
-        &*REGISTRY.as_ptr()
     }
 }

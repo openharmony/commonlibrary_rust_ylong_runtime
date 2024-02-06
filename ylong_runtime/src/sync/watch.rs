@@ -584,9 +584,9 @@ impl<T: Debug> Debug for Channel<T> {
 mod tests {
     use std::sync::atomic::Ordering::Acquire;
 
-    use crate::spawn;
     use crate::sync::error::RecvError;
     use crate::sync::watch;
+    use crate::{block_on, spawn};
 
     /// UT test cases for `send()` and `try_notified()`.
     ///
@@ -623,16 +623,14 @@ mod tests {
     #[test]
     fn send_notified_await() {
         let (tx, mut rx) = watch::channel("hello");
-        let mut rx2 = rx.clone();
         assert!(tx.send("world").is_ok());
-        spawn(async move {
-            assert_eq!(rx.notified().await, Ok(()));
-            assert_eq!(*rx.borrow(), "world");
-        });
         drop(tx);
-        spawn(async move {
-            assert!(rx2.notified().await.is_err());
+        let handle1 = spawn(async move {
+            assert!(rx.notified().await.is_ok());
+            assert_eq!(*rx.borrow(), "world");
+            assert!(rx.notified().await.is_err());
         });
+        let _ = block_on(handle1);
     }
 
     /// UT test cases for `send()` and `borrow_notify()`.

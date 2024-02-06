@@ -32,9 +32,10 @@ cfg_net! {
     use crate::net::ScheduleIO;
 }
 
+#[cfg(target_os = "linux")]
 cfg_signal! {
     use ylong_io::Token;
-    use crate::signal::SignalDriver;
+    use crate::signal::unix::SignalDriver;
 }
 
 // Flag used to identify whether to park on condvar.
@@ -47,7 +48,7 @@ pub(crate) enum ParkFlag {
 pub(crate) struct Driver {
     #[cfg(feature = "net")]
     io: IoDriver,
-    #[cfg(feature = "signal")]
+    #[cfg(all(feature = "signal", target_os = "linux"))]
     signal: SignalDriver,
     #[cfg(feature = "time")]
     time: Arc<TimeDriver>,
@@ -72,12 +73,12 @@ impl Driver {
             #[cfg(feature = "time")]
             time: time_handle,
         };
-        #[cfg(feature = "signal")]
+        #[cfg(all(feature = "signal", target_os = "linux"))]
         let signal_driver = SignalDriver::initialize(&handle);
         let driver = Driver {
             #[cfg(feature = "net")]
             io: io_driver,
-            #[cfg(feature = "signal")]
+            #[cfg(all(feature = "signal", target_os = "linux"))]
             signal: signal_driver,
             #[cfg(feature = "time")]
             time: time_driver,
@@ -91,7 +92,7 @@ impl Driver {
         let _duration = self.time.run();
         #[cfg(feature = "net")]
         self.io.drive(_duration).expect("io driver running failed");
-        #[cfg(feature = "signal")]
+        #[cfg(all(feature = "signal", target_os = "linux"))]
         if self.io.process_signal() {
             self.signal.broadcast();
         }
@@ -113,7 +114,7 @@ impl Driver {
         self.io
             .drive(Some(Duration::from_millis(0)))
             .expect("io driver running failed");
-        #[cfg(feature = "signal")]
+        #[cfg(all(feature = "signal", target_os = "linux"))]
         if self.io.process_signal() {
             self.signal.broadcast();
         }
@@ -176,7 +177,7 @@ impl Handle {
     }
 }
 
-#[cfg(feature = "signal")]
+#[cfg(all(feature = "signal", target_os = "linux"))]
 impl Handle {
     pub(crate) fn io_register_with_token(
         &self,
