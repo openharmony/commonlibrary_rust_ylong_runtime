@@ -14,27 +14,18 @@
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-cfg_event!(
-    use std::io;
-    use crate::executor::worker::{get_current_handle};
-);
+pub(crate) use crate::executor::driver_handle::Handle;
 
 cfg_time! {
-    use std::fmt::Error;
-    use std::ptr::NonNull;
-    use crate::time::{Clock, TimeDriver, TimeHandle};
-    use std::time::Instant;
+    use crate::time::TimeDriver;
 }
+
 cfg_net! {
-    use crate::util::slab::Ref;
-    use crate::net::{IoDriver, IoHandle};
-    use ylong_io::{Interest, Source};
-    use crate::net::ScheduleIO;
+    use crate::net::IoDriver;
 }
 
 #[cfg(target_os = "linux")]
 cfg_signal! {
-    use ylong_io::Token;
     use crate::signal::unix::SignalDriver;
 }
 
@@ -52,13 +43,6 @@ pub(crate) struct Driver {
     signal: SignalDriver,
     #[cfg(feature = "time")]
     time: Arc<TimeDriver>,
-}
-
-pub(crate) struct Handle {
-    #[cfg(feature = "net")]
-    io: IoHandle,
-    #[cfg(feature = "time")]
-    time: TimeHandle,
 }
 
 impl Driver {
@@ -96,6 +80,8 @@ impl Driver {
         if self.io.process_signal() {
             self.signal.broadcast();
         }
+        #[cfg(all(unix, feature = "process"))]
+        crate::process::GlobalZombieChild::get_instance().release_zombie();
         if cfg!(feature = "net") {
             ParkFlag::NotPark
         } else {
@@ -118,73 +104,7 @@ impl Driver {
         if self.io.process_signal() {
             self.signal.broadcast();
         }
-    }
-}
-
-impl Handle {
-    pub(crate) fn wake(&self) {
-        #[cfg(feature = "net")]
-        self.io.waker.wake().expect("ylong_io wake failed");
-    }
-
-    #[cfg(any(feature = "net", feature = "time"))]
-    pub(crate) fn get_handle() -> io::Result<Arc<Handle>> {
-        let context = get_current_handle()
-            .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "get_current_ctx() fail"))?;
-        Ok(context._handle.clone())
-    }
-}
-
-#[cfg(feature = "net")]
-impl Handle {
-    pub(crate) fn io_register(
-        &self,
-        io: &mut impl Source,
-        interest: Interest,
-    ) -> io::Result<Ref<ScheduleIO>> {
-        self.io.register_source(io, interest)
-    }
-
-    pub(crate) fn io_deregister(&self, io: &mut impl Source) -> io::Result<()> {
-        self.io.deregister_source(io)
-    }
-
-    #[cfg(feature = "metrics")]
-    pub(crate) fn get_registered_count(&self) -> u64 {
-        self.io.get_registered_count()
-    }
-
-    #[cfg(feature = "metrics")]
-    pub(crate) fn get_ready_count(&self) -> u64 {
-        self.io.get_ready_count()
-    }
-}
-
-#[cfg(feature = "time")]
-impl Handle {
-    pub(crate) fn start_time(&self) -> Instant {
-        self.time.start_time()
-    }
-
-    pub(crate) fn timer_register(&self, clock_entry: NonNull<Clock>) -> Result<u64, Error> {
-        let res = self.time.timer_register(clock_entry);
-        self.wake();
-        res
-    }
-
-    pub(crate) fn timer_cancel(&self, clock_entry: NonNull<Clock>) {
-        self.time.timer_cancel(clock_entry);
-    }
-}
-
-#[cfg(all(feature = "signal", target_os = "linux"))]
-impl Handle {
-    pub(crate) fn io_register_with_token(
-        &self,
-        io: &mut impl Source,
-        token: Token,
-        interest: Interest,
-    ) -> io::Result<()> {
-        self.io.register_source_with_token(io, token, interest)
+        #[cfg(all(unix, feature = "process"))]
+        crate::process::GlobalZombieChild::get_instance().release_zombie();
     }
 }

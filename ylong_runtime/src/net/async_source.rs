@@ -11,19 +11,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::fmt::{Debug, Formatter};
 use std::io;
 use std::ops::Deref;
+use std::sync::Arc;
 
 use ylong_io::{Interest, Source};
 
+use crate::executor::Handle;
 use crate::io::poll_ready;
 use crate::net::ScheduleIO;
 use crate::util::slab::Ref;
-
-cfg_not_ffrt!(
-    use std::sync::Arc;
-    use crate::executor::driver::Handle;
-);
 
 cfg_net!(
     use std::task::{Context, Poll};
@@ -43,7 +41,6 @@ pub(crate) struct AsyncSource<E: Source> {
     /// registered into it when created.
     pub(crate) entry: Ref<ScheduleIO>,
 
-    #[cfg(not(feature = "ffrt"))]
     /// Handle to the IO Driver, used for deregistration
     pub(crate) handle: Arc<Handle>,
 }
@@ -60,7 +57,6 @@ impl<E: Source> AsyncSource<E> {
     ///
     /// If no reactor is found or fd registration fails, an error will be
     /// returned.
-    #[cfg(not(feature = "ffrt"))]
     pub fn new(mut io: E, interest: Option<Interest>) -> io::Result<AsyncSource<E>> {
         let inner = Handle::get_handle()?;
 
@@ -70,29 +66,6 @@ impl<E: Source> AsyncSource<E> {
             io: Some(io),
             entry,
             handle: inner,
-        })
-    }
-
-    /// Wraps a `Source` object into an `AsyncSource`. When the `AsyncSource`
-    /// object is created, it's fd will be registered into runtime's
-    /// reactor.
-    ///
-    /// If `interest` passed in is None, the interested event for fd
-    /// registration will be both readable and writable.
-    ///
-    /// # Error
-    ///
-    /// If no reactor is found or fd registration fails, an error will be
-    /// returned.
-    #[cfg(feature = "ffrt")]
-    pub fn new(mut io: E, interest: Option<Interest>) -> io::Result<AsyncSource<E>> {
-        let inner = crate::net::IoHandle::get_ref();
-
-        let interest = interest.unwrap_or_else(|| Interest::READABLE | Interest::WRITABLE);
-        let entry = inner.register_source(&mut io, interest)?;
-        Ok(AsyncSource {
-            io: Some(io),
-            entry,
         })
     }
 
@@ -111,6 +84,16 @@ impl<E: Source> AsyncSource<E> {
                 }
                 x => return x,
             }
+        }
+    }
+
+    cfg_process! {
+        /// Deregisters the io and return it.
+        pub(crate) fn io_take(mut self) -> io::Result<E> {
+            // before AsyncSource drop, io is always Some().
+            let mut io = self.io.take().unwrap();
+            self.handle.io_deregister(&mut io)?;
+            Ok(io)
         }
     }
 
@@ -236,6 +219,12 @@ impl<E: Source> AsyncSource<E> {
     }
 }
 
+impl<E: Source + Debug> Debug for AsyncSource<E> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AsyncSource").field("io", &self.io).finish()
+    }
+}
+
 impl<E: Source> Deref for AsyncSource<E> {
     type Target = E;
 
@@ -245,23 +234,10 @@ impl<E: Source> Deref for AsyncSource<E> {
 }
 
 // Deregisters fd when the `AsyncSource` object get dropped.
-#[cfg(not(feature = "ffrt"))]
 impl<E: Source> Drop for AsyncSource<E> {
     fn drop(&mut self) {
         if let Some(mut io) = self.io.take() {
             let _ = self.handle.io_deregister(&mut io);
-        }
-    }
-}
-
-// Deregisters fd when the `AsyncSource` object get dropped.
-#[cfg(feature = "ffrt")]
-impl<E: Source> Drop for AsyncSource<E> {
-    fn drop(&mut self) {
-        if let Some(io) = self.io.take() {
-            unsafe {
-                ylong_ffrt::ffrt_poller_deregister(io.as_raw_fd() as libc::c_int);
-            }
         }
     }
 }

@@ -81,3 +81,8 @@ cfg_fs! {
 cfg_net! {
     pub mod net;
 }
+
+#[cfg(unix)]
+cfg_process! {
+    pub mod process;
+}
