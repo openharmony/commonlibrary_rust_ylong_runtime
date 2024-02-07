@@ -24,3 +24,5 @@ mod child;
 pub use child::{Child, ChildStderr, ChildStdin, ChildStdout};
 
 mod try_join3;
+
+pub mod pty_process;

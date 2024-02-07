@@ -175,7 +175,7 @@ impl Source for UnixListener {
         selector.deregister(self.inner.as_raw_fd())
     }
 
-    fn as_raw_fd(&self) -> Fd {
+    fn get_fd(&self) -> Fd {
         self.inner.as_raw_fd()
     }
 }

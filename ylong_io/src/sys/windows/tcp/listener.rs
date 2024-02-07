@@ -165,7 +165,7 @@ impl Source for TcpListener {
         self.state.deregister()
     }
 
-    fn as_raw_fd(&self) -> Fd {
+    fn get_fd(&self) -> Fd {
         self.inner.as_raw_socket()
     }
 }

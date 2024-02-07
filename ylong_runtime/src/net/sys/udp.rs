@@ -1432,14 +1432,14 @@ use ylong_io::Source;
 #[cfg(unix)]
 impl AsRawFd for UdpSocket {
     fn as_raw_fd(&self) -> RawFd {
-        self.source.as_raw_fd()
+        self.source.get_fd()
     }
 }
 
 #[cfg(unix)]
 impl AsRawFd for ConnectedUdpSocket {
     fn as_raw_fd(&self) -> RawFd {
-        self.source.as_raw_fd()
+        self.source.get_fd()
     }
 }
 

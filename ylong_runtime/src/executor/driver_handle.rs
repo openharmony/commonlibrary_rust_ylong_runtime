@@ -141,7 +141,7 @@ cfg_ffrt! {
 
         pub(crate) fn io_deregister(&self, io: &mut impl Source) -> io::Result<()> {
             unsafe {
-                ylong_ffrt::ffrt_poller_deregister(io.as_raw_fd() as libc::c_int);
+                ylong_ffrt::ffrt_poller_deregister(io.get_fd() as libc::c_int);
             }
             Ok(())
         }

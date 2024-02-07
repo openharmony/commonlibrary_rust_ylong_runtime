@@ -12,37 +12,23 @@
 // limitations under the License.
 
 use std::ffi::OsStr;
-use std::future::Future;
 use std::io;
 use std::path::Path;
-use std::process::{Command as StdCommand, CommandArgs, CommandEnvs, ExitStatus, Output, Stdio};
+use std::process::{CommandArgs, CommandEnvs, Stdio};
 
-use crate::process::child::{Child, ChildStderr, ChildStdin, ChildStdout};
+use crate::process::pty_process::Pts;
+use crate::process::{Child, Command};
 
-/// Async version of std::process::Command
-#[derive(Debug)]
-pub struct Command {
-    std: StdCommand,
-    kill: bool,
+/// A Command which spawn with Pty.
+pub struct PtyCommand {
+    command: Command,
+    stdin: bool,
+    stdout: bool,
+    stderr: bool,
+    f: Option<Box<dyn FnMut() -> io::Result<()> + Send + Sync + 'static>>,
 }
 
-/// # Example
-///
-/// ```
-/// use std::process::Command;
-/// let command = Command::new("echo");
-/// let ylong_command = ylong_runtime::process::Command::new("hello");
-/// ```
-impl From<StdCommand> for Command {
-    fn from(value: StdCommand) -> Self {
-        Self {
-            std: value,
-            kill: false,
-        }
-    }
-}
-
-impl Command {
+impl PtyCommand {
     /// Constructs a new Command for launching the program at path program, with
     /// the following default configuration:
     /// * No arguments to the program
@@ -59,100 +45,85 @@ impl Command {
     /// issue [#37519]).
     ///
     /// # Example
-    /// ```
-    /// use ylong_runtime::process::Command;
-    /// let _command = Command::new("sh");
+    ///
+    /// ```no_run
+    /// use ylong_runtime::process::pty_process::PtyCommand;
+    /// let _command = PtyCommand::new("sh");
     /// ```
     ///
     /// [#37519]: https://github.com/rust-lang/rust/issues/37519
     pub fn new<S: AsRef<OsStr>>(program: S) -> Self {
         Self {
-            std: StdCommand::new(program),
-            kill: false,
+            command: Command::new(program),
+            stdin: false,
+            stdout: false,
+            stderr: false,
+            f: None,
         }
-    }
-
-    /// Gets std::process::Command from async `Command`
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use ylong_runtime::process::Command;
-    /// let command = Command::new("echo");
-    /// let std_command = command.as_std();
-    /// ```
-    pub fn as_std(&self) -> &StdCommand {
-        &self.std
-    }
-
-    /// Sets whether kill the child process when `Child` drop.
-    /// The default value is false, it's similar to the behavior of the std.
-    pub fn kill_on_drop(&mut self, kill: bool) -> &mut Command {
-        self.kill = kill;
-        self
     }
 
     /// Adds a parameter to pass to the program.
     ///
-    /// It's same as std.
-    ///
     /// # Example
     ///
     /// ```no_run
-    /// use ylong_runtime::process::Command;
+    /// use ylong_runtime::process::pty_process::{Pty, PtyCommand};
     ///
-    /// Command::new("ls")
+    /// let pty = Pty::new().expect("Pty create fail!");
+    /// let pts = pty.pts().expect("get pts fail!");
+    ///
+    /// PtyCommand::new("ls")
     ///     .arg("-l")
     ///     .arg("-a")
-    ///     .spawn()
+    ///     .spawn(&pts)
     ///     .expect("ls command failed to start");
     /// ```
-    pub fn arg<S: AsRef<OsStr>>(&mut self, arg: S) -> &mut Command {
-        self.std.arg(arg);
+    pub fn arg<S: AsRef<OsStr>>(&mut self, arg: S) -> &mut PtyCommand {
+        self.command.arg(arg);
         self
     }
 
     /// Adds multiple parameters to pass to the program.
     ///
-    /// It's same as std.
-    ///
     /// # Example
     ///
     /// ```no_run
-    /// use ylong_runtime::process::Command;
+    /// use ylong_runtime::process::pty_process::{Pty, PtyCommand};
     ///
-    /// Command::new("ls")
+    /// let pty = Pty::new().expect("Pty create fail!");
+    /// let pts = pty.pts().expect("get pts fail!");
+    ///
+    /// PtyCommand::new("ls")
     ///     .args(["-l", "-a"])
-    ///     .spawn()
+    ///     .spawn(&pts)
     ///     .expect("ls command failed to start");
     /// ```
-    pub fn args<I: IntoIterator<Item = S>, S: AsRef<OsStr>>(&mut self, args: I) -> &mut Command {
-        self.std.args(args);
+    pub fn args<I: IntoIterator<Item = S>, S: AsRef<OsStr>>(&mut self, args: I) -> &mut PtyCommand {
+        self.command.args(args);
         self
     }
 
     /// Inserts or updates an environment variable mapping.
     ///
-    /// It's same as std.
-    ///
     /// # Example
     ///
     /// ```no_run
-    /// use ylong_runtime::process::Command;
+    /// use ylong_runtime::process::pty_process::{Pty, PtyCommand};
     ///
-    /// Command::new("ls")
+    /// let pty = Pty::new().expect("Pty create fail!");
+    /// let pts = pty.pts().expect("get pts fail!");
+    ///
+    /// PtyCommand::new("ls")
     ///     .env("PATH", "/bin")
-    ///     .spawn()
+    ///     .spawn(&pts)
     ///     .expect("ls command failed to start");
     /// ```
-    pub fn env<K: AsRef<OsStr>, V: AsRef<OsStr>>(&mut self, key: K, val: V) -> &mut Command {
-        self.std.env(key, val);
+    pub fn env<K: AsRef<OsStr>, V: AsRef<OsStr>>(&mut self, key: K, val: V) -> &mut PtyCommand {
+        self.command.env(key, val);
         self
     }
 
     /// Adds or updates multiple environment variable mappings.
-    ///
-    /// It's same as std.
     ///
     /// # Example
     ///
@@ -161,84 +132,77 @@ impl Command {
     /// use std::env;
     /// use std::process::Stdio;
     ///
-    /// use ylong_runtime::process::Command;
+    /// use ylong_runtime::process::pty_process::{Pty, PtyCommand};
+    ///
+    /// let pty = Pty::new().expect("Pty create fail!");
+    /// let pts = pty.pts().expect("get pts fail!");
     ///
     /// let filtered_env: HashMap<String, String> = env::vars()
     ///     .filter(|&(ref k, _)| k == "TERM" || k == "TZ" || k == "LANG" || k == "PATH")
     ///     .collect();
     ///
-    /// Command::new("printenv")
+    /// PtyCommand::new("printenv")
     ///     .stdin(Stdio::null())
     ///     .stdout(Stdio::inherit())
     ///     .env_clear()
     ///     .envs(&filtered_env)
-    ///     .spawn()
+    ///     .spawn(&pts)
     ///     .expect("printenv failed to start");
     /// ```
-    pub fn envs<I, S, V>(&mut self, vars: I) -> &mut Command
+    pub fn envs<I, K, V>(&mut self, vars: I) -> &mut PtyCommand
     where
-        I: IntoIterator<Item = (S, V)>,
-        S: AsRef<OsStr>,
+        I: IntoIterator<Item = (K, V)>,
+        K: AsRef<OsStr>,
         V: AsRef<OsStr>,
     {
-        self.std.envs(vars);
+        self.command.envs(vars);
         self
     }
 
     /// Removes an environment variable mapping.
     ///
-    /// It's same as std.
-    ///
     /// # Example
     ///
     /// ```no_run
-    /// use ylong_runtime::process::Command;
+    /// use ylong_runtime::process::pty_process::{Pty, PtyCommand};
     ///
-    /// Command::new("ls")
+    /// let pty = Pty::new().expect("Pty create fail!");
+    /// let pts = pty.pts().expect("get pts fail!");
+    /// PtyCommand::new("ls")
     ///     .env_remove("PATH")
-    ///     .spawn()
+    ///     .spawn(&pts)
     ///     .expect("ls command failed to start");
     /// ```
-    pub fn env_remove<S: AsRef<OsStr>>(&mut self, key: S) -> &mut Command {
-        self.std.env_remove(key);
+    pub fn env_remove<K: AsRef<OsStr>>(&mut self, key: K) -> &mut PtyCommand {
+        self.command.env_remove(key);
         self
     }
 
     /// Clears the entire environment map for the child process.
     ///
-    /// It's same as std.
-    ///
     /// # Example
     ///
     /// ```no_run
-    /// use ylong_runtime::process::Command;
+    /// use ylong_runtime::process::pty_process::PtyCommand;
     ///
-    /// Command::new("ls")
-    ///     .env_clear()
-    ///     .spawn()
-    ///     .expect("ls command failed to start");
+    /// PtyCommand::new("ls").env_clear();
     /// ```
-    pub fn env_clear(&mut self) -> &mut Command {
-        self.std.env_clear();
+    pub fn env_clear(&mut self) -> &mut PtyCommand {
+        self.command.env_clear();
         self
     }
 
-    /// Sets the child process's working directory.
-    ///
-    /// It's same as std.
+    /// Sets the working directory for the child process.
     ///
     /// # Example
     ///
     /// ```no_run
-    /// use ylong_runtime::process::Command;
+    /// use ylong_runtime::process::pty_process::PtyCommand;
     ///
-    /// Command::new("ls")
-    ///     .current_dir("/bin")
-    ///     .spawn()
-    ///     .expect("ls command failed to start");
+    /// PtyCommand::new("ls").current_dir("/bin");
     /// ```
-    pub fn current_dir<P: AsRef<Path>>(&mut self, dir: P) -> &mut Command {
-        self.std.current_dir(dir);
+    pub fn current_dir<P: AsRef<Path>>(&mut self, dir: P) -> &mut PtyCommand {
+        self.command.current_dir(dir);
         self
     }
 
@@ -246,22 +210,18 @@ impl Command {
     /// Defaults to inherit when used with spawn or status, and defaults to
     /// piped when used with output.
     ///
-    /// It's same as std.
-    ///
     /// # Example
     ///
     /// ```no_run
     /// use std::process::Stdio;
     ///
-    /// use ylong_runtime::process::Command;
+    /// use ylong_runtime::process::pty_process::PtyCommand;
     ///
-    /// Command::new("ls")
-    ///     .stdin(Stdio::null())
-    ///     .spawn()
-    ///     .expect("ls command failed to start");
+    /// PtyCommand::new("ls").stdin(Stdio::null());
     /// ```
-    pub fn stdin<T: Into<Stdio>>(&mut self, cfg: T) -> &mut Command {
-        self.std.stdin(cfg);
+    pub fn stdin<T: Into<Stdio>>(&mut self, cfg: T) -> &mut PtyCommand {
+        self.command.stdin(cfg);
+        self.stdin = true;
         self
     }
 
@@ -269,22 +229,18 @@ impl Command {
     /// Defaults to inherit when used with spawn or status, and defaults to
     /// piped when used with output.
     ///
-    /// It's same as std.
-    ///
     /// # Example
     ///
     /// ```no_run
     /// use std::process::Stdio;
     ///
-    /// use ylong_runtime::process::Command;
+    /// use ylong_runtime::process::pty_process::PtyCommand;
     ///
-    /// Command::new("ls")
-    ///     .stdout(Stdio::null())
-    ///     .spawn()
-    ///     .expect("ls command failed to start");
+    /// PtyCommand::new("ls").stdout(Stdio::null());
     /// ```
-    pub fn stdout<T: Into<Stdio>>(&mut self, cfg: T) -> &mut Command {
-        self.std.stdout(cfg);
+    pub fn stdout<T: Into<Stdio>>(&mut self, cfg: T) -> &mut PtyCommand {
+        self.command.stdout(cfg);
+        self.stdout = true;
         self
     }
 
@@ -292,22 +248,18 @@ impl Command {
     /// Defaults to inherit when used with spawn or status, and defaults to
     /// piped when used with output.
     ///
-    /// It's same as std.
-    ///
     /// # Example
     ///
     /// ```no_run
     /// use std::process::Stdio;
     ///
-    /// use ylong_runtime::process::Command;
+    /// use ylong_runtime::process::pty_process::PtyCommand;
     ///
-    /// Command::new("ls")
-    ///     .stderr(Stdio::null())
-    ///     .spawn()
-    ///     .expect("ls command failed to start");
+    /// PtyCommand::new("ls").stderr(Stdio::null());
     /// ```
-    pub fn stderr<T: Into<Stdio>>(&mut self, cfg: T) -> &mut Command {
-        self.std.stderr(cfg);
+    pub fn stderr<T: Into<Stdio>>(&mut self, cfg: T) -> &mut PtyCommand {
+        self.command.stderr(cfg);
+        self.stderr = true;
         self
     }
 
@@ -320,120 +272,60 @@ impl Command {
     /// # Example
     ///
     /// ```no_run
-    /// use ylong_runtime::process::Command;
+    /// use ylong_runtime::process::pty_process::{Pty, PtyCommand};
     ///
     /// async fn command() -> std::process::ExitStatus {
-    ///     let mut child = Command::new("ls")
-    ///         .spawn()
+    ///     let pty = Pty::new().expect("Pty create fail!");
+    ///     let pts = pty.pts().expect("get pts fail!");
+    ///     let mut child = PtyCommand::new("ls")
+    ///         .spawn(&pts)
     ///         .expect("ls command failed to start");
     ///     child.wait().await.expect("ls command failed to run")
     /// }
     /// ```
-    pub fn spawn(&mut self) -> io::Result<Child> {
-        let mut child = self.std.spawn()?;
-        let stdin = child
-            .stdin
-            .take()
-            .map(super::sys::stdio)
-            .transpose()?
-            .map(ChildStdin::new);
-        let stdout = child
-            .stdout
-            .take()
-            .map(super::sys::stdio)
-            .transpose()?
-            .map(ChildStdout::new);
-        let stderr = child
-            .stderr
-            .take()
-            .map(super::sys::stdio)
-            .transpose()?
-            .map(ChildStderr::new);
-
-        Child::new(child, self.kill, stdin, stdout, stderr)
-    }
-
-    /// Executes the command as a child process, waiting for it to finish and
-    /// collecting all of its output. By default, stdout and stderr are
-    /// captured (and used to provide the resulting output). Stdin is not
-    /// inherited from the parent and any attempt by the child process to read
-    /// from the stdin stream will result in the stream immediately closing.
-    ///
-    /// If set `kill_on_drop()`, the child will be killed when this method
-    /// return.
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// use ylong_runtime::process::Command;
-    ///
-    /// async fn command() {
-    ///     let output = Command::new("ls")
-    ///         .output()
-    ///         .await
-    ///         .expect("ls command failed to run");
-    ///     println!("stdout of ls: {:?}", output.stdout);
-    /// }
-    /// ```
-    pub fn output(&mut self) -> impl Future<Output = io::Result<Output>> {
-        self.stdout(Stdio::piped());
-        self.stderr(Stdio::piped());
-
-        let child = self.spawn();
-
-        async { child?.output_wait().await }
-    }
-
-    /// Executes a command as a child process, waiting for it to finish and
-    /// collecting its status. By default, stdin, stdout and stderr are
-    /// inherited from the parent.
-    ///
-    /// If set `kill_on_drop()`, the child will be killed when this method
-    /// return.
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// use ylong_runtime::process::Command;
-    ///
-    /// async fn command() -> std::process::ExitStatus {
-    ///     Command::new("ls")
-    ///         .status()
-    ///         .await
-    ///         .expect("Command status failed!")
-    /// }
-    /// ```
-    /// This fn can only obtain `ExitStatus`. To obtain the `Output`, please use
-    /// `output()`
-    pub fn status(&mut self) -> impl Future<Output = io::Result<ExitStatus>> {
-        let child = self.spawn();
-
-        async {
-            let mut child = child?;
-
-            drop(child.take_stdin());
-            drop(child.take_stdout());
-            drop(child.take_stderr());
-
-            child.wait().await
+    pub fn spawn(&mut self, pts: &Pts) -> io::Result<Child> {
+        if !self.stdin {
+            let stdin = pts.clone_stdio()?;
+            self.command.stdin(stdin);
         }
+        if !self.stdout {
+            let stdout = pts.clone_stdio()?;
+            self.command.stdout(stdout);
+        }
+        if !self.stderr {
+            let stderr = pts.clone_stdio()?;
+            self.command.stderr(stderr);
+        }
+
+        let mut session_leader = pts.session_leader();
+        // session_leader do nothing unsafe.
+        unsafe {
+            if let Some(mut f) = self.f.take() {
+                self.command.pre_exec(move || {
+                    session_leader()?;
+                    f()
+                });
+            } else {
+                self.command.pre_exec(session_leader);
+            }
+        }
+
+        self.command.spawn()
     }
 
     /// Returns the path to the program that was given to Command::new.
     ///
-    /// It's same as std.
-    ///
     /// # Example
     ///
     /// ```
-    /// use ylong_runtime::process::Command;
+    /// use ylong_runtime::process::pty_process::PtyCommand;
     ///
-    /// let cmd = Command::new("echo");
+    /// let cmd = PtyCommand::new("echo");
     /// assert_eq!(cmd.get_program(), "echo");
     /// ```
     #[must_use]
     pub fn get_program(&self) -> &OsStr {
-        self.std.get_program()
+        self.command.get_program()
     }
 
     /// Returns an iterator of the arguments that will be passed to the program.
@@ -442,37 +334,33 @@ impl Command {
     /// it only includes the arguments specified with Command::arg and
     /// Command::args.
     ///
-    /// It's same as std.
-    ///
     /// # Example
     ///
     /// ```
     /// use std::ffi::OsStr;
     ///
-    /// use ylong_runtime::process::Command;
+    /// use ylong_runtime::process::pty_process::PtyCommand;
     ///
-    /// let mut cmd = Command::new("echo");
+    /// let mut cmd = PtyCommand::new("echo");
     /// cmd.arg("first").arg("second");
     /// let args: Vec<&OsStr> = cmd.get_args().collect();
     /// assert_eq!(args, &["first", "second"]);
     /// ```
     pub fn get_args(&self) -> CommandArgs<'_> {
-        self.std.get_args()
+        self.command.get_args()
     }
 
     /// Returns an iterator of the environment variables that will be set when
     /// the process is spawned.
-    ///
-    /// It's same as std.
     ///
     /// # Example
     ///
     /// ```
     /// use std::ffi::OsStr;
     ///
-    /// use ylong_runtime::process::Command;
+    /// use ylong_runtime::process::pty_process::PtyCommand;
     ///
-    /// let mut cmd = Command::new("ls");
+    /// let mut cmd = PtyCommand::new("ls");
     /// cmd.env("TERM", "dumb").env_remove("TZ");
     /// let envs: Vec<(&OsStr, Option<&OsStr>)> = cmd.get_envs().collect();
     /// assert_eq!(
@@ -484,14 +372,12 @@ impl Command {
     /// );
     /// ```
     pub fn get_envs(&self) -> CommandEnvs<'_> {
-        self.std.get_envs()
+        self.command.get_envs()
     }
 
     /// Returns the working directory for the child process.
     ///
     /// This returns None if the working directory will not be changed.
-    ///
-    /// It's same as std.
     ///
     /// # Example
     ///
@@ -499,50 +385,69 @@ impl Command {
     /// use std::ffi::OsStr;
     /// use std::path::Path;
     ///
-    /// use ylong_runtime::process::Command;
+    /// use ylong_runtime::process::pty_process::PtyCommand;
     ///
-    /// let mut cmd = Command::new("ls");
+    /// let mut cmd = PtyCommand::new("ls");
     /// assert_eq!(cmd.get_current_dir(), None);
     /// cmd.current_dir("/bin");
     /// assert_eq!(cmd.get_current_dir(), Some(Path::new("/bin")))
     /// ```
     #[must_use]
     pub fn get_current_dir(&self) -> Option<&Path> {
-        self.std.get_current_dir()
+        self.command.get_current_dir()
     }
-}
 
-#[cfg(unix)]
-use std::os::unix::process::CommandExt;
-
-#[cfg(unix)]
-impl Command {
     /// Sets the child process's user ID. This translates to a `setuid` call in
     /// the child process. Failure in the `setuid` call will cause the spawn to
     /// fail.
     ///
-    /// It's same as std.
-    pub fn uid(&mut self, id: u32) -> &mut Command {
-        self.std.uid(id);
+    /// # Example
+    ///
+    /// ```
+    /// use ylong_runtime::process::pty_process::PtyCommand;
+    ///
+    /// fn pty(id: u32) {
+    ///     let mut cmd = PtyCommand::new("ls");
+    ///     let gid = cmd.uid(id);
+    /// }
+    /// ```
+    pub fn uid(&mut self, id: u32) -> &mut PtyCommand {
+        self.command.uid(id);
         self
     }
 
     /// Similar to `uid`, but sets the group ID of the child process. This has
     /// the same semantics as the `uid` field.
     ///
-    /// It's same as std.
-    pub fn gid(&mut self, id: u32) -> &mut Command {
-        self.std.gid(id);
+    /// # Example
+    ///
+    /// ```
+    /// use ylong_runtime::process::pty_process::PtyCommand;
+    ///
+    /// fn pty(id: u32) {
+    ///     let mut cmd = PtyCommand::new("ls");
+    ///     let gid = cmd.gid(id);
+    /// }
+    /// ```
+    pub fn gid(&mut self, id: u32) -> &mut PtyCommand {
+        self.command.gid(id);
         self
     }
 
-    /// Sets executable argument
-    /// Sets the first process argument, argv[0], to something other than the
+    /// Set executable argument
+    /// Set the first process argument, argv[0], to something other than the
     /// default executable path.
     ///
-    /// It's same as std.
-    pub fn arg0<S: AsRef<OsStr>>(&mut self, arg: S) -> &mut Command {
-        self.std.arg0(arg);
+    /// # Example
+    ///
+    /// ```no_run
+    /// use ylong_runtime::process::pty_process::PtyCommand;
+    ///
+    /// let mut cmd = PtyCommand::new("ls");
+    /// let gid = cmd.arg0("/path");
+    /// ```
+    pub fn arg0<S: AsRef<OsStr>>(&mut self, arg: S) -> &mut PtyCommand {
+        self.command.arg0(arg);
         self
     }
 
@@ -554,8 +459,6 @@ impl Command {
     /// returns Err then no further closures will be called and the spawn
     /// operation will immediately return with a failure.
     ///
-    /// It's same as std.
-    ///
     /// # Safety
     ///
     /// This closure will be run in the context of the child process after a
@@ -565,11 +468,25 @@ impl Command {
     /// like `malloc`, accessing environment variables through [`std::env`] or
     /// acquiring a mutex are not guaranteed to work (due to other threads
     /// perhaps still running when the `fork` was run).
-    pub unsafe fn pre_exec<F>(&mut self, f: F) -> &mut Command
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use ylong_runtime::process::pty_process::PtyCommand;
+    ///
+    /// let mut cmd = PtyCommand::new("ls");
+    /// unsafe {
+    ///     cmd.pre_exec(|| {
+    ///         // do something
+    ///         Ok(())
+    ///     });
+    /// }
+    /// ```
+    pub unsafe fn pre_exec<F>(&mut self, f: F) -> &mut PtyCommand
     where
         F: FnMut() -> io::Result<()> + Send + Sync + 'static,
     {
-        self.std.pre_exec(f);
+        self.f = Some(Box::new(f));
         self
     }
 
@@ -577,9 +494,18 @@ impl Command {
     /// Equivalent to a setpgid call in the child process, but may be more
     /// efficient. Process groups determine which processes receive signals.
     ///
-    /// It's same as std.
-    pub fn process_group(&mut self, pgroup: i32) -> &mut Command {
-        self.std.process_group(pgroup);
+    /// # Example
+    ///
+    /// ```no_run
+    /// use ylong_runtime::process::pty_process::PtyCommand;
+    ///
+    /// fn pty(pgid: i32) {
+    ///     let mut cmd = PtyCommand::new("ls");
+    ///     let gid = cmd.process_group(pgid);
+    /// }
+    /// ```
+    pub fn process_group(&mut self, pgroup: i32) -> &mut PtyCommand {
+        self.command.process_group(pgroup);
         self
     }
 }

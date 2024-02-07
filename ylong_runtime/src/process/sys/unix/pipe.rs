@@ -70,7 +70,7 @@ impl Source for Pipe {
         token: Token,
         interests: Interest,
     ) -> io::Result<()> {
-        SourceFd(&AsRawFd::as_raw_fd(self)).register(selector, token, interests)
+        SourceFd(&self.as_raw_fd()).register(selector, token, interests)
     }
 
     fn reregister(
@@ -79,14 +79,14 @@ impl Source for Pipe {
         token: Token,
         interests: Interest,
     ) -> io::Result<()> {
-        SourceFd(&AsRawFd::as_raw_fd(self)).reregister(selector, token, interests)
+        SourceFd(&self.as_raw_fd()).reregister(selector, token, interests)
     }
 
     fn deregister(&mut self, selector: &Selector) -> io::Result<()> {
-        SourceFd(&AsRawFd::as_raw_fd(self)).deregister(selector)
+        SourceFd(&self.as_raw_fd()).deregister(selector)
     }
 
-    fn as_raw_fd(&self) -> ylong_io::Fd {
+    fn get_fd(&self) -> ylong_io::Fd {
         self.fd.as_raw_fd()
     }
 }

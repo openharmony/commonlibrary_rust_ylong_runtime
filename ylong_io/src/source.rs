@@ -48,5 +48,5 @@ pub trait Source {
     fn deregister(&mut self, selector: &Selector) -> io::Result<()>;
 
     /// Returns the raw fd of this IO.
-    fn as_raw_fd(&self) -> Fd;
+    fn get_fd(&self) -> Fd;
 }

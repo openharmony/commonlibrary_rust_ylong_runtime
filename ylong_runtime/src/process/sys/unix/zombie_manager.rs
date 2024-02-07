@@ -15,7 +15,8 @@ use std::mem::MaybeUninit;
 use std::process::Child as StdChild;
 use std::sync::{Mutex, MutexGuard, Once};
 
-use crate::signal::{unix::signal_return_watch, SignalKind};
+use crate::signal::unix::signal_return_watch;
+use crate::signal::SignalKind;
 use crate::sync::watch;
 
 pub(crate) struct GlobalZombieChild {
