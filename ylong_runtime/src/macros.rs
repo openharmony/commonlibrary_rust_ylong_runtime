@@ -51,6 +51,7 @@ macro_rules! cfg_signal {
     }
 }
 
+#[cfg(unix)]
 macro_rules! cfg_process {
     ($($item:item)*) => {
         $(

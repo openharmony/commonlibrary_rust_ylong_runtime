@@ -149,7 +149,7 @@ fn init_signal() -> io::Result<()> {
 ///
 /// # Examples
 ///
-/// ```no_run
+/// ```no run
 /// use ylong_runtime::signal::{signal, SignalKind};
 /// async fn io_func() {
 ///     let handle = ylong_runtime::spawn(async move {
