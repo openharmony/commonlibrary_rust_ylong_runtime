@@ -266,6 +266,7 @@ impl IoDriver {
             #[cfg(all(feature = "signal", target_os = "linux"))]
             if token == SIGNAL_TOKEN {
                 self.signal_pending = true;
+                continue;
             }
             let ready = Ready::from_event(event);
             self.dispatch(token, ready);
