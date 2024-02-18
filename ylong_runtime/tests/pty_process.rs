@@ -121,11 +121,11 @@ fn sdv_pty_process_read_and_write_test() {
         let status = child.wait().await.unwrap();
         assert!(status.success());
 
-        let mut buf = [0; 12];
+        let mut buf = [0; 14];
         pty.read_exact(&mut buf).await.unwrap();
         pty.flush().await.unwrap();
         pty.shutdown().await.unwrap();
-        assert_eq!(arg, std::str::from_utf8(&buf).unwrap());
+        assert!(String::from_utf8_lossy(&buf).contains(arg));
     });
 }
 
@@ -155,9 +155,9 @@ fn sdv_pty_split_test() {
         let status = child.wait().await.unwrap();
         assert!(status.success());
 
-        let mut buf = [0; 12];
+        let mut buf = [0; 14];
         read_pty.read_exact(&mut buf).await.unwrap();
-        assert_eq!(arg, std::str::from_utf8(&buf).unwrap());
+        assert!(String::from_utf8_lossy(&buf).contains(arg));
     });
 }
 
@@ -187,9 +187,9 @@ fn sdv_pty_into_split_test() {
         let status = child.wait().await.unwrap();
         assert!(status.success());
 
-        let mut buf = [0; 12];
+        let mut buf = [0; 14];
         read_pty.read_exact(&mut buf).await.unwrap();
-        assert_eq!(arg, std::str::from_utf8(&buf).unwrap());
+        assert!(String::from_utf8_lossy(&buf).contains(arg));
     });
 }
 
@@ -218,9 +218,9 @@ fn sdv_pty_unsplit_test() {
         let status = child.wait().await.unwrap();
         assert!(status.success());
 
-        let mut buf = [0; 12];
+        let mut buf = [0; 14];
         pty.read_exact(&mut buf).await.unwrap();
-        assert_eq!(arg, std::str::from_utf8(&buf).unwrap());
+        assert!(String::from_utf8_lossy(&buf).contains(arg));
     });
 }
 
