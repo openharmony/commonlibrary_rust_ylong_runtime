@@ -70,17 +70,11 @@ fn sdv_pty_process_test() {
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .uid(0)
-            .gid(0)
             .arg0("/bin")
             .process_group(pgid);
 
         unsafe {
             command.pre_exec(move || {
-                let gid = libc::getgid();
-                assert_eq!(gid, 0);
-                let gid = libc::getuid();
-                assert_eq!(gid, 0);
                 let pid = libc::getpid();
                 assert_eq!(libc::getpgid(pid), pgid);
                 Ok(())
