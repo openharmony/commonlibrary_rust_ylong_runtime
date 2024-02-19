@@ -105,6 +105,7 @@ macro_rules! ylong_tcp_task {
 
         #[bench]
         fn $bench(b: &mut Bencher) {
+            ylong_runtime_init();
             let basic_addr = "127.0.0.1:";
             let port = $port;
             b.iter(black_box(|| {
@@ -137,7 +138,7 @@ mod tcp_bench {
     use ylong_runtime::io::{AsyncReadExt, AsyncWriteExt};
     use ylong_runtime::net::{TcpListener, TcpStream};
 
-    pub use crate::task_helpers::tokio_runtime;
+    pub use crate::task_helpers::{tokio_runtime, ylong_runtime_init};
 
     ylong_tcp_task!(
         ylong_tcp_10_1000_10000,

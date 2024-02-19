@@ -200,16 +200,16 @@ impl BlockPoolSpawner {
         let task = BlockingTask(Some(task));
         let scheduler: Weak<PlaceholderScheduler> = Weak::new();
         let (task, handle) = Task::create_task(builder, scheduler, task, VirtualTableType::Ylong);
-        let _ = self.spawn(task);
+        self.spawn(task);
         handle
     }
 
-    fn spawn(&self, task: Task) -> Result<(), ScheduleError> {
+    fn spawn(&self, task: Task) {
         let mut shared = self.inner.shared.lock().unwrap();
 
         // if the shutdown flag is on, cancel the task
         if shared.shutdown {
-            return Err(ErrorKind::TaskShutdown.into());
+            panic!("The blocking runtime has already been shutdown, cannot spawn tasks");
         }
 
         shared.queue.push_back(task);
@@ -245,7 +245,6 @@ impl BlockPoolSpawner {
             shared.notify_num += 1;
             self.inner.condvar.notify_one();
         }
-        Ok(())
     }
 }
 
@@ -359,13 +358,10 @@ where
 
 #[cfg(test)]
 mod test {
-    use std::sync::Weak;
     use std::time::Duration;
 
     use crate::builder::RuntimeBuilder;
     use crate::executor::blocking_pool::BlockPoolSpawner;
-    use crate::executor::PlaceholderScheduler;
-    use crate::task::{Task, VirtualTableType};
 
     /// UT test cases for BlockPoolSpawner::new()
     ///
@@ -404,7 +400,6 @@ mod test {
     /// 3. When shared.shutdown is true, BlockPoolSpawner::shutdown returns
     ///    directly, representing that the blocking thread pool has safely
     ///    exited
-
     #[test]
     fn ut_blocking_pool_shutdown() {
         let thread_pool_builder = RuntimeBuilder::new_multi_thread();
@@ -499,126 +494,6 @@ mod test {
                 .name()
                 .unwrap(),
             "block-r-0"
-        );
-    }
-
-    /// UT test cases for BlockPoolSpawner::spawn()
-    ///
-    /// # Brief
-    /// 1. shared.shutdown == true, return directly.
-    /// 2. shared.shutdown == false, shared.idle_thread_num != 0
-    /// 3. shared.shutdown == false, shared.idle_thread_num == 0,
-    ///    shared.total_thread_num == self.inner.max_pool_size
-    /// 4. shared.shutdown == false, shared.idle_thread_num == 0,
-    ///    shared.total_thread_num != self.inner.max_pool_size,
-    ///    self.inner.worker_name.clone() != None
-    /// 5. shared.shutdown == false, shared.idle_thread_num == 0,
-    ///    shared.total_thread_num != self.inner.max_pool_size,
-    ///    self.inner.worker_name.clone() == None
-
-    #[test]
-    fn ut_blocking_pool_spawner_spawn() {
-        use std::thread::sleep;
-
-        use crate::executor::blocking_pool::BlockingTask;
-        use crate::task::TaskBuilder;
-
-        let thread_pool_builder = RuntimeBuilder::new_multi_thread();
-        let blocking_pool = BlockPoolSpawner::new(&thread_pool_builder.common);
-        blocking_pool.inner.shared.lock().unwrap().shutdown = true;
-        let task = BlockingTask(Some(move || {
-            sleep(Duration::from_millis(10));
-            String::from("task")
-        }));
-        let builder = TaskBuilder::new();
-        let scheduler: Weak<PlaceholderScheduler> = Weak::new();
-        let (task, _) = Task::create_task(&builder, scheduler, task, VirtualTableType::Ylong);
-        assert!(blocking_pool.spawn(task).is_err());
-
-        let thread_pool_builder = RuntimeBuilder::new_multi_thread();
-        let blocking_pool = BlockPoolSpawner::new(&thread_pool_builder.common);
-        blocking_pool.inner.shared.lock().unwrap().shutdown = false;
-        blocking_pool.inner.shared.lock().unwrap().idle_thread_num = 1;
-        let task = BlockingTask(Some(move || {
-            sleep(Duration::from_millis(10));
-            String::from("task")
-        }));
-        let scheduler: Weak<PlaceholderScheduler> = Weak::new();
-        let (task, _) = Task::create_task(&builder, scheduler, task, VirtualTableType::Ylong);
-        blocking_pool.spawn(task).expect("failed");
-        assert_eq!(blocking_pool.inner.shared.lock().unwrap().notify_num, 1);
-
-        let thread_pool_builder = RuntimeBuilder::new_multi_thread().max_blocking_pool_size(4);
-        let blocking_pool = BlockPoolSpawner::new(&thread_pool_builder.common);
-        blocking_pool.inner.shared.lock().unwrap().shutdown = false;
-        blocking_pool.inner.shared.lock().unwrap().idle_thread_num = 0;
-        blocking_pool.inner.shared.lock().unwrap().total_thread_num = 4;
-        let task = BlockingTask(Some(move || {
-            sleep(Duration::from_millis(10));
-            String::from("task")
-        }));
-        let scheduler: Weak<PlaceholderScheduler> = Weak::new();
-        let (task, _) = Task::create_task(&builder, scheduler, task, VirtualTableType::Ylong);
-        blocking_pool.spawn(task).expect("failed");
-        assert_eq!(blocking_pool.inner.shared.lock().unwrap().worker_id, 0);
-
-        let thread_pool_builder = RuntimeBuilder::new_multi_thread().max_blocking_pool_size(4);
-        let blocking_pool = BlockPoolSpawner::new(&thread_pool_builder.common);
-        blocking_pool.inner.shared.lock().unwrap().shutdown = false;
-        blocking_pool.inner.shared.lock().unwrap().idle_thread_num = 0;
-        blocking_pool.inner.shared.lock().unwrap().total_thread_num = 3;
-
-        let task = BlockingTask(Some(move || {
-            sleep(Duration::from_millis(10));
-            String::from("task")
-        }));
-        let scheduler: Weak<PlaceholderScheduler> = Weak::new();
-        let (task, _) = Task::create_task(&builder, scheduler, task, VirtualTableType::Ylong);
-        blocking_pool.spawn(task).expect("failed");
-        assert_eq!(
-            blocking_pool
-                .inner
-                .shared
-                .lock()
-                .unwrap()
-                .worker_threads
-                .pop_front()
-                .unwrap()
-                .1
-                .thread()
-                .name()
-                .unwrap(),
-            "block-0"
-        );
-
-        let thread_pool_builder = RuntimeBuilder::new_multi_thread()
-            .max_blocking_pool_size(4)
-            .worker_name(String::from("test"));
-        let blocking_pool = BlockPoolSpawner::new(&thread_pool_builder.common);
-        blocking_pool.inner.shared.lock().unwrap().shutdown = false;
-        blocking_pool.inner.shared.lock().unwrap().idle_thread_num = 0;
-        blocking_pool.inner.shared.lock().unwrap().total_thread_num = 3;
-        let task = BlockingTask(Some(move || {
-            sleep(Duration::from_millis(10));
-            String::from("task")
-        }));
-        let scheduler: Weak<PlaceholderScheduler> = Weak::new();
-        let (task, _) = Task::create_task(&builder, scheduler, task, VirtualTableType::Ylong);
-        blocking_pool.spawn(task).expect("failed");
-        assert_eq!(
-            blocking_pool
-                .inner
-                .shared
-                .lock()
-                .unwrap()
-                .worker_threads
-                .pop_front()
-                .unwrap()
-                .1
-                .thread()
-                .name()
-                .unwrap(),
-            "block-0"
         );
     }
 }

@@ -547,7 +547,8 @@ mod test {
     use crate::executor::async_pool::{get_cpu_core, AsyncPoolSpawner, MultiThreadScheduler};
     use crate::executor::driver::Driver;
     use crate::executor::parker::Parker;
-    use crate::task::{Task, TaskBuilder, VirtualTableType};
+    use crate::executor::Schedule;
+    use crate::task::{JoinHandle, Task, TaskBuilder, VirtualTableType};
 
     pub struct TestFuture {
         value: usize,
@@ -612,6 +613,22 @@ mod test {
         assert!(local_run_queue_info.is_empty());
     }
 
+    pub(crate) fn create_task<T, S>(
+        builder: &TaskBuilder,
+        scheduler: std::sync::Weak<S>,
+        task: T,
+        virtual_table_type: VirtualTableType,
+    ) -> (Task, JoinHandle<T::Output>)
+    where
+        T: Future + Send + 'static,
+        T::Output: Send + 'static,
+        S: Schedule,
+    {
+        let (task, handle) = Task::create_task(builder, scheduler, task, virtual_table_type);
+        task.0.drop_ref();
+        (task, handle)
+    }
+
     /// UT test cases for ExecutorMngInfo::enqueue()
     ///
     /// # Brief
@@ -624,7 +641,7 @@ mod test {
 
         let builder = TaskBuilder::new();
         let exe_scheduler = Arc::downgrade(&Arc::new(MultiThreadScheduler::new(1, arc_handle)));
-        let (task, _) = Task::create_task(
+        let (task, _) = create_task(
             &builder,
             exe_scheduler,
             test_future(),
@@ -784,7 +801,7 @@ mod test {
 
         let builder = TaskBuilder::new();
         let exe_scheduler = Arc::downgrade(&Arc::new(MultiThreadScheduler::new(1, arc_handle)));
-        let (task, _) = Task::create_task(
+        let (task, _) = create_task(
             &builder,
             exe_scheduler,
             test_future(),
@@ -830,7 +847,7 @@ mod test {
 
         let builder = TaskBuilder::new();
         let exe_scheduler = Arc::downgrade(&Arc::new(MultiThreadScheduler::new(1, arc_handle)));
-        let (task, _) = Task::create_task(
+        let (task, _) = create_task(
             &builder,
             exe_scheduler,
             test_future(),

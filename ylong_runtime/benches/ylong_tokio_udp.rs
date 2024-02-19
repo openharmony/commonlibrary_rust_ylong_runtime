@@ -29,7 +29,7 @@ mod udp_bench {
     use tokio::net::UdpSocket as tokioUdpSocket;
     use ylong_runtime::net::UdpSocket;
 
-    use crate::task_helpers::tokio_runtime;
+    use crate::task_helpers::{tokio_runtime, ylong_runtime_init};
 
     /// Benchmark test for ylong udp connect.
     ///
@@ -40,6 +40,7 @@ mod udp_bench {
     fn ylong_udp_connect(b: &mut Bencher) {
         let sender_addr = "127.0.0.1:8093";
         let receiver_addr = "127.0.0.1:8094";
+        ylong_runtime_init();
         b.iter(|| {
             let handle = ylong_runtime::spawn(async move {
                 let sender = UdpSocket::bind(sender_addr).await.unwrap();
@@ -82,6 +83,7 @@ mod udp_bench {
     fn ylong_udp_send_recv(b: &mut Bencher) {
         let basic_addr = "127.0.0.1:";
         let port = 8081;
+        ylong_runtime_init();
         b.iter(|| {
             let mut handlers = Vec::new();
             for i in 0..10 {
@@ -168,6 +170,7 @@ mod udp_bench {
     fn ylong_udp_send_to_recv_from(b: &mut Bencher) {
         let basic_addr = "127.0.0.1:";
         let port = 8141;
+        ylong_runtime_init();
         b.iter(|| {
             let mut handlers = Vec::new();
             for i in 0..10 {

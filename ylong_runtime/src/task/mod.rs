@@ -22,7 +22,6 @@ mod task_handle;
 mod waker;
 pub(crate) mod yield_now;
 use std::future::Future;
-use std::mem;
 use std::ptr::NonNull;
 use std::sync::Weak;
 
@@ -73,8 +72,8 @@ unsafe impl Sync for Task {}
 impl Task {
     pub(crate) fn run(self) {
         self.0.run();
-        mem::forget(self);
     }
+
     #[cfg(not(feature = "ffrt"))]
     pub(crate) fn shutdown(self) {
         self.0.shutdown();
@@ -126,12 +125,6 @@ impl Task {
             panic!("task mem is null because not enough memory is available");
         };
         RawTask { ptr }
-    }
-}
-
-impl Drop for Task {
-    fn drop(&mut self) {
-        self.0.drop_ref()
     }
 }
 
