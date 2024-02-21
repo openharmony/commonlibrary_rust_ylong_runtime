@@ -33,11 +33,8 @@ impl UnixListener {
     /// ```no_run
     /// use ylong_io::UnixListener;
     ///
-    /// let listener = match UnixListener::bind("/socket/path") {
-    ///     Ok(sock) => sock,
-    ///     Err(e) => {
-    ///         println!("connect fail: {e:?}");
-    ///     }
+    /// if let Ok(sock) = UnixListener::bind("/socket/path") {
+    ///     println!("socket binds succesfully");
     /// };
     /// ```
     pub fn bind<P: AsRef<Path>>(path: P) -> io::Result<UnixListener> {
@@ -53,9 +50,8 @@ impl UnixListener {
     /// fn test() -> std::io::Result<()> {
     ///     let listener = UnixListener::bind("/socket/path")?;
     ///
-    ///     match listener.accept() {
-    ///         Ok((socket, addr)) => println!("accept success: {addr:?}"),
-    ///         Err(err) => println!("accept failed: {err:?}"),
+    ///     if let Ok((socket, addr)) = listener.accept() {
+    ///         println!("accept success: {addr:?}");
     ///     }
     ///     Ok(())
     /// }
@@ -87,15 +83,12 @@ impl UnixListener {
     /// ```no_run
     /// use std::os::unix::net::UnixListener;
     ///
-    /// use ylong_io::UnixListener as Ylong_UnixListener;
+    /// use ylong_io::UnixListener as YlongUnixListener;
     ///
-    /// let sock = match UnixListener::bind("/socket/path") {
-    ///     Ok(sock) => sock,
-    ///     Err(err) => {
-    ///         println!("bind fail: {err:?}");
-    ///     }
+    /// if let Ok(sock) = UnixListener::bind("/socket/path") {
+    ///     println!("socket binds succesfully");
+    ///     let ylong_sock = YlongUnixListener::from_std(sock);
     /// };
-    /// let ylong_sock = Ylong_UnixListener::from_std(sock);
     /// ```
     pub fn from_std(socket: net::UnixListener) -> UnixListener {
         UnixListener { inner: socket }

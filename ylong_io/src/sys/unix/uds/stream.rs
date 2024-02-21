@@ -32,11 +32,8 @@ impl UnixStream {
     /// ```no_run
     /// use ylong_io::UnixStream;
     ///
-    /// let socket = match UnixStream::connect("/tmp/sock") {
-    ///     Ok(sock) => sock,
-    ///     Err(err) => {
-    ///         println!("connect fail: {err:?}");
-    ///     }
+    /// if let Ok(sock) = UnixStream::connect("/tmp/sock") {
+    ///     println!("socket connection succeeds");
     /// };
     /// ```
     pub fn connect<P: AsRef<Path>>(path: P) -> io::Result<UnixStream> {
@@ -49,15 +46,12 @@ impl UnixStream {
     /// ```no_run
     /// use std::os::unix::net::UnixStream;
     ///
-    /// use ylong_io::UnixStream as Ylong_UnixStream;
+    /// use ylong_io::UnixStream as YlongUnixStream;
     ///
-    /// let stream = match UnixStream::bind("/path/to/the/socket") {
-    ///     Ok(stream) => stream,
-    ///     Err(e) => {
-    ///         println!("Couldn't bind: {e:?}");
-    ///     }
+    /// if let Ok(stream) = UnixStream::connect("/path/to/the/socket") {
+    ///     println!("socket binds successfully");
+    ///     let stream = YlongUnixStream::from_std(stream);
     /// };
-    /// let _stream = Ylong_UnixStream::from_std(stream);
     /// ```
     pub fn from_std(stream: net::UnixStream) -> UnixStream {
         UnixStream { inner: stream }
@@ -70,11 +64,8 @@ impl UnixStream {
     /// ```no_run
     /// use ylong_io::UnixStream;
     ///
-    /// let (stream1, stream2) = match UnixStream::pair() {
-    ///     Ok((stream1, stream2)) => (stream1, stream2),
-    ///     Err(err) => {
-    ///         println!("Couldn't create a pair of sockets: {err:?}");
-    ///     }
+    /// if let Ok((stream1, stream2)) = UnixStream::pair() {
+    ///     println!("unix socket pair created successfully");
     /// };
     /// ```
     pub fn pair() -> io::Result<(UnixStream, UnixStream)> {

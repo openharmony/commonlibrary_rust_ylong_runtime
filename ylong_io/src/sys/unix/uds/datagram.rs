@@ -31,11 +31,8 @@ impl UnixDatagram {
     /// ```no_run
     /// use ylong_io::UnixDatagram;
     ///
-    /// let socket = match UnixDatagram::bind("/socket/path") {
-    ///     Ok(socket) => socket,
-    ///     Err(e) => {
-    ///         println!("bind error: {e:?}");
-    ///     }
+    /// if let Ok(socket) = UnixDatagram::bind("/socket/path") {
+    ///     println!("socket binds successfully");
     /// };
     /// ```
     pub fn bind<P: AsRef<Path>>(path: P) -> io::Result<UnixDatagram> {
@@ -48,15 +45,12 @@ impl UnixDatagram {
     /// ```no_run
     /// use std::os::unix::net::UnixDatagram;
     ///
-    /// use ylong_io::UnixDatagram as Ylong_UnixDatagram;
+    /// use ylong_io::UnixDatagram as YlongUnixDatagram;
     ///
-    /// let socket = match UnixDatagram::bind("/path/to/the/socket") {
-    ///     Ok(socket) => socket,
-    ///     Err(e) => {
-    ///         println!("bind fail: {e:?}");
-    ///     }
+    /// if let Ok(socket) = UnixDatagram::bind("/path/to/the/socket") {
+    ///     println!("socket binds successfully");
+    ///     let ylong_sock = YlongUnixDatagram::from_std(socket);
     /// };
-    /// let ylong_sock = Ylong_UnixDatagram::from_std(socket);
     /// ```
     pub fn from_std(socket: net::UnixDatagram) -> UnixDatagram {
         UnixDatagram { inner: socket }
@@ -80,12 +74,9 @@ impl UnixDatagram {
     /// ```no_run
     /// use ylong_io::UnixDatagram;
     ///
-    /// let socket = UnixDatagram::unbound();
-    /// match socket.connect("/socket/path") {
-    ///     Ok(socket) => socket,
-    ///     Err(err) => {
-    ///         println!("connect fail: {err:?}");
-    ///     }
+    /// let socket = UnixDatagram::unbound().unwrap();
+    /// if let Ok(socket) = socket.connect("/socket/path") {
+    ///     println!("socket connects successfully");
     /// };
     /// ```
     pub fn connect<P: AsRef<Path>>(&self, path: P) -> io::Result<()> {
@@ -99,11 +90,8 @@ impl UnixDatagram {
     /// ```no_run
     /// use ylong_io::UnixDatagram;
     ///
-    /// let (sock1, sock2) = match UnixDatagram::pair() {
-    ///     Ok((sock1, sock2)) => (sock1, sock2),
-    ///     Err(e) => {
-    ///         println!("pair fail: {e:?}");
-    ///     }
+    /// if let Ok((sock1, sock2)) = UnixDatagram::pair() {
+    ///     println!("unix datagram pair creates successfully");
     /// };
     /// ```
     pub fn pair() -> io::Result<(UnixDatagram, UnixDatagram)> {
