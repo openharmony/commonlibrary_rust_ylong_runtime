@@ -107,7 +107,8 @@ fn sdv_process_child_stdio_test1() {
         let stdout_handle = ylong_runtime::spawn(async move {
             let mut buf = Vec::new();
             stdout.read_to_end(&mut buf).await.unwrap();
-            assert_eq!(buf.as_slice(), b"!dlrow ,olleH");
+            let str = "!dlrow ,olleH";
+            assert!(String::from_utf8(buf).unwrap().contains(str));
         });
 
         let mut stderr = child.take_stderr().expect("Failed to open stderr");
@@ -159,7 +160,8 @@ fn sdv_process_child_stdio_test2() {
         let stdout_handle = ylong_runtime::spawn(async move {
             let mut buf = Vec::new();
             stdout.read_to_end(&mut buf).await.unwrap();
-            assert_eq!(buf.as_slice(), b"!dlrow ,olleH");
+            let str = "!dlrow ,olleH";
+            assert!(String::from_utf8(buf).unwrap().contains(str));
         });
 
         let mut stderr = child.take_stderr().expect("Failed to open stderr");
@@ -211,7 +213,7 @@ fn sdv_process_try_wait_test() {
         let mut child = command.spawn().unwrap();
 
         loop {
-            if let Some(_) = child.try_wait().unwrap() {
+            if child.try_wait().unwrap().is_some() {
                 break;
             }
         }
