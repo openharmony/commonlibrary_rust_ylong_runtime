@@ -43,6 +43,7 @@ ohos_rust_systemtest("rust_ylong_runtime_test_sdv") {
     "--cfg=feature=\"fs\"",
     "--cfg=feature=\"macros\"",
     "--cfg=feature=\"net\"",
+    "--cfg=feature=\"process\"",
     "--cfg=feature=\"sync\"",
     "--cfg=feature=\"signal\"",
     "--cfg=feature=\"time\"",
