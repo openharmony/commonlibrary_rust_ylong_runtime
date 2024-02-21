@@ -41,7 +41,7 @@ async fn run_forever() {
 }
 
 fn main() {
-    let _ = RuntimeBuilder::new_multi_thread()
+    RuntimeBuilder::new_multi_thread()
         .worker_num(8)
         .build_global()
         .unwrap();

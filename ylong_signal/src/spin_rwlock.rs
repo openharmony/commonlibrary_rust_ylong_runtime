@@ -12,7 +12,7 @@
 // limitations under the License.
 
 //! The code inside a signal handler should be async-signal-safe, you can check
-//! the definition here: https://man7.org/linux/man-pages/man7/signal-safety.7.html.
+//! the definition here: <https://man7.org/linux/man-pages/man7/signal-safety.7.html.>
 //! For short, a signal can be happened at anytime in a thread and the signal
 //! handler will be executed on the same exact thread. Therefore, if the signal
 //! handler function needs a resource that has been already acquired by the

@@ -537,7 +537,7 @@ impl Command {
     }
 
     /// Sets executable argument
-    /// Sets the first process argument, argv[0], to something other than the
+    /// Sets the first process argument `argv[0]`, to something other than the
     /// default executable path.
     ///
     /// It's same as std.
@@ -562,7 +562,7 @@ impl Command {
     /// `fork`. This primarily means that any modifications made to memory on
     /// behalf of this closure will ***not*** be visible to the parent process.
     /// This is often a very constrained environment where normal operations
-    /// like `malloc`, accessing environment variables through [`std::env`] or
+    /// like `malloc`, accessing environment variables through [`mod@std::env`] or
     /// acquiring a mutex are not guaranteed to work (due to other threads
     /// perhaps still running when the `fork` was run).
     pub unsafe fn pre_exec<F>(&mut self, f: F) -> &mut Command
