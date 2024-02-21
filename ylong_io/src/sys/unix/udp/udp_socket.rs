@@ -79,11 +79,8 @@ impl UdpSocket {
     ///
     /// async fn io_func() -> io::Result<()> {
     ///     let addr = "127.0.0.1:8080".parse().unwrap();
-    ///     let mut sock = match UdpSocket::bind(addr) {
-    ///         Ok(new_socket) => new_socket,
-    ///         Err(e) => {
-    ///             panic!("Failed to bind socket. {:?}", e);
-    ///         }
+    ///     if let Ok(mut sock) = UdpSocket::bind(addr) {
+    ///         println!("socket binds successfully");
     ///     };
     ///     Ok(())
     /// }
