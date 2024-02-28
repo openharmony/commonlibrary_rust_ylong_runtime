@@ -15,7 +15,6 @@
 //! - thread pool: how threads are started and how they run the tasks.
 //! - schedule policy: how tasks are scheduled in the task queues.
 pub(crate) mod block_on;
-pub(crate) mod blocking_pool;
 #[cfg(feature = "current_thread_runtime")]
 pub(crate) mod current_thread;
 
@@ -24,8 +23,7 @@ use std::mem::MaybeUninit;
 use std::sync::Once;
 
 use crate::builder::multi_thread_builder::GLOBAL_BUILDER;
-use crate::builder::{initialize_blocking_spawner, RuntimeBuilder};
-use crate::executor::blocking_pool::BlockPoolSpawner;
+use crate::builder::RuntimeBuilder;
 #[cfg(feature = "current_thread_runtime")]
 use crate::executor::current_thread::CurrentThreadSpawner;
 use crate::task::{JoinHandle, Task, TaskBuilder};
@@ -37,12 +35,14 @@ cfg_ffrt! {
 cfg_not_ffrt! {
     mod parker;
     pub(crate) mod async_pool;
+    pub(crate) mod blocking_pool;
     pub(crate) mod queue;
     mod sleeper;
     pub(crate) mod worker;
     pub(crate) mod driver;
-    use crate::builder::initialize_async_spawner;
+    use crate::builder::{initialize_blocking_spawner, initialize_async_spawner};
     use crate::executor::async_pool::AsyncPoolSpawner;
+    use crate::executor::blocking_pool::BlockPoolSpawner;
 }
 
 pub(crate) trait Schedule {
@@ -121,6 +121,7 @@ pub(crate) fn global_default_async() -> &'static Runtime {
     }
 }
 
+#[cfg(not(feature = "ffrt"))]
 pub(crate) fn global_default_blocking() -> &'static BlockPoolSpawner {
     static mut GLOBAL_DEFAULT_BLOCKING: MaybeUninit<BlockPoolSpawner> = MaybeUninit::uninit();
     static ONCE: Once = Once::new();

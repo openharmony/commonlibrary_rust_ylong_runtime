@@ -13,148 +13,191 @@
 
 #![cfg(feature = "multi_instance_runtime")]
 
-use std::thread::sleep;
-use std::time;
+#[cfg(feature = "ffrt")]
+mod ffrt_test {
+    use std::thread::sleep;
+    use std::time;
 
-use ylong_runtime::builder::RuntimeBuilder;
-use ylong_runtime::executor::Runtime;
-use ylong_runtime::task::TaskBuilder;
+    use ylong_runtime::task::TaskBuilder;
 
-fn test_spawn(runtime: &Runtime) {
-    let num = 1000;
+    #[test]
+    fn ffrt_spawn_blocking_test() {
+        let num = 1000;
 
-    let mut handles = Vec::with_capacity(num);
-    for i in 0..num {
-        handles.push(runtime.spawn_blocking(move || {
-            sleep(time::Duration::from_millis(1));
-            i
-        }));
-    }
-    for (times, handle) in handles.into_iter().enumerate() {
-        let ret = runtime.block_on(handle);
-        assert_eq!(ret.unwrap(), times);
-    }
+        let mut handles = Vec::with_capacity(num);
+        for i in 0..num {
+            handles.push(ylong_runtime::spawn_blocking(move || {
+                sleep(time::Duration::from_millis(1));
+                i
+            }));
+        }
 
-    let mut handles = Vec::with_capacity(num);
-    for i in 0..num {
-        handles.push(ylong_runtime::spawn_blocking(move || {
-            sleep(time::Duration::from_millis(1));
-            i
-        }));
-    }
+        for (times, handle) in handles.into_iter().enumerate() {
+            let ret = runtime.block_on(handle);
+            assert_eq!(ret.unwrap(), times);
+        }
 
-    for (times, handle) in handles.into_iter().enumerate() {
-        let ret = runtime.block_on(handle);
-        assert_eq!(ret.unwrap(), times);
-    }
+        let mut handles = Vec::with_capacity(num);
+        let task_builder = TaskBuilder::new();
+        for i in 0..num {
+            handles.push(task_builder.spawn_blocking(move || {
+                sleep(time::Duration::from_millis(1));
+                i
+            }));
+        }
 
-    let mut handles = Vec::with_capacity(num);
-    let task_builder = TaskBuilder::new();
-    for i in 0..num {
-        handles.push(task_builder.spawn_blocking(move || {
-            sleep(time::Duration::from_millis(1));
-            i
-        }));
-    }
-
-    for (times, handle) in handles.into_iter().enumerate() {
-        let ret = runtime.block_on(handle);
-        assert_eq!(ret.unwrap(), times);
+        for (times, handle) in handles.into_iter().enumerate() {
+            let ret = runtime.block_on(handle);
+            assert_eq!(ret.unwrap(), times);
+        }
     }
 }
 
-// One Core Test
-#[test]
-fn sdv_one_core_test() {
-    let max_blocking_pool_size = 1;
-    let blocking_permanent_thread_num = 1;
+#[cfg(not(feature = "ffrt"))]
+mod not_ffrt_test {
+    use std::thread::sleep;
+    use std::time;
 
-    let runtime = RuntimeBuilder::new_multi_thread()
-        .max_blocking_pool_size(max_blocking_pool_size)
-        .blocking_permanent_thread_num(blocking_permanent_thread_num)
-        .build()
-        .unwrap();
+    use ylong_runtime::builder::RuntimeBuilder;
+    use ylong_runtime::executor::Runtime;
+    use ylong_runtime::task::TaskBuilder;
 
-    test_spawn(&runtime);
-}
+    fn test_spawn(runtime: &Runtime) {
+        let num = 1000;
 
-// Second Core Test
-#[test]
-fn sdv_two_core_test() {
-    let max_blocking_pool_size = 2;
-    let blocking_permanent_thread_num = 2;
+        let mut handles = Vec::with_capacity(num);
+        for i in 0..num {
+            handles.push(runtime.spawn_blocking(move || {
+                sleep(time::Duration::from_millis(1));
+                i
+            }));
+        }
+        for (times, handle) in handles.into_iter().enumerate() {
+            let ret = runtime.block_on(handle);
+            assert_eq!(ret.unwrap(), times);
+        }
 
-    let runtime = RuntimeBuilder::new_multi_thread()
-        .max_blocking_pool_size(max_blocking_pool_size)
-        .blocking_permanent_thread_num(blocking_permanent_thread_num)
-        .build()
-        .unwrap();
+        let mut handles = Vec::with_capacity(num);
+        for i in 0..num {
+            handles.push(ylong_runtime::spawn_blocking(move || {
+                sleep(time::Duration::from_millis(1));
+                i
+            }));
+        }
 
-    test_spawn(&runtime);
-}
+        for (times, handle) in handles.into_iter().enumerate() {
+            let ret = runtime.block_on(handle);
+            assert_eq!(ret.unwrap(), times);
+        }
 
-// Three Core Test
-#[test]
-fn sdv_three_core_test() {
-    let max_blocking_pool_size = 3;
-    let blocking_permanent_thread_num = 3;
+        let mut handles = Vec::with_capacity(num);
+        let task_builder = TaskBuilder::new();
+        for i in 0..num {
+            handles.push(task_builder.spawn_blocking(move || {
+                sleep(time::Duration::from_millis(1));
+                i
+            }));
+        }
 
-    let runtime = RuntimeBuilder::new_multi_thread()
-        .max_blocking_pool_size(max_blocking_pool_size)
-        .blocking_permanent_thread_num(blocking_permanent_thread_num)
-        .build()
-        .unwrap();
+        for (times, handle) in handles.into_iter().enumerate() {
+            let ret = runtime.block_on(handle);
+            assert_eq!(ret.unwrap(), times);
+        }
+    }
 
-    test_spawn(&runtime);
-}
+    // One Core Test
+    #[test]
+    fn sdv_one_core_test() {
+        let max_blocking_pool_size = 1;
+        let blocking_permanent_thread_num = 1;
 
-// Four resident threads test
-#[test]
-fn sdv_four_core_test() {
-    let max_blocking_pool_size = 4;
+        let runtime = RuntimeBuilder::new_multi_thread()
+            .max_blocking_pool_size(max_blocking_pool_size)
+            .blocking_permanent_thread_num(blocking_permanent_thread_num)
+            .build()
+            .unwrap();
 
-    let runtime = RuntimeBuilder::new_multi_thread()
-        .max_blocking_pool_size(max_blocking_pool_size)
-        .build()
-        .unwrap();
+        test_spawn(&runtime);
+    }
 
-    test_spawn(&runtime);
-}
+    // Second Core Test
+    #[test]
+    fn sdv_two_core_test() {
+        let max_blocking_pool_size = 2;
+        let blocking_permanent_thread_num = 2;
 
-// Eight Core Test
-#[test]
-fn sdv_eight_core_test() {
-    let max_blocking_pool_size = 8;
+        let runtime = RuntimeBuilder::new_multi_thread()
+            .max_blocking_pool_size(max_blocking_pool_size)
+            .blocking_permanent_thread_num(blocking_permanent_thread_num)
+            .build()
+            .unwrap();
 
-    let runtime = RuntimeBuilder::new_multi_thread()
-        .max_blocking_pool_size(max_blocking_pool_size)
-        .build()
-        .unwrap();
+        test_spawn(&runtime);
+    }
 
-    test_spawn(&runtime);
-}
+    // Three Core Test
+    #[test]
+    fn sdv_three_core_test() {
+        let max_blocking_pool_size = 3;
+        let blocking_permanent_thread_num = 3;
 
-// 64-core test, which is also the maximum number of cores supported
-#[test]
-fn sdv_max_core_test() {
-    let max_blocking_pool_size = 64;
+        let runtime = RuntimeBuilder::new_multi_thread()
+            .max_blocking_pool_size(max_blocking_pool_size)
+            .blocking_permanent_thread_num(blocking_permanent_thread_num)
+            .build()
+            .unwrap();
 
-    let runtime = RuntimeBuilder::new_multi_thread()
-        .max_blocking_pool_size(max_blocking_pool_size)
-        .build()
-        .unwrap();
+        test_spawn(&runtime);
+    }
 
-    test_spawn(&runtime);
-}
+    // Four resident threads test
+    #[test]
+    fn sdv_four_core_test() {
+        let max_blocking_pool_size = 4;
 
-#[test]
-fn sdv_complex_task_test() {
-    let max_blocking_pool_size = 4;
+        let runtime = RuntimeBuilder::new_multi_thread()
+            .max_blocking_pool_size(max_blocking_pool_size)
+            .build()
+            .unwrap();
 
-    let runtime = RuntimeBuilder::new_multi_thread()
-        .max_blocking_pool_size(max_blocking_pool_size)
-        .build()
-        .unwrap();
+        test_spawn(&runtime);
+    }
 
-    test_spawn(&runtime);
+    // Eight Core Test
+    #[test]
+    fn sdv_eight_core_test() {
+        let max_blocking_pool_size = 8;
+
+        let runtime = RuntimeBuilder::new_multi_thread()
+            .max_blocking_pool_size(max_blocking_pool_size)
+            .build()
+            .unwrap();
+
+        test_spawn(&runtime);
+    }
+
+    // 64-core test, which is also the maximum number of cores supported
+    #[test]
+    fn sdv_max_core_test() {
+        let max_blocking_pool_size = 64;
+
+        let runtime = RuntimeBuilder::new_multi_thread()
+            .max_blocking_pool_size(max_blocking_pool_size)
+            .build()
+            .unwrap();
+
+        test_spawn(&runtime);
+    }
+
+    #[test]
+    fn sdv_complex_task_test() {
+        let max_blocking_pool_size = 4;
+
+        let runtime = RuntimeBuilder::new_multi_thread()
+            .max_blocking_pool_size(max_blocking_pool_size)
+            .build()
+            .unwrap();
+
+        test_spawn(&runtime);
+    }
 }

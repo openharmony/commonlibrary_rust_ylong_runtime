@@ -20,8 +20,7 @@ use ylong_ffrt::FfrtRet::{FfrtCoroutinePending, FfrtCoroutineReady};
 use ylong_ffrt::{ffrt_submit_coroutine, FfrtRet, FfrtTaskAttr};
 
 use crate::executor::PlaceholderScheduler;
-use crate::task::{JoinHandle, Task, VirtualTableType};
-use crate::TaskBuilder;
+use crate::task::{JoinHandle, Task, TaskBuilder, VirtualTableType};
 
 pub(crate) fn ffrt_submit(t: Task, builder: &TaskBuilder) {
     extern "C" fn exec_future(data: *mut c_void) -> FfrtRet {

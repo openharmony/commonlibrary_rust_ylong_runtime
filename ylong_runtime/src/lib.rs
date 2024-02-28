@@ -50,6 +50,7 @@ mod util;
 
 cfg_ffrt! {
     pub(crate) mod ffrt;
+    pub use ylong_ffrt::Qos;
 }
 
 cfg_macros! {
