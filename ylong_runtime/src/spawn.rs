@@ -13,10 +13,48 @@
 
 use std::future::Future;
 
-use crate::executor::{global_default_async, global_default_blocking};
+use crate::executor::global_default_async;
 use crate::task::join_handle::JoinHandle;
 use crate::task::TaskBuilder;
 
+cfg_not_ffrt! {
+    use crate::executor::global_default_blocking;
+}
+
+cfg_ffrt! {
+    use std::pin::Pin;
+    use std::task::{Context, Poll};
+    use crate::ffrt::spawner::spawn;
+
+    struct BlockingTask<T>(Option<T>);
+
+    impl<T> Unpin for BlockingTask<T> {}
+
+    impl<T, R> Future for BlockingTask<T>
+        where
+            T: FnOnce() -> R,
+    {
+        type Output = R;
+
+        fn poll(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
+            let func = self.0.take().expect("blocking tasks cannot be polled after finished");
+            Poll::Ready(func())
+        }
+    }
+
+    /// Spawns a task on the blocking pool.
+    pub(crate) fn spawn_blocking<T, R>(builder: &TaskBuilder, task: T) -> JoinHandle<R>
+        where
+            T: FnOnce() -> R,
+            T: Send + 'static,
+            R: Send + 'static,
+    {
+        let task = BlockingTask(Some(task));
+        spawn(task, builder)
+    }
+}
+
+#[cfg(not(feature = "ffrt"))]
 /// Spawns a task on the blocking pool.
 pub(crate) fn spawn_blocking<T, R>(builder: &TaskBuilder, task: T) -> JoinHandle<R>
 where

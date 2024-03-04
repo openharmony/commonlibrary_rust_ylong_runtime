@@ -37,11 +37,11 @@ pub use current_thread_builder::CurrentThreadBuilder;
 pub use multi_thread_builder::MultiThreadBuilder;
 
 pub(crate) use crate::builder::common_builder::CommonBuilder;
-use crate::error::ScheduleError;
-use crate::executor::blocking_pool::BlockPoolSpawner;
 
 cfg_not_ffrt!(
+    use crate::error::ScheduleError;
     use crate::executor::async_pool::AsyncPoolSpawner;
+    use crate::executor::blocking_pool::BlockPoolSpawner;
     use std::io;
 );
 
@@ -96,7 +96,7 @@ impl RuntimeBuilder {
     /// ```
     /// use ylong_runtime::builder::RuntimeBuilder;
     ///
-    /// let runtime = RuntimeBuilder::new_current_thread()
+    /// let builder = RuntimeBuilder::new_current_thread()
     ///     .worker_stack_size(1024 * 3)
     ///     .max_blocking_pool_size(4);
     /// ```
@@ -116,26 +116,27 @@ impl RuntimeBuilder {
     /// ```
     /// use ylong_runtime::builder::RuntimeBuilder;
     ///
-    /// let runtime = RuntimeBuilder::new_multi_thread().max_blocking_pool_size(4);
+    /// let builder = RuntimeBuilder::new_multi_thread();
     /// ```
     pub fn new_multi_thread() -> MultiThreadBuilder {
         MultiThreadBuilder::new()
     }
 }
 
-#[cfg(not(feature = "ffrt"))]
-pub(crate) fn initialize_async_spawner(
-    builder: &MultiThreadBuilder,
-) -> io::Result<AsyncPoolSpawner> {
-    AsyncPoolSpawner::new(builder)
-}
+cfg_not_ffrt! {
+    pub(crate) fn initialize_async_spawner(
+        builder: &MultiThreadBuilder,
+    ) -> io::Result<AsyncPoolSpawner> {
+        AsyncPoolSpawner::new(builder)
+    }
 
-pub(crate) fn initialize_blocking_spawner(
-    builder: &CommonBuilder,
-) -> Result<BlockPoolSpawner, ScheduleError> {
-    let blocking_spawner = BlockPoolSpawner::new(builder);
-    blocking_spawner.create_permanent_threads()?;
-    Ok(blocking_spawner)
+    pub(crate) fn initialize_blocking_spawner(
+        builder: &CommonBuilder,
+    ) -> Result<BlockPoolSpawner, ScheduleError> {
+        let blocking_spawner = BlockPoolSpawner::new(builder);
+        blocking_spawner.create_permanent_threads()?;
+        Ok(blocking_spawner)
+    }
 }
 
 #[cfg(test)]
@@ -163,18 +164,18 @@ mod test {
     fn ut_thread_pool_builder_new() {
         let thread_pool_builder = RuntimeBuilder::new_multi_thread();
         assert_eq!(thread_pool_builder.common.worker_name, None);
-        assert_eq!(thread_pool_builder.common.blocking_permanent_thread_num, 0);
-        assert_eq!(thread_pool_builder.common.max_blocking_pool_size, Some(50));
-        assert_eq!(thread_pool_builder.common.keep_alive_time, None);
         #[cfg(not(feature = "ffrt"))]
         {
+            assert_eq!(thread_pool_builder.common.blocking_permanent_thread_num, 0);
+            assert_eq!(thread_pool_builder.common.max_blocking_pool_size, Some(50));
+            assert_eq!(thread_pool_builder.common.keep_alive_time, None);
             assert_eq!(thread_pool_builder.core_thread_size, None);
+            assert_eq!(thread_pool_builder.common.stack_size, None);
             assert_eq!(
                 thread_pool_builder.common.schedule_algo,
                 ScheduleAlgo::FifoBound
             );
         }
-        assert_eq!(thread_pool_builder.common.stack_size, None);
     }
 
     /// UT test cases for RuntimeBuilder::name()
@@ -217,6 +218,7 @@ mod test {
     /// 1. stack_size set to 0, Check if the return value is Some(1)
     /// 2. stack_size set to 1, Check if the return value is Some(1)
     #[test]
+    #[cfg(not(feature = "ffrt"))]
     fn ut_thread_pool_builder_stack_size() {
         let thread_pool_builder = RuntimeBuilder::new_multi_thread().worker_stack_size(0);
         assert_eq!(thread_pool_builder.common.stack_size.unwrap(), 1);

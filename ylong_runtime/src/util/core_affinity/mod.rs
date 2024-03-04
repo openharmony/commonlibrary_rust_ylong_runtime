@@ -13,10 +13,12 @@
 
 //! Sets the core affinity of a thread.
 
-#[cfg(target_os = "linux")]
-pub mod linux;
-#[cfg(target_os = "linux")]
-pub use linux::*;
+cfg_not_ffrt! {
+    #[cfg(target_os = "linux")]
+    pub mod linux;
+    #[cfg(target_os = "linux")]
+    pub use linux::*;
+}
 
 #[cfg(target_os = "windows")]
 pub mod windows;

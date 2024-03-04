@@ -14,12 +14,10 @@
 //! A FFI crate for FFRT runtime.
 
 mod config;
-mod deadline;
 mod sys_event;
 mod task;
 
 pub use config::*;
-pub use deadline::*;
 use libc::{c_int, c_void};
 pub use sys_event::*;
 pub use task::*;

@@ -34,6 +34,7 @@ use crate::executor::Schedule;
 use crate::task::raw::{Header, RawTask, TaskMngInfo};
 
 pub(crate) enum VirtualTableType {
+    #[cfg(not(feature = "ffrt"))]
     Ylong,
     #[cfg(feature = "ffrt")]
     Ffrt,
@@ -69,22 +70,22 @@ pub(crate) struct Task(pub(crate) RawTask);
 unsafe impl Send for Task {}
 unsafe impl Sync for Task {}
 
+#[cfg(not(feature = "ffrt"))]
 impl Task {
     pub(crate) fn run(self) {
         self.0.run();
     }
 
-    #[cfg(not(feature = "ffrt"))]
     pub(crate) fn shutdown(self) {
         self.0.shutdown();
+    }
+
+    pub(crate) unsafe fn from_raw(ptr: NonNull<Header>) -> Task {
+        Task(RawTask::form_raw(ptr))
     }
 }
 
 impl Task {
-    pub(crate) unsafe fn from_raw(ptr: NonNull<Header>) -> Task {
-        Task(RawTask::form_raw(ptr))
-    }
-
     pub(crate) fn create_task<T, S>(
         builder: &TaskBuilder,
         scheduler: Weak<S>,

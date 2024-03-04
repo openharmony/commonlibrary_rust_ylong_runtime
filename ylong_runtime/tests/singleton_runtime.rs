@@ -144,8 +144,11 @@ fn sdv_global_block_on() {
 #[test]
 fn sdv_build_global_failed() {
     let _ = ylong_runtime::block_on(ylong_runtime::spawn(async move { 1 }));
+    #[cfg(not(feature = "ffrt"))]
     let ret = RuntimeBuilder::new_multi_thread()
         .max_blocking_pool_size(1)
         .build_global();
+    #[cfg(feature = "ffrt")]
+    let ret = RuntimeBuilder::new_multi_thread().build_global();
     assert!(ret.is_err());
 }

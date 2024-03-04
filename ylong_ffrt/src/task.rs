@@ -23,9 +23,12 @@ type FfrtExecHook = extern "C" fn(*mut c_void) -> FfrtRet;
 
 type RawTaskCtx = *mut c_void;
 
+/// Return value.
 #[repr(C)]
 pub enum FfrtRet {
+    /// Asynchronous task result pending.
     FfrtCoroutinePending,
+    /// Asynchronous task result is ready.
     FfrtCoroutineReady,
 }
 

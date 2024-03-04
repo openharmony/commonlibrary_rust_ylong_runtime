@@ -61,10 +61,6 @@ pub(crate) struct RawTask {
 }
 
 impl RawTask {
-    pub(crate) fn form_raw(ptr: NonNull<Header>) -> RawTask {
-        RawTask { ptr }
-    }
-
     pub(crate) fn header(&self) -> &Header {
         unsafe { self.ptr.as_ref() }
     }
@@ -106,6 +102,10 @@ impl RawTask {
 
 #[cfg(not(feature = "ffrt"))]
 impl RawTask {
+    pub(crate) fn form_raw(ptr: NonNull<Header>) -> RawTask {
+        RawTask { ptr }
+    }
+
     pub(super) fn shutdown(self) {
         let vir_table = self.header().vtable;
         unsafe {
@@ -230,29 +230,6 @@ pub(crate) struct TaskMngInfo<T: Future, S: Schedule> {
     inner: Inner<T, S>,
 }
 
-unsafe fn run<T, S>(ptr: NonNull<Header>) -> bool
-where
-    T: Future,
-    S: Schedule,
-{
-    let task_handle = TaskHandle::<T, S>::from_raw(ptr);
-    task_handle.run();
-    true
-}
-
-unsafe fn schedule<T, S>(ptr: NonNull<Header>, flag: bool)
-where
-    T: Future,
-    S: Schedule,
-{
-    let task_handle = TaskHandle::<T, S>::from_raw(ptr);
-    if flag {
-        task_handle.wake();
-    } else {
-        task_handle.wake_by_ref();
-    }
-}
-
 unsafe fn get_result<T, S>(ptr: NonNull<Header>, res: *mut ())
 where
     T: Future,
@@ -291,40 +268,64 @@ where
     task_handle.drop_join_handle();
 }
 
-#[cfg(not(feature = "ffrt"))]
-unsafe fn release<T, S>(ptr: NonNull<Header>)
-where
-    T: Future,
-    S: Schedule,
-{
-    let task_handle = TaskHandle::<T, S>::from_raw(ptr);
-    task_handle.shutdown();
-}
+cfg_not_ffrt! {
+    unsafe fn run<T, S>(ptr: NonNull<Header>) -> bool
+    where
+        T: Future,
+        S: Schedule,
+    {
+        let task_handle = TaskHandle::<T, S>::from_raw(ptr);
+        task_handle.run();
+        true
+    }
 
-unsafe fn cancel<T, S>(ptr: NonNull<Header>)
-where
-    T: Future,
-    S: Schedule,
-{
-    let task_handle = TaskHandle::<T, S>::from_raw(ptr);
-    task_handle.set_canceled();
-}
+    unsafe fn schedule<T, S>(ptr: NonNull<Header>, flag: bool)
+    where
+        T: Future,
+        S: Schedule,
+    {
+        let task_handle = TaskHandle::<T, S>::from_raw(ptr);
+        if flag {
+            task_handle.wake();
+        } else {
+            task_handle.wake_by_ref();
+        }
+    }
 
-fn create_vtable<T, S>() -> &'static TaskVirtualTable
-where
-    T: Future,
-    S: Schedule,
-{
-    &TaskVirtualTable {
-        run: run::<T, S>,
-        schedule: schedule::<T, S>,
-        get_result: get_result::<T, S>,
-        drop_join_handle: drop_join_handle::<T, S>,
-        drop_ref: drop_ref::<T, S>,
-        set_waker: set_waker::<T, S>,
-        #[cfg(not(feature = "ffrt"))]
-        release: release::<T, S>,
-        cancel: cancel::<T, S>,
+    unsafe fn release<T, S>(ptr: NonNull<Header>)
+    where
+        T: Future,
+        S: Schedule,
+    {
+        let task_handle = TaskHandle::<T, S>::from_raw(ptr);
+        task_handle.shutdown();
+    }
+
+    unsafe fn cancel<T, S>(ptr: NonNull<Header>)
+    where
+        T: Future,
+        S: Schedule,
+    {
+        let task_handle = TaskHandle::<T, S>::from_raw(ptr);
+        task_handle.set_canceled();
+    }
+
+    fn create_vtable<T, S>() -> &'static TaskVirtualTable
+    where
+        T: Future,
+        S: Schedule,
+    {
+        &TaskVirtualTable {
+            run: run::<T, S>,
+            schedule: schedule::<T, S>,
+            get_result: get_result::<T, S>,
+            drop_join_handle: drop_join_handle::<T, S>,
+            drop_ref: drop_ref::<T, S>,
+            set_waker: set_waker::<T, S>,
+            #[cfg(not(feature = "ffrt"))]
+            release: release::<T, S>,
+            cancel: cancel::<T, S>,
+        }
     }
 }
 
@@ -392,6 +393,7 @@ where
         virtual_table_type: VirtualTableType,
     ) -> Box<Self> {
         let vtable = match virtual_table_type {
+            #[cfg(not(feature = "ffrt"))]
             VirtualTableType::Ylong => create_vtable::<T, S>(),
             #[cfg(feature = "ffrt")]
             VirtualTableType::Ffrt => create_ffrt_vtable::<T, S>(),

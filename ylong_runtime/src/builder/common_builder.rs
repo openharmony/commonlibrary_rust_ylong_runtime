@@ -11,22 +11,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::time::Duration;
-
-use crate::builder::CallbackHook;
-use crate::executor::blocking_pool::BLOCKING_MAX_THEAD_NUM;
-cfg_not_ffrt!(
+cfg_not_ffrt! {
+    use std::time::Duration;
+    use crate::builder::CallbackHook;
+    use crate::executor::blocking_pool::BLOCKING_MAX_THEAD_NUM;
     use crate::builder::ScheduleAlgo;
-);
+    const BLOCKING_PERMANENT_THREAD_NUM: u8 = 0;
+}
 
-const BLOCKING_PERMANENT_THREAD_NUM: u8 = 0;
+cfg_ffrt! {
+    use std::collections::HashMap;
+    use ylong_ffrt::Qos;
+}
 
+#[cfg(feature = "ffrt")]
+pub(crate) struct CommonBuilder {
+    /// Name prefix of worker threads
+    pub(crate) worker_name: Option<String>,
+    /// Thread stack size for each qos
+    pub(crate) stack_size_by_qos: HashMap<Qos, usize>,
+}
+
+#[cfg(not(feature = "ffrt"))]
 pub(crate) struct CommonBuilder {
     /// Name prefix of worker threads
     pub(crate) worker_name: Option<String>,
 
     /// Core affinity, default set to true
-    #[cfg(not(feature = "ffrt"))]
     pub(crate) is_affinity: bool,
 
     /// How long the blocking thread will be kept alive after becoming idle
@@ -36,7 +47,6 @@ pub(crate) struct CommonBuilder {
     pub(crate) max_blocking_pool_size: Option<u8>,
 
     /// Schedule policy, default set to FIFO
-    #[cfg(not(feature = "ffrt"))]
     pub(crate) schedule_algo: ScheduleAlgo,
 
     /// Maximum number of permanent threads
@@ -52,15 +62,24 @@ pub(crate) struct CommonBuilder {
     pub(crate) before_stop: Option<CallbackHook>,
 }
 
+#[cfg(feature = "ffrt")]
 impl CommonBuilder {
     pub(crate) fn new() -> Self {
         CommonBuilder {
             worker_name: None,
-            #[cfg(not(feature = "ffrt"))]
+            stack_size_by_qos: HashMap::new(),
+        }
+    }
+}
+
+#[cfg(not(feature = "ffrt"))]
+impl CommonBuilder {
+    pub(crate) fn new() -> Self {
+        CommonBuilder {
+            worker_name: None,
             is_affinity: true,
             blocking_permanent_thread_num: BLOCKING_PERMANENT_THREAD_NUM,
             max_blocking_pool_size: Some(BLOCKING_MAX_THEAD_NUM),
-            #[cfg(not(feature = "ffrt"))]
             schedule_algo: ScheduleAlgo::FifoBound,
             stack_size: None,
             after_start: None,
@@ -70,16 +89,20 @@ impl CommonBuilder {
     }
 }
 
+#[cfg(not(feature = "ffrt"))]
 macro_rules! impl_common {
     ($self:ident) => {
-        use std::time::Duration;
-        cfg_not_ffrt!(
-            use crate::builder::ScheduleAlgo;
-            use std::sync::Arc;
-        );
+         use std::time::Duration;
+         use crate::builder::ScheduleAlgo;
+         use std::sync::Arc;
 
-        #[cfg(not(feature = "ffrt"))]
         impl $self {
+            /// Sets the name prefix for all worker threads.
+            pub fn worker_name(mut self, name: String) -> Self {
+                self.common.worker_name = Some(name);
+                self
+            }
+
             /// Sets the core affinity of the worker threads
             pub fn is_affinity(mut self, is_affinity: bool) -> Self {
                 self.common.is_affinity = is_affinity;
@@ -107,14 +130,6 @@ macro_rules! impl_common {
                 F: Fn() + Send + Sync + 'static,
             {
                 self.common.before_stop = Some(Arc::new(f));
-                self
-            }
-        }
-
-        impl $self {
-            /// Sets the name prefix for all worker threads.
-            pub fn worker_name(mut self, name: String) -> Self {
-                self.common.worker_name = Some(name);
                 self
             }
 
@@ -147,6 +162,13 @@ macro_rules! impl_common {
                 self
             }
 
+            /// Sets how long will the thread be kept alive inside the blocking pool
+            /// after it becomes idle.
+            pub fn keep_alive_time(mut self, keep_alive_time: Duration) -> Self {
+                self.common.keep_alive_time = Some(keep_alive_time);
+                self
+            }
+
             /// Sets the stack size for every worker thread that gets spawned by the
             /// runtime. The minimum stack size is 1.
             pub fn worker_stack_size(mut self, stack_size: usize) -> Self {
@@ -157,15 +179,9 @@ macro_rules! impl_common {
                 }
                 self
             }
-
-            /// Sets how long will the thread be kept alive inside the blocking pool
-            /// after it becomes idle.
-            pub fn keep_alive_time(mut self, keep_alive_time: Duration) -> Self {
-                self.common.keep_alive_time = Some(keep_alive_time);
-                self
-            }
         }
     };
 }
 
+#[cfg(not(feature = "ffrt"))]
 pub(crate) use impl_common;

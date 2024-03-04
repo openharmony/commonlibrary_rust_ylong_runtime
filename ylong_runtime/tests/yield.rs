@@ -11,6 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::sync::atomic::Ordering::{Acquire, Release};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
@@ -18,6 +19,26 @@ use std::sync::Arc;
 use ylong_ffrt::Qos;
 use ylong_runtime::builder::RuntimeBuilder;
 use ylong_runtime::task::yield_now;
+
+struct Parker {
+    parker: AtomicUsize,
+}
+
+impl Parker {
+    fn new(size: usize) -> Parker {
+        Parker {
+            parker: AtomicUsize::new(size),
+        }
+    }
+
+    fn wait_for_all(&self) {
+        while self.parker.load(Acquire) != 0 {}
+    }
+
+    fn wake_one(&self) {
+        self.parker.fetch_sub(1, Release);
+    }
+}
 
 /// SDV case for yield_now.
 ///
@@ -43,11 +64,13 @@ fn sdv_yield_now_single_worker() {
         .unwrap();
 
     let val = Arc::new(AtomicUsize::new(0));
-
+    let parker = Arc::new(Parker::new(10));
     let mut handles = vec![];
     for _ in 0..10 {
         let val_cpy = val.clone();
+        let parker_cpy = parker.clone();
         let handle = ylong_runtime::spawn(async move {
+            parker_cpy.wait_for_all();
             for _ in 0..100 {
                 val_cpy.fetch_add(1, Ordering::Relaxed);
                 yield_now().await;
@@ -56,6 +79,7 @@ fn sdv_yield_now_single_worker() {
             assert!(cur > 100);
         });
         handles.push(handle);
+        parker.wake_one();
     }
     for handle in handles {
         ylong_runtime::block_on(handle).unwrap();
