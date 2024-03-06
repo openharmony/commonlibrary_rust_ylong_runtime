@@ -23,15 +23,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use windows_sys::Win32::Foundation::{
-    ERROR_INVALID_HANDLE, ERROR_IO_PENDING, HANDLE, STATUS_CANCELLED, WAIT_TIMEOUT,
+use crate::sys::winapi::{
+    WSAGetLastError, WSAIoctl, ERROR_INVALID_HANDLE, ERROR_IO_PENDING, HANDLE, OVERLAPPED,
+    SIO_BASE_HANDLE, SIO_BSP_HANDLE, SIO_BSP_HANDLE_POLL, SIO_BSP_HANDLE_SELECT, SOCKET_ERROR,
+    STATUS_CANCELLED, WAIT_TIMEOUT,
 };
-use windows_sys::Win32::Networking::WinSock::{
-    WSAGetLastError, WSAIoctl, SIO_BASE_HANDLE, SIO_BSP_HANDLE, SIO_BSP_HANDLE_POLL,
-    SIO_BSP_HANDLE_SELECT, SOCKET_ERROR,
-};
-use windows_sys::Win32::System::IO::OVERLAPPED;
-
 use crate::sys::windows::afd;
 use crate::sys::windows::afd::{Afd, AfdGroup, AfdPollInfo};
 use crate::sys::windows::events::{

@@ -20,19 +20,12 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::{fmt, io};
 
-use windows_sys::Win32::Foundation::{
-    RtlNtStatusToDosError, HANDLE, INVALID_HANDLE_VALUE, NTSTATUS, STATUS_NOT_FOUND,
-    STATUS_PENDING, STATUS_SUCCESS, UNICODE_STRING,
+use crate::sys::winapi::{
+    NtCreateFile, NtDeviceIoControlFile, RtlNtStatusToDosError, SetFileCompletionNotificationModes,
+    FILE_OPEN, FILE_SHARE_READ, FILE_SHARE_WRITE, FILE_SKIP_SET_EVENT_ON_HANDLE, HANDLE,
+    INVALID_HANDLE_VALUE, IO_STATUS_BLOCK, IO_STATUS_BLOCK_0, NTSTATUS, OBJECT_ATTRIBUTES,
+    STATUS_NOT_FOUND, STATUS_PENDING, STATUS_SUCCESS, SYNCHRONIZE, UNICODE_STRING,
 };
-use windows_sys::Win32::Storage::FileSystem::{
-    NtCreateFile, SetFileCompletionNotificationModes, FILE_OPEN, FILE_SHARE_READ, FILE_SHARE_WRITE,
-    SYNCHRONIZE,
-};
-use windows_sys::Win32::System::WindowsProgramming::{
-    NtDeviceIoControlFile, FILE_SKIP_SET_EVENT_ON_HANDLE, IO_STATUS_BLOCK, IO_STATUS_BLOCK_0,
-    OBJECT_ATTRIBUTES,
-};
-
 use crate::sys::windows::iocp::CompletionPort;
 
 pub const POLL_RECEIVE: u32 = 0x0001;

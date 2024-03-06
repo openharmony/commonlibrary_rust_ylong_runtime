@@ -16,11 +16,10 @@ use std::os::windows::io::{FromRawSocket, RawSocket};
 use std::os::windows::raw;
 use std::{io, mem, net};
 
-use windows_sys::Win32::Networking::WinSock::{
+use crate::sys::winapi::{
     bind as win_bind, closesocket, ioctlsocket, socket, ADDRESS_FAMILY, AF_INET, AF_INET6, FIONBIO,
     INVALID_SOCKET, SOCKET, SOCKET_ERROR, SOCK_DGRAM,
 };
-
 use crate::sys::windows::net::init;
 use crate::sys::windows::socket_addr::socket_addr_trans;
 

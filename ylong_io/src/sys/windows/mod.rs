@@ -11,6 +11,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Event-driven non-blocking Tcp/Udp for windows
+
 macro_rules! syscall {
     ($fn: ident ( $($arg: expr),* $(,)* ), $ret: expr) => {{
         let res = unsafe { $fn($($arg, )*) };
@@ -44,6 +46,8 @@ mod waker;
 pub(crate) use waker::WakerInner;
 
 mod net;
+pub(crate) mod winapi;
+
 pub(crate) use net::NetInner;
 cfg_net! {
     macro_rules! socket_syscall {

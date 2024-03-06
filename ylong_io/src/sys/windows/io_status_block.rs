@@ -14,7 +14,7 @@
 use std::fmt;
 use std::ops::{Deref, DerefMut};
 
-use windows_sys::Win32::System::WindowsProgramming::{IO_STATUS_BLOCK, IO_STATUS_BLOCK_0};
+use crate::sys::winapi::{IO_STATUS_BLOCK, IO_STATUS_BLOCK_0};
 
 pub(crate) struct IoStatusBlock(IO_STATUS_BLOCK);
 

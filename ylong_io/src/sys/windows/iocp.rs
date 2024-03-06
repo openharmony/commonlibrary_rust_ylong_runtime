@@ -15,13 +15,11 @@ use std::os::windows::io::{AsRawHandle, IntoRawHandle, RawHandle};
 use std::time::Duration;
 use std::{cmp, io};
 
-use windows_sys::Win32::Foundation::{HANDLE, INVALID_HANDLE_VALUE};
-use windows_sys::Win32::System::IO::{
-    CreateIoCompletionPort, GetQueuedCompletionStatusEx, PostQueuedCompletionStatus, OVERLAPPED,
-    OVERLAPPED_ENTRY,
-};
-
 use super::Handle;
+use crate::sys::winapi::{
+    CreateIoCompletionPort, GetQueuedCompletionStatusEx, PostQueuedCompletionStatus, HANDLE,
+    INVALID_HANDLE_VALUE, OVERLAPPED, OVERLAPPED_ENTRY,
+};
 use crate::sys::Overlapped;
 use crate::{Event, Token};
 
