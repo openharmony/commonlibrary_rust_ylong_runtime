@@ -403,6 +403,7 @@ mod tests {
 
     use ylong_signal::SIGNAL_BLOCK_LIST;
 
+    use crate::futures::poll_fn;
     use crate::signal::unix::signal_return_watch;
     use crate::signal::{signal, SignalKind};
 
@@ -414,7 +415,7 @@ mod tests {
     /// 3. Check the method `from_raw` of `SignalKind`.
     /// 4. Check the method `as_raw` of `SignalKind`.
     #[test]
-    fn signal_from_and_into_c_int() {
+    fn ut_signal_from_and_into_c_int() {
         assert_eq!(SignalKind::from(1), SignalKind::hangup());
         assert_eq!(c_int::from(SignalKind::hangup()), 1);
         assert_eq!(SignalKind::from_raw(2), SignalKind::interrupt());
@@ -427,18 +428,19 @@ mod tests {
     /// 1. Generate a forbidden kind of signal.
     /// 2. Call `signal_return_watch` and check the result.
     #[test]
-    fn signal_forbidden_input() {
+    fn ut_signal_forbidden_input() {
         let signal_kind = SignalKind::from_raw(SIGNAL_BLOCK_LIST[0]);
         assert!(signal_return_watch(signal_kind).is_err());
     }
 
-    /// UT test cases for `signal` method for every kind in `SignalKind`.
+    /// UT test cases for `recv` and `poll_recv`.
     ///
     /// # Brief
-    /// 1. Generate all kinds of signals in `SignalKind`.
-    /// 2. Check the function of `signal` for every kind.
+    /// 1. Generate a kind of signal.
+    /// 2. Send notification signals and try receiving them through `recv` and
+    ///    `poll_recv`.
     #[test]
-    fn signal_function_coverage() {
+    fn ut_signal_recv_and_poll_recv() {
         let mut handles = Vec::new();
         handles.push(crate::spawn(async move {
             let mut signal = signal(SignalKind::alarm()).unwrap();
@@ -446,58 +448,159 @@ mod tests {
             signal.recv().await;
         }));
         handles.push(crate::spawn(async move {
+            let mut signal = signal(SignalKind::alarm()).unwrap();
+            unsafe { libc::raise(libc::SIGALRM) };
+            poll_fn(|cx| signal.poll_recv(cx)).await;
+        }));
+    }
+
+    /// UT test cases for SIGALRM signal.
+    ///
+    /// # Brief
+    /// 1. Generate the SIGALRM signal.
+    /// 2. Check the function of `signal` for the SIGALRM signal.
+    #[test]
+    fn ut_signal_alarm() {
+        let handle = crate::spawn(async move {
+            let mut signal = signal(SignalKind::alarm()).unwrap();
+            unsafe { libc::raise(libc::SIGALRM) };
+            signal.recv().await;
+        });
+        let _ = crate::block_on(handle);
+    }
+
+    /// UT test cases for SIGCHLD signal.
+    ///
+    /// # Brief
+    /// 1. Generate the SIGCHLD signal.
+    /// 2. Check the function of `signal` for the SIGCHLD signal.
+    #[test]
+    fn ut_signal_child() {
+        let handle = crate::spawn(async move {
             let mut signal = signal(SignalKind::child()).unwrap();
             unsafe { libc::raise(libc::SIGCHLD) };
             signal.recv().await;
-        }));
-        handles.push(crate::spawn(async move {
+        });
+        let _ = crate::block_on(handle);
+    }
+
+    /// UT test cases for SIGHUP signal.
+    ///
+    /// # Brief
+    /// 1. Generate the SIGHUP signal.
+    /// 2. Check the function of `signal` for the SIGHUP signal.
+    #[test]
+    fn ut_signal_hangup() {
+        let handle = crate::spawn(async move {
             let mut signal = signal(SignalKind::hangup()).unwrap();
             unsafe { libc::raise(libc::SIGHUP) };
             signal.recv().await;
-        }));
-        handles.push(crate::spawn(async move {
+        });
+        let _ = crate::block_on(handle);
+    }
+
+    /// UT test cases for SIGINT signal.
+    ///
+    /// # Brief
+    /// 1. Generate the SIGINT signal.
+    /// 2. Check the function of `signal` for the SIGINT signal.
+    #[test]
+    fn ut_signal_interrupt() {
+        let handle = crate::spawn(async move {
             let mut signal = signal(SignalKind::interrupt()).unwrap();
             unsafe { libc::raise(libc::SIGINT) };
             signal.recv().await;
-        }));
-        handles.push(crate::spawn(async move {
+        });
+        let _ = crate::block_on(handle);
+    }
+
+    /// UT test cases for SIGIO signal.
+    ///
+    /// # Brief
+    /// 1. Generate the SIGIO signal.
+    /// 2. Check the function of `signal` for the SIGIO signal.
+    #[test]
+    fn ut_signal_io() {
+        let handle = crate::spawn(async move {
             let mut signal = signal(SignalKind::io()).unwrap();
             unsafe { libc::raise(libc::SIGIO) };
             signal.recv().await;
-        }));
-        handles.push(crate::spawn(async move {
+        });
+        let _ = crate::block_on(handle);
+    }
+
+    /// UT test cases for SIGPIPE signal.
+    ///
+    /// # Brief
+    /// 1. Generate the SIGPIPE signal.
+    /// 2. Check the function of `signal` for the SIGPIPE signal.
+    #[test]
+    fn ut_signal_pipe() {
+        let handle = crate::spawn(async move {
             let mut signal = signal(SignalKind::pipe()).unwrap();
             unsafe { libc::raise(libc::SIGPIPE) };
             signal.recv().await;
-        }));
-        handles.push(crate::spawn(async move {
-            let mut signal = signal(SignalKind::quit()).unwrap();
-            unsafe { libc::raise(libc::SIGQUIT) };
-            signal.recv().await;
-        }));
-        handles.push(crate::spawn(async move {
+        });
+        let _ = crate::block_on(handle);
+    }
+
+    /// UT test cases for SIGTERM signal.
+    ///
+    /// # Brief
+    /// 1. Generate the SIGTERM signal.
+    /// 2. Check the function of `signal` for the SIGTERM signal.
+    #[test]
+    fn ut_signal_terminate() {
+        let handle = crate::spawn(async move {
             let mut signal = signal(SignalKind::terminate()).unwrap();
             unsafe { libc::raise(libc::SIGTERM) };
             signal.recv().await;
-        }));
-        handles.push(crate::spawn(async move {
+        });
+        let _ = crate::block_on(handle);
+    }
+
+    /// UT test cases for SIGUSR1 signal.
+    ///
+    /// # Brief
+    /// 1. Generate the SIGUSR1 signal.
+    /// 2. Check the function of `signal` for the SIGUSR1 signal.
+    #[test]
+    fn ut_signal_user_defined1() {
+        let handle = crate::spawn(async move {
             let mut signal = signal(SignalKind::user_defined1()).unwrap();
             unsafe { libc::raise(libc::SIGUSR1) };
             signal.recv().await;
-        }));
-        handles.push(crate::spawn(async move {
+        });
+        let _ = crate::block_on(handle);
+    }
+
+    /// UT test cases for SIGUSR2 signal.
+    ///
+    /// # Brief
+    /// 1. Generate the SIGUSR2 signal.
+    /// 2. Check the function of `signal` for the SIGUSR2 signal.
+    #[test]
+    fn ut_signal_user_defined2() {
+        let handle = crate::spawn(async move {
             let mut signal = signal(SignalKind::user_defined2()).unwrap();
             unsafe { libc::raise(libc::SIGUSR2) };
             signal.recv().await;
-        }));
-        handles.push(crate::spawn(async move {
+        });
+        let _ = crate::block_on(handle);
+    }
+
+    /// UT test cases for SIGWINCH signal.
+    ///
+    /// # Brief
+    /// 1. Generate the SIGWINCH signal.
+    /// 2. Check the function of `signal` for the SIGWINCH signal.
+    #[test]
+    fn ut_signal_window_change() {
+        let handle = crate::spawn(async move {
             let mut signal = signal(SignalKind::window_change()).unwrap();
             unsafe { libc::raise(libc::SIGWINCH) };
             signal.recv().await;
-        }));
-
-        for handle in handles {
-            let _ = crate::block_on(handle);
-        }
+        });
+        let _ = crate::block_on(handle);
     }
 }
