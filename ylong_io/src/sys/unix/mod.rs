@@ -11,7 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Event-driven non-blocking Tcp/Udp
+//! Event-driven non-blocking Tcp/Udp for unix
 
 macro_rules! syscall {
     ($fn: ident ( $($arg: expr),* $(,)* ) ) => {{

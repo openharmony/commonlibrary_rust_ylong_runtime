@@ -34,7 +34,7 @@ impl UnixListener {
     /// use ylong_io::UnixListener;
     ///
     /// if let Ok(sock) = UnixListener::bind("/socket/path") {
-    ///     println!("socket binds succesfully");
+    ///     println!("socket binds successfully");
     /// };
     /// ```
     pub fn bind<P: AsRef<Path>>(path: P) -> io::Result<UnixListener> {
@@ -86,7 +86,7 @@ impl UnixListener {
     /// use ylong_io::UnixListener as YlongUnixListener;
     ///
     /// if let Ok(sock) = UnixListener::bind("/socket/path") {
-    ///     println!("socket binds succesfully");
+    ///     println!("socket binds successfully");
     ///     let ylong_sock = YlongUnixListener::from_std(sock);
     /// };
     /// ```

@@ -18,11 +18,11 @@ use std::time::Duration;
 use std::{io, mem, net};
 
 use libc::{c_int, getsockopt};
-use windows_sys::Win32::Networking::WinSock::{
-    self, closesocket, ioctlsocket, setsockopt, socket, ADDRESS_FAMILY, AF_INET, AF_INET6, FIONBIO,
+
+use crate::sys::winapi::{
+    closesocket, ioctlsocket, setsockopt, socket, ADDRESS_FAMILY, AF_INET, AF_INET6, FIONBIO,
     INVALID_SOCKET, LINGER, SOCKET, SOCKET_ERROR, SOCK_STREAM, SOL_SOCKET, SO_LINGER,
 };
-
 use crate::sys::windows::net::init;
 use crate::sys::windows::socket_addr::socket_addr_trans;
 
@@ -62,7 +62,7 @@ impl TcpSocket {
 
     /// System call to bind Socket.
     pub(crate) fn bind(&self, addr: SocketAddr) -> io::Result<()> {
-        use WinSock::bind;
+        use crate::sys::winapi::bind;
 
         let (raw_addr, raw_addr_length) = socket_addr_trans(&addr);
         socket_syscall!(
@@ -77,7 +77,7 @@ impl TcpSocket {
     pub(crate) fn listen(self, backlog: u32) -> io::Result<()> {
         use std::convert::TryInto;
 
-        use WinSock::listen;
+        use crate::sys::winapi::listen;
 
         let backlog = backlog.try_into().unwrap_or(i32::MAX);
         socket_syscall!(
@@ -91,7 +91,7 @@ impl TcpSocket {
 
     /// System call to connect.
     pub(crate) fn connect(self, addr: SocketAddr) -> io::Result<()> {
-        use WinSock::connect;
+        use crate::sys::winapi::connect;
 
         let (socket_addr, socket_addr_length) = socket_addr_trans(&addr);
         let res = socket_syscall!(

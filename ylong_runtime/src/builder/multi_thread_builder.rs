@@ -149,8 +149,8 @@ impl MultiThreadBuilder {
     /// # Note
     /// This method does nothing now under ffrt feature.
     pub fn after_start<F>(self, _f: F) -> Self
-        where
-            F: Fn() + Send + Sync + 'static,
+    where
+        F: Fn() + Send + Sync + 'static,
     {
         self
     }
@@ -160,8 +160,8 @@ impl MultiThreadBuilder {
     /// # Note
     /// This method does nothing now under ffrt feature.
     pub fn before_stop<F>(self, _f: F) -> Self
-        where
-            F: Fn() + Send + Sync + 'static,
+    where
+        F: Fn() + Send + Sync + 'static,
     {
         self
     }
@@ -170,10 +170,7 @@ impl MultiThreadBuilder {
     ///
     /// # Note
     /// This method does nothing now under ffrt feature.
-    pub fn blocking_permanent_thread_num(
-        self,
-        _blocking_permanent_thread_num: u8,
-    ) -> Self {
+    pub fn blocking_permanent_thread_num(self, _blocking_permanent_thread_num: u8) -> Self {
         self
     }
 

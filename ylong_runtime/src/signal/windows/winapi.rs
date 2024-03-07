@@ -11,24 +11,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::fmt;
+#![allow(non_camel_case_types)]
 
-use crate::sys::winapi::OVERLAPPED_ENTRY;
-use crate::Event;
+pub type BOOL = i32;
+pub type PHANDLER_ROUTINE = Option<unsafe extern "system" fn(ctrlType: u32) -> BOOL>;
 
-#[repr(C)]
-pub(crate) struct Overlapped {
-    // TODO: use in pipe
-    // inner: UnsafeCell<OVERLAPPED>,
-    pub(crate) callback: fn(&OVERLAPPED_ENTRY, Option<&mut Vec<Event>>),
+pub const CTRL_C_EVENT: u32 = 0u32;
+pub const CTRL_BREAK_EVENT: u32 = 1u32;
+pub const CTRL_CLOSE_EVENT: u32 = 2u32;
+pub const CTRL_LOGOFF_EVENT: u32 = 5u32;
+pub const CTRL_SHUTDOWN_EVENT: u32 = 6u32;
+
+extern "system" {
+    pub fn SetConsoleCtrlHandler(HandlerRoutine: PHANDLER_ROUTINE, Add: BOOL) -> BOOL;
 }
-
-impl fmt::Debug for Overlapped {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Overlapped").finish()
-    }
-}
-
-unsafe impl Send for Overlapped {}
-
-unsafe impl Sync for Overlapped {}

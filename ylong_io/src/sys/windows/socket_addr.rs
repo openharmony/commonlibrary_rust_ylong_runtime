@@ -14,7 +14,7 @@
 use std::mem;
 use std::net::SocketAddr;
 
-use windows_sys::Win32::Networking::WinSock::{
+use crate::sys::winapi::{
     AF_INET, AF_INET6, IN6_ADDR, IN6_ADDR_0, IN_ADDR, IN_ADDR_0, SOCKADDR, SOCKADDR_IN,
     SOCKADDR_IN6, SOCKADDR_IN6_0,
 };

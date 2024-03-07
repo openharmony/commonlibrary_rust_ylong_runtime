@@ -14,12 +14,12 @@
 //! Asynchronous signal handling in windows system.
 
 mod registry;
+mod winapi;
 
 use std::io;
 use std::sync::Once;
 
 use registry::Registry;
-use windows_sys::Win32::System::Console;
 
 use crate::signal::Signal;
 
@@ -43,7 +43,7 @@ impl SignalKind {
     /// }
     /// ```
     pub const fn ctrl_break() -> SignalKind {
-        SignalKind(Console::CTRL_BREAK_EVENT)
+        SignalKind(winapi::CTRL_BREAK_EVENT)
     }
 
     /// "ctrl-close" signal type.
@@ -61,7 +61,7 @@ impl SignalKind {
     /// }
     /// ```
     pub const fn ctrl_close() -> SignalKind {
-        SignalKind(Console::CTRL_CLOSE_EVENT)
+        SignalKind(winapi::CTRL_CLOSE_EVENT)
     }
 
     /// "ctrl-c" signal type.
@@ -79,7 +79,7 @@ impl SignalKind {
     /// }
     /// ```
     pub const fn ctrl_c() -> SignalKind {
-        SignalKind(Console::CTRL_C_EVENT)
+        SignalKind(winapi::CTRL_C_EVENT)
     }
 
     /// "ctrl-logoff" signal type.
@@ -97,7 +97,7 @@ impl SignalKind {
     /// }
     /// ```
     pub const fn ctrl_logoff() -> SignalKind {
-        SignalKind(Console::CTRL_LOGOFF_EVENT)
+        SignalKind(winapi::CTRL_LOGOFF_EVENT)
     }
 
     /// "ctrl-shutdown" signal type.
@@ -115,7 +115,7 @@ impl SignalKind {
     /// }
     /// ```
     pub const fn ctrl_shutdown() -> SignalKind {
-        SignalKind(Console::CTRL_SHUTDOWN_EVENT)
+        SignalKind(winapi::CTRL_SHUTDOWN_EVENT)
     }
 }
 
@@ -131,7 +131,7 @@ fn init_signal() -> io::Result<()> {
     static SIGNAL_ONCE: Once = Once::new();
     let mut register_res = Ok(());
     SIGNAL_ONCE.call_once(|| {
-        let res = unsafe { Console::SetConsoleCtrlHandler(Some(signal_action), 1) };
+        let res = unsafe { winapi::SetConsoleCtrlHandler(Some(signal_action), 1) };
         register_res = if res != 0 {
             Ok(())
         } else {

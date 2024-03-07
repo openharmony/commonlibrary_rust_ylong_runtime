@@ -17,7 +17,13 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 #[cfg(target_os = "windows")]
-use windows_sys::Win32::System::Console::{GenerateConsoleCtrlEvent, CTRL_C_EVENT};
+extern "system" {
+    pub fn GenerateConsoleCtrlEvent(dwCtrlEvent: u32, dwProcessGroupId: u32) -> i32;
+}
+
+#[cfg(target_os = "windows")]
+pub const CTRL_C_EVENT: u32 = 0u32;
+
 use ylong_runtime::signal::{signal, SignalKind};
 
 fn print_time(duration: Duration) {
@@ -57,6 +63,7 @@ fn run_multi_thread_signal() {
             let mut stream = signal(SignalKind::ctrl_c()).unwrap();
             num_clone.fetch_add(1, Release);
             stream.recv().await;
+            println!("signal received");
         }));
     }
     while num.load(Acquire) < 10 {}
@@ -68,7 +75,7 @@ fn run_multi_thread_signal() {
 
 fn main() {
     let start = Instant::now();
-    for _ in 0..100000 {
+    for _ in 0..10 {
         run_multi_thread_signal();
     }
     let end = Instant::now();
