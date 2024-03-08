@@ -13,87 +13,199 @@
 
 #![cfg(feature = "net")]
 
-use std::thread;
-
 use ylong_runtime::io::{AsyncReadExt, AsyncWriteExt};
 use ylong_runtime::net::{TcpListener, TcpStream};
 
-fn test_tcp_client() {
-    let mut recv_buf = [0_u8; 12];
-    let handle = ylong_runtime::spawn(async move {
-        loop {
-            let addr = "127.0.0.1:8081";
-            if let Ok(mut client) = TcpStream::connect(addr).await {
-                match client.write(b"hello server").await {
-                    Ok(n) => {
-                        assert_eq!(n, "hello server".len());
-                    }
-                    Err(e) => {
-                        assert_eq!(0, 1, "client send failed {e}");
-                    }
-                }
-                match client.read(&mut recv_buf).await {
-                    Ok(n) => {
-                        assert_eq!(
-                            std::str::from_utf8(&recv_buf).unwrap(),
-                            "hello client".to_string()
-                        );
-                        assert_eq!(n, "hello client".len());
-                        break;
-                    }
-                    Err(e) => {
-                        assert_eq!(0, 1, "client recv failed {e}");
-                    }
-                }
-            };
-        }
+const ADDR: &str = "127.0.0.1:0";
+
+/// SDV test cases for `TcpListener`.
+///
+/// # Brief
+/// 1. Bind `TcpListener`.
+/// 2. Call local_addr(), set_ttl(), ttl(), take_error().
+/// 3. Check result is correct.
+#[test]
+fn sdv_tcp_listener_interface() {
+    let handle = ylong_runtime::spawn(async {
+        let server = TcpListener::bind(ADDR).await.unwrap();
+
+        server.set_ttl(101).unwrap();
+        assert_eq!(server.ttl().unwrap(), 101);
+
+        assert!(server.take_error().unwrap().is_none());
     });
-    ylong_runtime::block_on(handle).expect("block_on failed");
+    ylong_runtime::block_on(handle).unwrap();
+}
+
+/// SDV test cases for `TcpStream`.
+///
+/// # Brief
+/// 1. Bind `TcpListener` and wait for `accept()`.
+/// 2. After accept, try to write buf.
+/// 2. `TcpStream` connect to listener and try to read buf.
+/// 4. Check result is correct.
+#[test]
+fn sdv_tcp_stream_try() {
+    let handle = ylong_runtime::spawn(async move {
+        let listener = TcpListener::bind(ADDR).await.unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        let handle = ylong_runtime::spawn(async move {
+            let mut stream = TcpStream::connect(addr).await;
+            while stream.is_err() {
+                stream = TcpStream::connect(addr).await;
+            }
+            let stream = stream.unwrap();
+            let mut buf = vec![0; 5];
+            stream.readable().await.unwrap();
+            stream.try_read(&mut buf).unwrap();
+            assert_eq!(buf, b"hello");
+        });
+
+        let (stream, _) = listener.accept().await.unwrap();
+        stream.writable().await.unwrap();
+        stream.try_write(b"hello").unwrap();
+
+        handle.await.unwrap();
+    });
+    ylong_runtime::block_on(handle).unwrap();
+}
+
+/// SDV test cases for `TcpStream`.
+///
+/// # Brief
+/// 1. Bind `TcpListener` and wait for `accept()`.
+/// 2. `TcpStream` connect to listener.
+/// 3. Call peer_addr(), local_addr(), set_ttl(), ttl(), set_nodelay(),
+///    nodelay(), take_error().
+/// 4. Check result is correct.
+#[test]
+fn sdv_tcp_stream_basic() {
+    let handle = ylong_runtime::spawn(async move {
+        let listener = TcpListener::bind(ADDR).await.unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        let handle = ylong_runtime::spawn(async move {
+            let mut stream = TcpStream::connect(addr).await;
+            while stream.is_err() {
+                stream = TcpStream::connect(addr).await;
+            }
+            let stream = stream.unwrap();
+
+            assert_eq!(stream.peer_addr().unwrap(), addr);
+            assert_eq!(
+                stream.local_addr().unwrap().ip(),
+                std::net::Ipv4Addr::new(127, 0, 0, 1)
+            );
+            stream.set_ttl(101).unwrap();
+            assert_eq!(stream.ttl().unwrap(), 101);
+            stream.set_nodelay(true).unwrap();
+            assert!(stream.nodelay().unwrap());
+            assert!(stream.linger().unwrap().is_none());
+            stream
+                .set_linger(Some(std::time::Duration::from_secs(1)))
+                .unwrap();
+            assert_eq!(
+                stream.linger().unwrap(),
+                Some(std::time::Duration::from_secs(1))
+            );
+            assert!(stream.take_error().unwrap().is_none());
+        });
+
+        listener.accept().await.unwrap();
+
+        handle.await.unwrap();
+    });
+    ylong_runtime::block_on(handle).unwrap();
+}
+
+/// SDV test cases for `TcpStream`.
+///
+/// # Brief
+/// 1. Bind `TcpListener` and wait for `accept()`.
+/// 2. `TcpStream` connect to listener.
+/// 3. Call peek() to get.
+/// 4. Check result is correct.
+#[test]
+fn sdv_tcp_stream_peek() {
+    let handle = ylong_runtime::spawn(async {
+        let listener = TcpListener::bind(ADDR).await.unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        let handle = ylong_runtime::spawn(async move {
+            let mut stream = TcpStream::connect(addr).await;
+            while stream.is_err() {
+                stream = TcpStream::connect(addr).await;
+            }
+            let stream = stream.unwrap();
+
+            let mut buf = [0; 100];
+            let len = stream.peek(&mut buf).await.expect("peek failed!");
+            let buf = &buf[0..len];
+            assert_eq!(len, 5);
+            assert_eq!(String::from_utf8_lossy(buf), "hello");
+        });
+
+        let (mut stream, _) = listener.accept().await.unwrap();
+        stream.write(b"hello").await.unwrap();
+
+        handle.await.unwrap();
+    });
+    ylong_runtime::block_on(handle).unwrap();
 }
 
 #[test]
 fn sdv_tcp_global_runtime() {
-    // Start a thread as client side
-    thread::spawn(test_tcp_client);
-    let addr = "127.0.0.1:8081";
     let handle = ylong_runtime::spawn(async move {
-        let listener = TcpListener::bind(addr).await;
-        if let Err(e) = listener {
-            assert_eq!(0, 1, "Bind Listener Failed {e}");
-            return;
-        }
+        let listener = TcpListener::bind(ADDR).await.expect("Bind Listener Failed");
+        let addr = listener.local_addr().unwrap();
 
-        let listener = listener.unwrap();
-        let mut socket = match listener.accept().await {
-            Ok((socket, _)) => socket,
-            Err(e) => {
-                assert_eq!(0, 1, "Bind accept Failed {e}");
-                return;
+        // Start a thread as client side
+        let handle = ylong_runtime::spawn(async move {
+            let mut client = TcpStream::connect(addr).await;
+            while client.is_err() {
+                client = TcpStream::connect(addr).await;
             }
-        };
+            let mut client = client.unwrap();
+
+            let n = client
+                .write(b"hello server")
+                .await
+                .expect("client send failed");
+            assert_eq!(n, "hello server".len());
+
+            let mut recv_buf = [0_u8; 12];
+            let n = client
+                .read(&mut recv_buf)
+                .await
+                .expect("client recv failed");
+            assert_eq!(
+                std::str::from_utf8(&recv_buf).unwrap(),
+                "hello client".to_string()
+            );
+            assert_eq!(n, "hello client".len());
+        });
+
+        let (mut socket, _) = listener.accept().await.expect("Bind accept Failed");
         loop {
             let mut buf = [0_u8; 12];
-            let _ = match socket.read(&mut buf).await {
-                Ok(0) => break,
-                Ok(n) => {
+            match socket.read(&mut buf).await.expect("recv Failed") {
+                0 => break,
+                n => {
                     assert_eq!(
                         std::str::from_utf8(&buf).unwrap(),
                         "hello server".to_string()
                     );
                     assert_eq!(n, "hello server".len());
-                    n
-                }
-                Err(e) => {
-                    assert_eq!(0, 1, "recv Failed {e}");
-                    break;
                 }
             };
 
-            if let Err(e) = socket.write(b"hello client").await {
-                assert_eq!(0, 1, "failed to write to socket {e}");
-                break;
-            }
+            socket
+                .write(b"hello client")
+                .await
+                .expect("failed to write to socket");
         }
+        handle.await.unwrap();
     });
     ylong_runtime::block_on(handle).expect("block_on failed");
 }
@@ -104,9 +216,24 @@ fn sdv_tcp_multi_runtime() {
     use ylong_runtime::builder::RuntimeBuilder;
     let runtime = RuntimeBuilder::new_multi_thread().build().unwrap();
 
-    let server = runtime.spawn(async move {
-        let addr = "127.0.0.1:8082";
-        let tcp = TcpListener::bind(addr).await.unwrap();
+    runtime.block_on(async {
+        let tcp = TcpListener::bind(ADDR).await.unwrap();
+        let addr = tcp.local_addr().unwrap();
+
+        let client = runtime.spawn(async move {
+            let mut tcp = TcpStream::connect(addr).await;
+            while tcp.is_err() {
+                tcp = TcpStream::connect(addr).await;
+            }
+            let mut tcp = tcp.unwrap();
+            let buf = [3; 100];
+            tcp.write_all(&buf).await.unwrap();
+
+            let mut buf = [0; 100];
+            tcp.read_exact(&mut buf).await.unwrap();
+            assert_eq!(buf, [2; 100]);
+        });
+
         let (mut stream, _) = tcp.accept().await.unwrap();
         let mut buf = [0; 100];
         stream.read_exact(&mut buf).await.unwrap();
@@ -114,24 +241,115 @@ fn sdv_tcp_multi_runtime() {
 
         let buf = [2; 100];
         stream.write_all(&buf).await.unwrap();
-    });
 
-    let client = runtime.spawn(async move {
-        let addr = "127.0.0.1:8082";
-        let mut tcp = TcpStream::connect(addr).await;
-        while tcp.is_err() {
-            tcp = TcpStream::connect(addr).await;
-        }
-        let mut tcp = tcp.unwrap();
-        let buf = [3; 100];
-        tcp.write_all(&buf).await.unwrap();
-
-        let mut buf = [0; 100];
-        tcp.read_exact(&mut buf).await.unwrap();
-        assert_eq!(buf, [2; 100]);
+        client.await.unwrap();
     });
-    runtime.block_on(server).unwrap();
-    runtime.block_on(client).unwrap();
+}
+
+/// SDV test cases for `TcpStream` of split().
+///
+/// # Brief
+/// 1. Bind `TcpListener` and wait for `accept()`.
+/// 2. `TcpStream` connect to listener.
+/// 3. Split TcpStream into read half and write half with borrowed.
+/// 4. Write with write half and read with read half.
+/// 5. Check result is correct.
+#[test]
+fn sdv_tcp_split_borrow_half() {
+    let handle = ylong_runtime::spawn(async {
+        let listener = TcpListener::bind(ADDR).await.unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        let handle = ylong_runtime::spawn(async move {
+            let mut stream = TcpStream::connect(addr).await;
+            while stream.is_err() {
+                stream = TcpStream::connect(addr).await;
+            }
+            let mut stream = stream.unwrap();
+
+            let (mut read_half, mut write_half) = stream.split();
+            write_half.write(b"I am write half.").await.unwrap();
+            write_half.flush().await.unwrap();
+            write_half.shutdown().await.unwrap();
+
+            let mut buf = [0; 6];
+            let n = read_half.read(&mut buf).await.expect("server read err");
+            assert_eq!(n, 6);
+            assert_eq!(buf, [1, 2, 3, 4, 5, 6]);
+        });
+
+        let (mut stream, _) = listener.accept().await.unwrap();
+        let (mut read_half, mut write_half) = stream.split();
+        let mut buf = [0; 16];
+        let n = read_half.read(&mut buf).await.expect("server read err");
+        assert_eq!(n, 16);
+        assert_eq!(
+            String::from_utf8(Vec::from(buf)).unwrap().as_str(),
+            "I am write half."
+        );
+
+        let data1 = [1, 2, 3];
+        let data2 = [4, 5, 6];
+        let slice1 = std::io::IoSlice::new(&data1);
+        let slice2 = std::io::IoSlice::new(&data2);
+        write_half.write_vectored(&[slice1, slice2]).await.unwrap();
+
+        handle.await.unwrap();
+    });
+    ylong_runtime::block_on(handle).unwrap();
+}
+
+/// SDV test cases for `TcpStream` of into_split().
+///
+/// # Brief
+/// 1. Bind `TcpListener` and wait for `accept()`.
+/// 2. `TcpStream` connect to listener.
+/// 3. Split TcpStream into read half and write half with owned.
+/// 4. Write with write half and read with read half.
+/// 5. Check result is correct.
+#[test]
+fn sdv_tcp_split_owned_half() {
+    let handle = ylong_runtime::spawn(async move {
+        let listener = TcpListener::bind(ADDR).await.unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        let handle = ylong_runtime::spawn(async move {
+            let mut stream = TcpStream::connect(addr).await;
+            while stream.is_err() {
+                stream = TcpStream::connect(addr).await;
+            }
+            let stream = stream.unwrap();
+            let (mut read_half, mut write_half) = stream.into_split();
+
+            write_half.write(b"I am write half.").await.unwrap();
+            write_half.flush().await.unwrap();
+            write_half.shutdown().await.unwrap();
+
+            let mut buf = [0; 6];
+            let n = read_half.read(&mut buf).await.expect("server read err");
+            assert_eq!(n, 6);
+            assert_eq!(buf, [1, 2, 3, 4, 5, 6]);
+        });
+
+        let (mut stream, _) = listener.accept().await.unwrap();
+        let (mut read_half, mut write_half) = stream.split();
+
+        let mut buf = [0; 16];
+        let n = read_half.read(&mut buf).await.expect("server read err");
+        assert_eq!(n, 16);
+        assert_eq!(
+            String::from_utf8(Vec::from(buf)).unwrap().as_str(),
+            "I am write half."
+        );
+        let data1 = [1, 2, 3];
+        let data2 = [4, 5, 6];
+        let slice1 = std::io::IoSlice::new(&data1);
+        let slice2 = std::io::IoSlice::new(&data2);
+        write_half.write_vectored(&[slice1, slice2]).await.unwrap();
+
+        handle.await.unwrap();
+    });
+    ylong_runtime::block_on(handle).unwrap();
 }
 
 /// SDV case for dropping TcpStream outside of worker context
@@ -145,8 +363,11 @@ fn sdv_tcp_multi_runtime() {
 #[test]
 #[cfg(not(feature = "ffrt"))]
 fn sdv_tcp_drop_out_context() {
-    let handle1 = ylong_runtime::spawn(async move {
-        let tcp = TcpListener::bind("127.0.0.1:8200").await.unwrap();
+    let (tx, rx) = ylong_runtime::sync::oneshot::channel();
+    let handle = ylong_runtime::spawn(async move {
+        let tcp = TcpListener::bind(ADDR).await.unwrap();
+        let addr = tcp.local_addr().unwrap();
+        tx.send(addr).unwrap();
         let (mut stream, _) = tcp.accept().await.unwrap();
         let mut buf = [0; 10];
         stream.read_exact(&mut buf).await.unwrap();
@@ -158,9 +379,10 @@ fn sdv_tcp_drop_out_context() {
     });
 
     let client = ylong_runtime::block_on(async move {
-        let mut tcp = TcpStream::connect("127.0.0.1:8200").await;
+        let addr = rx.await.unwrap();
+        let mut tcp = TcpStream::connect(addr).await;
         while tcp.is_err() {
-            tcp = TcpStream::connect("127.0.0.1:8200").await;
+            tcp = TcpStream::connect(addr).await;
         }
         let mut tcp = tcp.unwrap();
         let buf = [3; 10];
@@ -172,7 +394,7 @@ fn sdv_tcp_drop_out_context() {
         tcp
     });
 
-    let server = ylong_runtime::block_on(handle1).unwrap();
+    let server = ylong_runtime::block_on(handle).unwrap();
 
     drop(server);
     drop(client);
@@ -192,9 +414,11 @@ fn sdv_tcp_cancel() {
 
     use ylong_runtime::time::sleep;
 
-    let server = ylong_runtime::spawn(async move {
-        let addr = "127.0.0.1:8201";
-        let tcp = TcpListener::bind(addr).await.unwrap();
+    let (tx, rx) = ylong_runtime::sync::oneshot::channel();
+    let server = ylong_runtime::spawn(async {
+        let tcp = TcpListener::bind(ADDR).await.unwrap();
+        let addr = tcp.local_addr().unwrap();
+        tx.send(addr).unwrap();
         let (mut stream, _) = tcp.accept().await.unwrap();
         sleep(Duration::from_secs(10000)).await;
 
@@ -206,8 +430,8 @@ fn sdv_tcp_cancel() {
         stream.write_all(&buf).await.unwrap();
     });
 
-    let client = ylong_runtime::spawn(async move {
-        let addr = "127.0.0.1:8201";
+    let client = ylong_runtime::spawn(async {
+        let addr = rx.await.unwrap();
         let mut tcp = TcpStream::connect(addr).await;
         while tcp.is_err() {
             tcp = TcpStream::connect(addr).await;
@@ -229,9 +453,11 @@ fn sdv_tcp_cancel() {
     let ret = ylong_runtime::block_on(client);
     assert!(ret.is_err());
 
+    let (tx, rx) = ylong_runtime::sync::oneshot::channel();
     let server = ylong_runtime::spawn(async move {
-        let addr = "127.0.0.1:8201";
-        let tcp = TcpListener::bind(addr).await.unwrap();
+        let tcp = TcpListener::bind(ADDR).await.unwrap();
+        let addr = tcp.local_addr().unwrap();
+        tx.send(addr).unwrap();
         let (mut stream, _) = tcp.accept().await.unwrap();
 
         let mut buf = [0; 100];
@@ -243,7 +469,7 @@ fn sdv_tcp_cancel() {
     });
 
     let client = ylong_runtime::spawn(async move {
-        let addr = "127.0.0.1:8201";
+        let addr = rx.await.unwrap();
         let mut tcp = TcpStream::connect(addr).await;
         while tcp.is_err() {
             tcp = TcpStream::connect(addr).await;

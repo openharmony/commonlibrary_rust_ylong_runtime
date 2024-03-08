@@ -12,6 +12,7 @@
 // limitations under the License.
 
 #![allow(non_camel_case_types)]
+#![allow(clippy::upper_case_acronyms)]
 
 pub type BOOL = i32;
 pub type PHANDLER_ROUTINE = Option<unsafe extern "system" fn(ctrlType: u32) -> BOOL>;

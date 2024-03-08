@@ -90,3 +90,49 @@ impl Source for Pipe {
         self.fd.as_raw_fd()
     }
 }
+
+#[cfg(test)]
+mod test {
+    use std::io::{Read, Seek, Write};
+    use std::os::fd::{AsFd, AsRawFd};
+
+    use ylong_io::Source;
+
+    use super::Pipe;
+
+    /// UT test cases for Pipe.
+    ///
+    /// # Brief
+    /// 1. Create a `Pipe` from `std::fs::File`.
+    /// 2. Write something into `Pipe`.
+    /// 3. Read from `Pipe` and check result.
+    #[test]
+    fn ut_process_pipe_test() {
+        let arg = "Hello, world!";
+        let file_path = "pipe_file0.txt";
+
+        let mut file = std::fs::File::options()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(file_path)
+            .unwrap();
+        let seek = file.stream_position().unwrap();
+        let mut pipe = Pipe::from(file);
+
+        assert!(pipe.get_fd().as_raw_fd() >= 0);
+        assert!(pipe.as_fd().as_raw_fd() >= 0);
+        assert!(pipe.as_raw_fd() >= 0);
+
+        (&pipe).write_all(arg.as_bytes()).unwrap();
+        (&pipe).flush().unwrap();
+
+        pipe.fd.seek(std::io::SeekFrom::Start(seek)).unwrap();
+
+        let mut buf = [0; 13];
+        (&pipe).read_exact(&mut buf).unwrap();
+        assert_eq!(buf, arg.as_bytes());
+
+        std::fs::remove_file(file_path).unwrap();
+    }
+}

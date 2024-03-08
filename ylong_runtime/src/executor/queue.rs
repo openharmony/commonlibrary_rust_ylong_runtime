@@ -552,11 +552,11 @@ pub(crate) mod test {
     use std::task::{Context, Poll};
     use std::thread::park;
 
+    use crate::executor::async_pool::test::create_task;
     use crate::executor::async_pool::MultiThreadScheduler;
     use crate::executor::driver::Driver;
     use crate::executor::queue::{GlobalQueue, InnerBuffer, LocalQueue, LOCAL_QUEUE_CAP};
-    use crate::executor::Schedule;
-    use crate::task::{JoinHandle, Task, TaskBuilder, VirtualTableType};
+    use crate::task::{TaskBuilder, VirtualTableType};
 
     #[cfg(any(not(feature = "metrics"), feature = "ffrt"))]
     impl InnerBuffer {
@@ -634,22 +634,6 @@ pub(crate) mod test {
         let inner_buffer = InnerBuffer::new(LOCAL_QUEUE_CAP as u16);
         assert_eq!(inner_buffer.cap, LOCAL_QUEUE_CAP as u16);
         assert_eq!(inner_buffer.buffer.len(), LOCAL_QUEUE_CAP);
-    }
-
-    pub(crate) fn create_task<T, S>(
-        builder: &TaskBuilder,
-        scheduler: std::sync::Weak<S>,
-        task: T,
-        virtual_table_type: VirtualTableType,
-    ) -> (Task, JoinHandle<T::Output>)
-    where
-        T: Future + Send + 'static,
-        T::Output: Send + 'static,
-        S: Schedule,
-    {
-        let (task, handle) = Task::create_task(builder, scheduler, task, virtual_table_type);
-        // task.0.drop_ref();
-        (task, handle)
     }
 
     /// InnerBuffer::is_empty() UT test cases

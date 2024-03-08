@@ -13,6 +13,7 @@
 
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
+#![allow(clippy::upper_case_acronyms)]
 
 use libc::{c_char, c_int, c_long, c_uchar, c_ulong, c_ushort, c_void};
 

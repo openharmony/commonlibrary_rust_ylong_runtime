@@ -28,7 +28,7 @@ use std::time::Duration;
 use ylong_runtime::sync::Mutex;
 use ylong_runtime::time;
 
-/// UT test cases for Mutex::lock() interface
+/// SDV test cases for Mutex::lock() interface
 ///
 /// # Brief
 /// 1. Create a Concurrent Mutual Exclusion Lock.

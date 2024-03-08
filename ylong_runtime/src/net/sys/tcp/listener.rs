@@ -222,23 +222,20 @@ impl AsRawFd for TcpListener {
 
 #[cfg(test)]
 mod test {
-    use std::net::SocketAddr;
-
     use crate::net::TcpListener;
+
+    const ADDR: &str = "127.0.0.1:0";
 
     /// UT test cases for `TcpListener`.
     ///
     /// # Brief
     /// 1. Bind `TcpListener`.
-    /// 2. Call local_addr(), set_ttl(), ttl(), take_error().
+    /// 2. Call set_ttl(), ttl(), take_error().
     /// 3. Check result is correct.
     #[test]
     fn ut_tcp_listener_basic() {
         crate::block_on(async {
-            let addr: SocketAddr = "127.0.0.1:8081".parse().unwrap();
-            let server = TcpListener::bind(addr).await.unwrap();
-
-            assert_eq!(server.local_addr().unwrap(), addr);
+            let server = TcpListener::bind(ADDR).await.unwrap();
 
             server.set_ttl(101).unwrap();
             assert_eq!(server.ttl().unwrap(), 101);

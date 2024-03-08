@@ -13,11 +13,10 @@
 
 #![cfg(all(target_os = "linux", feature = "process"))]
 
-use std::io::IoSlice;
 use std::os::fd::{AsFd, AsRawFd};
 use std::process::Stdio;
 
-use ylong_runtime::io::{AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use ylong_runtime::io::{AsyncReadExt, AsyncWriteExt};
 use ylong_runtime::process::{ChildStderr, ChildStdin, ChildStdout, Command};
 
 /// SDV test cases for `output()`.
@@ -89,7 +88,7 @@ fn sdv_process_spawn_test() {
 /// 3. Take `child.stdout` and read it, check the result.
 /// 4. Check child's result.
 #[test]
-fn sdv_process_child_stdio_test1() {
+fn sdv_process_child_stdio_test() {
     let handle = ylong_runtime::spawn(async {
         let mut child = Command::new("rev")
             .stdin(Stdio::piped())
@@ -101,57 +100,6 @@ fn sdv_process_child_stdio_test1() {
         let mut stdin = child.take_stdin().expect("Failed to open stdin");
         let stdin_handle = ylong_runtime::spawn(async move {
             stdin.write_all(b"Hello, world!").await.unwrap();
-        });
-
-        let mut stdout = child.take_stdout().expect("Failed to open stdout");
-        let stdout_handle = ylong_runtime::spawn(async move {
-            let mut buf = Vec::new();
-            stdout.read_to_end(&mut buf).await.unwrap();
-            let str = "!dlrow ,olleH";
-            assert!(String::from_utf8(buf).unwrap().contains(str));
-        });
-
-        let mut stderr = child.take_stderr().expect("Failed to open stderr");
-        let stderr_handle = ylong_runtime::spawn(async move {
-            let mut buf = Vec::new();
-            stderr.read_to_end(&mut buf).await.unwrap();
-            assert!(buf.is_empty());
-        });
-
-        let status = child.wait().await.unwrap();
-        assert!(status.success());
-
-        stdin_handle.await.unwrap();
-        stdout_handle.await.unwrap();
-        stderr_handle.await.unwrap();
-    });
-    ylong_runtime::block_on(handle).unwrap();
-}
-
-/// SDV test cases for ChildStdio.
-///
-/// # Brief
-/// 1. Create a `Command` and `spawn()`.
-/// 2. Take `child.stdin` and `write_vectored()` something in it.
-/// 3. Take `child.stdout` and read it, check the result.
-/// 4. Check child's result.
-#[test]
-fn sdv_process_child_stdio_test2() {
-    let handle = ylong_runtime::spawn(async {
-        let mut child = Command::new("rev")
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .expect("Failed to spawn child process");
-
-        let mut stdin = child.take_stdin().expect("Failed to open stdin");
-        let stdin_handle = ylong_runtime::spawn(async move {
-            assert!(stdin.is_write_vectored());
-            stdin
-                .write_vectored(&[IoSlice::new(b"Hello, world!")])
-                .await
-                .unwrap();
             stdin.flush().await.unwrap();
             stdin.shutdown().await.unwrap();
         });
@@ -275,18 +223,18 @@ fn sdv_process_stdio_test() {
         let mut child = command.spawn().unwrap();
 
         let child_stdin = child.take_stdin().unwrap();
-        let _ = child_stdin.as_raw_fd();
-        let _ = child_stdin.as_fd();
+        assert!(child_stdin.as_fd().as_raw_fd() >= 0);
+        assert!(child_stdin.as_raw_fd() >= 0);
         assert!(TryInto::<Stdio>::try_into(child_stdin).is_ok());
 
         let child_stdout = child.take_stdout().unwrap();
-        let _ = child_stdout.as_raw_fd();
-        let _ = child_stdout.as_fd();
+        assert!(child_stdout.as_fd().as_raw_fd() >= 0);
+        assert!(child_stdout.as_raw_fd() >= 0);
         assert!(TryInto::<Stdio>::try_into(child_stdout).is_ok());
 
         let child_stderr = child.take_stderr().unwrap();
-        let _ = child_stderr.as_raw_fd();
-        let _ = child_stderr.as_fd();
+        assert!(child_stderr.as_fd().as_raw_fd() >= 0);
+        assert!(child_stderr.as_raw_fd() >= 0);
         assert!(TryInto::<Stdio>::try_into(child_stderr).is_ok());
         drop(child);
     });
@@ -314,6 +262,28 @@ fn sdv_process_child_stdio_convert_test() {
         assert!(ChildStdout::from_std(stdout).is_ok());
         let stderr = child.stderr.take().unwrap();
         assert!(ChildStderr::from_std(stderr).is_ok());
+    });
+    ylong_runtime::block_on(handle).unwrap();
+}
+
+/// SDV test cases for command debug.
+///
+/// # Brief
+/// 1. Debug Command and Child.
+/// 2. Check format is correct.
+#[test]
+fn sdv_process_debug_test() {
+    let handle = ylong_runtime::spawn(async {
+        let mut command = Command::new("echo");
+        assert_eq!(
+            format!("{command:?}"),
+            "Command { std: \"echo\", kill: false }"
+        );
+        let mut child = command.spawn().unwrap();
+
+        assert_eq!(format!("{child:?}"), "Child { state: Pending(Some(Child { stdin: None, stdout: None, stderr: None, .. })), kill_on_drop: false, stdin: None, stdout: None, stderr: None }");
+        let status = child.wait().await.unwrap();
+        assert!(status.success());
     });
     ylong_runtime::block_on(handle).unwrap();
 }

@@ -198,3 +198,154 @@ impl<T: ToSocketAddrs + ?Sized> ToSocketAddrs for &T {
         (**self).to_socket_addrs()
     }
 }
+
+#[cfg(test)]
+mod test {
+    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
+
+    use crate::net::ToSocketAddrs;
+
+    /// UT test cases for `ToSocketAddrs` str.
+    ///
+    /// # Brief
+    /// 1. Create an address with str.
+    /// 2. Call `to_socket_addrs()` to convert str to `SocketAddr`.
+    /// 3. Check if the test results are correct.
+    #[test]
+    fn ut_to_socket_addrs_str() {
+        let addr_str = "127.0.0.1:8080";
+        crate::block_on(async {
+            let mut addrs_iter = addr_str.to_socket_addrs().await.unwrap();
+
+            let expected_addr = SocketAddr::from(([127, 0, 0, 1], 8080));
+            assert_eq!(Some(expected_addr), addrs_iter.next());
+            assert!(addrs_iter.next().is_none());
+        });
+    }
+
+    /// UT test cases for `ToSocketAddrs` blocking.
+    ///
+    /// # Brief
+    /// 1. Create an address with "localhost".
+    /// 2. Call `to_socket_addrs()` to convert str to `SocketAddr`.
+    /// 3. Check if the test results are correct.
+    #[test]
+    fn ut_to_socket_addrs_blocking() {
+        let addr_str = "localhost:8080";
+        crate::block_on(async {
+            let addrs_vec = addr_str
+                .to_socket_addrs()
+                .await
+                .unwrap()
+                .collect::<Vec<SocketAddr>>();
+
+            let expected_addr1 = SocketAddr::from(([127, 0, 0, 1], 8080));
+            let expected_addr2 = SocketAddr::from(([0, 0, 0, 0, 0, 0, 0, 1], 8080));
+            println!("{:?}", addrs_vec);
+            assert!(addrs_vec.contains(&expected_addr1) || addrs_vec.contains(&expected_addr2));
+        });
+    }
+
+    /// UT test cases for `ToSocketAddrs` (&str, u16).
+    ///
+    /// # Brief
+    /// 1. Create an address with (&str, u16).
+    /// 2. Call `to_socket_addrs()` to convert str to `SocketAddr`.
+    /// 3. Check if the test results are correct.
+    #[test]
+    fn ut_to_socket_addrs_str_u16() {
+        let addr_str = ("127.0.0.1", 8080);
+        crate::block_on(async {
+            let mut addrs_iter = addr_str.to_socket_addrs().await.unwrap();
+
+            let expected_addr = SocketAddr::from(([127, 0, 0, 1], 8080));
+            assert_eq!(Some(expected_addr), addrs_iter.next());
+            assert!(addrs_iter.next().is_none());
+        });
+
+        let addr_str = ("localhost", 8080);
+        crate::block_on(async {
+            let addrs_vec = addr_str
+                .to_socket_addrs()
+                .await
+                .unwrap()
+                .collect::<Vec<SocketAddr>>();
+
+            let expected_addr1 = SocketAddr::from(([127, 0, 0, 1], 8080));
+            let expected_addr2 = SocketAddr::from(([0, 0, 0, 0, 0, 0, 0, 1], 8080));
+            assert!(addrs_vec.contains(&expected_addr1) || addrs_vec.contains(&expected_addr2));
+        });
+
+        let addr_str = ("::1", 8080);
+        crate::block_on(async {
+            let mut addrs_iter = addr_str.to_socket_addrs().await.unwrap();
+
+            let expected_addr = SocketAddr::from(([0, 0, 0, 0, 0, 0, 0, 1], 8080));
+            assert_eq!(Some(expected_addr), addrs_iter.next());
+            assert!(addrs_iter.next().is_none());
+        });
+    }
+
+    /// UT test cases for `ToSocketAddrs` (ipaddr, u16).
+    ///
+    /// # Brief
+    /// 1. Create an address with (ipaddr, u16).
+    /// 2. Call `to_socket_addrs()` to convert str to `SocketAddr`.
+    /// 3. Check if the test results are correct.
+    #[test]
+    fn ut_to_socket_addrs_ipaddr_u16() {
+        let addr_str = (IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+        crate::block_on(async {
+            let mut addrs_iter = addr_str.to_socket_addrs().await.unwrap();
+
+            let expected_addr = SocketAddr::from(([127, 0, 0, 1], 8080));
+            assert_eq!(Some(expected_addr), addrs_iter.next());
+            assert!(addrs_iter.next().is_none());
+        });
+
+        let addr_str = (IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), 8080);
+        crate::block_on(async {
+            let mut addrs_iter = addr_str.to_socket_addrs().await.unwrap();
+
+            let expected_addr = SocketAddr::from(([0, 0, 0, 0, 0, 0, 0, 1], 8080));
+            assert_eq!(Some(expected_addr), addrs_iter.next());
+            assert!(addrs_iter.next().is_none());
+        });
+    }
+
+    /// UT test cases for `ToSocketAddrs` (ipv4addr, u16).
+    ///
+    /// # Brief
+    /// 1. Create an address with (ipv4addr, u16).
+    /// 2. Call `to_socket_addrs()` to convert str to `SocketAddr`.
+    /// 3. Check if the test results are correct.
+    #[test]
+    fn ut_to_socket_addrs_ipv4addr_u16() {
+        let addr_str = (Ipv4Addr::new(127, 0, 0, 1), 8080);
+        crate::block_on(async {
+            let mut addrs_iter = addr_str.to_socket_addrs().await.unwrap();
+
+            let expected_addr = SocketAddr::from(([127, 0, 0, 1], 8080));
+            assert_eq!(Some(expected_addr), addrs_iter.next());
+            assert!(addrs_iter.next().is_none());
+        });
+    }
+
+    /// UT test cases for `ToSocketAddrs` (ipv6addr, u16).
+    ///
+    /// # Brief
+    /// 1. Create an address with (ipv6addr, u16).
+    /// 2. Call `to_socket_addrs()` to convert str to `SocketAddr`.
+    /// 3. Check if the test results are correct.
+    #[test]
+    fn ut_to_socket_addrs_ipv6addr_u16() {
+        let addr_str = (Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1), 8080);
+        crate::block_on(async {
+            let mut addrs_iter = addr_str.to_socket_addrs().await.unwrap();
+
+            let expected_addr = SocketAddr::from(([0, 0, 0, 0, 0, 0, 0, 1], 8080));
+            assert_eq!(Some(expected_addr), addrs_iter.next());
+            assert!(addrs_iter.next().is_none());
+        });
+    }
+}

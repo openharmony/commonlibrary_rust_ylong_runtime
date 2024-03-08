@@ -468,15 +468,20 @@ mod test {
     #[test]
     #[cfg(feature = "net")]
     fn ut_sleep_drop() {
-        async fn udp_sender(sender_addr: SocketAddr, receiver_addr: SocketAddr) {
-            let sender = UdpSocket::bind(sender_addr).await.unwrap();
+        const ADDR: &str = "127.0.0.1:0";
+
+        async fn udp_sender(rx: crate::sync::oneshot::Receiver<SocketAddr>) {
+            let sender = UdpSocket::bind(ADDR).await.unwrap();
             let buf = [2; 10];
             sleep(Duration::from_secs(1)).await;
+            let receiver_addr = rx.await.unwrap();
             sender.send_to(buf.as_slice(), receiver_addr).await.unwrap();
         }
 
-        async fn udp_receiver(receiver_addr: SocketAddr) {
-            let receiver = UdpSocket::bind(receiver_addr).await.unwrap();
+        async fn udp_receiver(tx: crate::sync::oneshot::Sender<SocketAddr>) {
+            let receiver = UdpSocket::bind(ADDR).await.unwrap();
+            let addr = receiver.local_addr().unwrap();
+            tx.send(addr).unwrap();
             let mut buf = [0; 10];
             assert!(
                 timeout(Duration::from_secs(2), receiver.recv_from(&mut buf[..]))
@@ -486,10 +491,9 @@ mod test {
         }
 
         let mut tasks: Vec<JoinHandle<()>> = Vec::new();
-        let udp_sender_addr = "127.0.0.1:9093".parse().unwrap();
-        let udp_receiver_addr = "127.0.0.1:9094".parse().unwrap();
-        tasks.push(crate::spawn(udp_sender(udp_sender_addr, udp_receiver_addr)));
-        tasks.push(crate::spawn(udp_receiver(udp_receiver_addr)));
+        let (tx, rx) = crate::sync::oneshot::channel();
+        tasks.push(crate::spawn(udp_sender(rx)));
+        tasks.push(crate::spawn(udp_receiver(tx)));
         for t in tasks {
             let _ = crate::block_on(t);
         }

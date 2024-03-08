@@ -728,8 +728,9 @@ impl DirEntry {
 #[cfg(test)]
 mod test {
     use crate::fs::{
-        canonicalize, copy, hard_link, metadata, read, read_link, read_to_string, remove_file,
-        rename, set_permissions, symlink_metadata, write, File,
+        canonicalize, copy, create_dir, hard_link, metadata, read, read_dir, read_link,
+        read_to_string, remove_dir_all, remove_file, rename, set_permissions, symlink_metadata,
+        write, File,
     };
 
     /// UT test for `remove_file`
@@ -988,5 +989,34 @@ mod test {
             let res = remove_file(file_path).await;
             assert!(res.is_ok());
         });
+    }
+
+    /// UT test cases for directory operations.
+    ///
+    /// # Brief
+    /// 1. Create a new directory.
+    /// 2. Create two files to read.
+    /// 3. Read the directory and check the name of files.
+    /// 4. Delete the directory and files in it.
+    #[test]
+    fn ut_async_dir_read() {
+        let handle = crate::spawn(async move {
+            let _ = create_dir("dir_test1").await;
+            File::create("dir_test1/test1.txt").await.unwrap();
+            File::create("dir_test1/test2.txt").await.unwrap();
+            let mut dir = read_dir("dir_test1").await.unwrap();
+            let entry = dir.next().await.unwrap().unwrap();
+            assert!(!entry.file_type().await.unwrap().is_dir());
+            assert!(entry.file_type().await.unwrap().is_file());
+            assert!(entry.file_name().into_string().unwrap().contains("test"));
+            let entry = dir.next().await.unwrap().unwrap();
+            assert!(!entry.metadata().await.unwrap().is_dir());
+            assert!(entry.metadata().await.unwrap().is_file());
+            assert!(!entry.metadata().await.unwrap().permissions().readonly());
+            assert!(entry.file_name().into_string().unwrap().contains("test"));
+            assert!(dir.next().await.unwrap().is_none());
+            assert!(remove_dir_all("dir_test1").await.is_ok());
+        });
+        crate::block_on(handle).unwrap();
     }
 }

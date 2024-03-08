@@ -14,9 +14,7 @@
 #![cfg(all(target_os = "linux", feature = "process"))]
 
 use std::ffi::OsStr;
-use std::os::fd::{AsFd, AsRawFd, OwnedFd};
 use std::path::Path;
-use std::process::Stdio;
 
 use ylong_runtime::io::{AsyncReadExt, AsyncWriteExt};
 use ylong_runtime::process::pty_process::{Pty, PtyCommand};
@@ -61,34 +59,6 @@ fn sdv_pty_process_test() {
 
         command.current_dir("/bin");
         assert_eq!(command.get_current_dir(), Some(Path::new("/bin")));
-
-        let pgid = unsafe {
-            let pid = libc::getpid();
-            libc::getpgid(pid)
-        };
-        command
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .arg0("/bin")
-            .process_group(pgid);
-
-        unsafe {
-            command.pre_exec(move || {
-                let pid = libc::getpid();
-                assert_eq!(libc::getpgid(pid), pgid);
-                Ok(())
-            });
-        }
-
-        let pty = Pty::new().unwrap();
-        let pts = pty.pts().unwrap();
-        let mut child = command.spawn(&pts).unwrap();
-        assert!(child.take_stdin().is_some());
-        assert!(child.take_stdout().is_some());
-        assert!(child.take_stderr().is_some());
-
-        let _ = child.wait().await.unwrap();
     });
     ylong_runtime::block_on(handle).unwrap();
 }
@@ -119,7 +89,7 @@ fn sdv_pty_process_read_and_write_test() {
         pty.read_exact(&mut buf).await.unwrap();
         pty.flush().await.unwrap();
         pty.shutdown().await.unwrap();
-        assert!(String::from_utf8_lossy(&buf).contains(arg));
+        assert_eq!(String::from_utf8_lossy(&buf).replace(['\n', '\r'], ""), arg);
     });
 }
 
@@ -151,7 +121,7 @@ fn sdv_pty_split_test() {
 
         let mut buf = [0; 14];
         read_pty.read_exact(&mut buf).await.unwrap();
-        assert!(String::from_utf8_lossy(&buf).contains(arg));
+        assert_eq!(String::from_utf8_lossy(&buf).replace(['\n', '\r'], ""), arg);
     });
 }
 
@@ -183,7 +153,7 @@ fn sdv_pty_into_split_test() {
 
         let mut buf = [0; 14];
         read_pty.read_exact(&mut buf).await.unwrap();
-        assert!(String::from_utf8_lossy(&buf).contains(arg));
+        assert_eq!(String::from_utf8_lossy(&buf).replace(['\n', '\r'], ""), arg);
     });
 }
 
@@ -214,24 +184,31 @@ fn sdv_pty_unsplit_test() {
 
         let mut buf = [0; 14];
         pty.read_exact(&mut buf).await.unwrap();
-        assert!(String::from_utf8_lossy(&buf).contains(arg));
+        assert_eq!(String::from_utf8_lossy(&buf).replace(['\n', '\r'], ""), arg);
     });
 }
 
-/// SDV test cases for pty.
+/// SDV test cases for pty debug.
 ///
 /// # Brief
-/// 1. Create a `Pty` .
-/// 2. Parse pty to OwnedFd.
-/// 3. Check result is ok.
+/// 1. Debug pty and splitPty.
+/// 2. Check format is correct.
 #[test]
-fn sdv_pty_as_test() {
+fn sdv_pty_debug_test() {
     ylong_runtime::block_on(async {
         let pty = Pty::new().unwrap();
-
-        let _ = pty.as_fd();
-        let _ = pty.as_raw_fd();
-        let fd: OwnedFd = From::<Pty>::from(pty);
-        assert!(fd.as_raw_fd() >= 0);
+        let pts = pty.pts().unwrap();
+        assert!(format!("{pts:?}").contains("Pts(PtsInner(OwnedFd { fd:"));
+        let (read_pty, write_pty) = pty.into_split();
+        assert!(format!("{read_pty:?}")
+            .contains("SplitReadPty(Pty(AsyncSource { io: Some(PtyInner(OwnedFd { fd:"));
+        assert!(format!("{write_pty:?}")
+            .contains("SplitWritePty(Pty(AsyncSource { io: Some(PtyInner(OwnedFd { fd:"));
+        let mut pty = Pty::unsplit(read_pty, write_pty).expect("unsplit fail!");
+        let (read_pty, write_pty) = pty.split();
+        assert!(format!("{read_pty:?}")
+            .contains("BorrowReadPty(Pty(AsyncSource { io: Some(PtyInner(OwnedFd { fd:"));
+        assert!(format!("{write_pty:?}")
+            .contains("BorrowWritePty(Pty(AsyncSource { io: Some(PtyInner(OwnedFd { fd:"));
     });
 }

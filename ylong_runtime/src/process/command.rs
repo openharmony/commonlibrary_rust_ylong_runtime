@@ -583,3 +583,183 @@ impl Command {
         self
     }
 }
+
+#[cfg(test)]
+mod test {
+    use std::io::IoSlice;
+    use std::process::Stdio;
+
+    use crate::io::{AsyncReadExt, AsyncWrite, AsyncWriteExt};
+    use crate::process::Command;
+
+    /// UT test cases for Command.
+    ///
+    /// # Brief
+    /// 1. Create a `Command`.
+    /// 2. Call `kill_on_drop()` set true and check command.kill.
+    /// 3. Call `kill_on_drop()` set false and check command.kill.
+    /// 4. Check command.std.
+    #[test]
+    fn ut_process_basic_test() {
+        let mut command = Command::new("echo");
+        assert!(!command.kill);
+        command.kill_on_drop(true);
+        assert!(command.kill);
+        command.kill_on_drop(false);
+        assert!(!command.kill);
+        assert_eq!(command.std.get_program(), "echo");
+    }
+
+    /// UT test cases for `output()`.
+    ///
+    /// # Brief
+    /// 1. Create a `Command` with arg.
+    /// 2. Use `output()` waiting result.
+    #[test]
+    fn ut_process_output_test() {
+        let handle = crate::spawn(async {
+            let mut command = Command::new("echo");
+            command.arg("Hello, world!");
+            let output = command.output().await.unwrap();
+
+            assert!(output.status.success());
+            assert_eq!(output.stdout.as_slice(), b"Hello, world!\n");
+            assert!(output.stderr.is_empty());
+        });
+        crate::block_on(handle).unwrap();
+    }
+
+    /// UT test cases for `status()`.
+    ///
+    /// # Brief
+    /// 1. Create a `Command` with arg.
+    /// 2. Use `status()` waiting result.
+    #[test]
+    fn ut_process_status_test() {
+        let handle = crate::spawn(async {
+            let mut command = Command::new("echo");
+            command.arg("Hello, world!");
+
+            let status = command.status().await.unwrap();
+            assert!(status.success());
+        });
+        crate::block_on(handle).unwrap();
+    }
+
+    /// UT test cases for Command.
+    ///
+    /// # Brief
+    /// 1. Create a `Command` and `spawn()`.
+    /// 2. Take `child.stdin` and write something in it.
+    /// 3. Take `child.stdout` and read it, check the result.
+    /// 4. Check child's result.
+    #[test]
+    fn ut_process_child_stdio_test() {
+        let handle = crate::spawn(async {
+            let mut child = Command::new("rev")
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+                .expect("Failed to spawn child process");
+
+            let mut stdin = child.take_stdin().expect("Failed to open stdin");
+            let stdin_handle = crate::spawn(async move {
+                assert!(stdin.is_write_vectored());
+                stdin
+                    .write_vectored(&[IoSlice::new(b"Hello, world!")])
+                    .await
+                    .unwrap();
+                stdin.flush().await.unwrap();
+                stdin.shutdown().await.unwrap();
+            });
+
+            let mut stdout = child.take_stdout().expect("Failed to open stdout");
+            let stdout_handle = crate::spawn(async move {
+                let mut buf = Vec::new();
+                stdout.read_to_end(&mut buf).await.unwrap();
+                let str = "!dlrow ,olleH";
+                assert!(String::from_utf8(buf).unwrap().contains(str));
+            });
+
+            let mut stderr = child.take_stderr().expect("Failed to open stderr");
+            let stderr_handle = crate::spawn(async move {
+                let mut buf = Vec::new();
+                stderr.read_to_end(&mut buf).await.unwrap();
+                assert!(buf.is_empty());
+            });
+
+            let status = child.wait().await.unwrap();
+            assert!(status.success());
+
+            stdin_handle.await.unwrap();
+            stdout_handle.await.unwrap();
+            stderr_handle.await.unwrap();
+        });
+        crate::block_on(handle).unwrap();
+    }
+
+    /// Ut test cases for `kill()`.
+    ///
+    /// # Brief
+    /// 1. Create a `Command` with arg.
+    /// 2. Use `spawn()` create a child handle
+    /// 3. Use `kill()` to kill the child handle.
+    #[test]
+    fn ut_process_kill_test() {
+        let handle = crate::spawn(async {
+            let mut command = Command::new("echo");
+            command.arg("Hello, world!");
+            let mut child = command.spawn().unwrap();
+
+            assert!(child.kill().await.is_ok());
+        });
+        crate::block_on(handle).unwrap();
+    }
+
+    /// UT test cases for drop.
+    ///
+    /// # Brief
+    /// 1. Create a `Command` with kill_on_drop.
+    /// 2. Use `spawn()` create a child handle
+    /// 3. Use `drop()` to drop the child handle.
+    #[test]
+    fn ut_process_drop_test() {
+        let handle = crate::spawn(async {
+            let mut command = Command::new("echo");
+            command.arg("Hello, world!").kill_on_drop(true);
+            let child = command.spawn();
+            assert!(child.is_ok());
+            drop(child.unwrap());
+
+            let mut command = Command::new("echo");
+            command.arg("Hello, world!");
+            let child = command.spawn();
+            assert!(child.is_ok());
+            drop(child.unwrap());
+        });
+        crate::block_on(handle).unwrap();
+    }
+
+    /// UT test cases for command debug.
+    ///
+    /// # Brief
+    /// 1. Debug Command and Child.
+    /// 2. Check format is correct.
+    #[test]
+    fn ut_process_debug_test() {
+        let handle = crate::spawn(async {
+            let mut command = Command::new("echo");
+            assert_eq!(
+                format!("{command:?}"),
+                "Command { std: \"echo\", kill: false }"
+            );
+            let mut child = command.spawn().unwrap();
+
+            assert_eq!(format!("{child:?}"), "Child { state: Pending(Some(Child { stdin: None, stdout: None, stderr: None, .. })), kill_on_drop: false, stdin: None, stdout: None, stderr: None }");
+            let status = child.wait().await.unwrap();
+            assert!(status.success());
+        });
+        crate::block_on(handle).unwrap();
+    }
+}

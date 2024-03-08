@@ -343,3 +343,181 @@ impl Drop for AutoRelSemaphorePermit<'_> {
         self.sem.inner.release();
     }
 }
+#[cfg(test)]
+mod test {
+    use std::sync::Arc;
+
+    use crate::sync::{AutoRelSemaphore, Semaphore};
+    use crate::task::JoinHandle;
+
+    /// UT test cases for `Semaphore::close()`.
+    ///
+    /// # Brief
+    /// 1. Create a counting semaphore with an initial capacity.
+    /// 2. Check the semaphore is not closed.
+    /// 3. Close the semaphore.
+    /// 4. Check the semaphore is closed.
+    #[test]
+    fn ut_sem_close_test() {
+        let sem = Semaphore::new(4).unwrap();
+        assert!(!sem.is_closed());
+        sem.close();
+        assert!(sem.is_closed());
+    }
+
+    /// UT test cases for `AutoRelSemaphore::acquire()`.
+    ///
+    /// # Brief
+    /// 1. Create a counting auto-release-semaphore with an initial capacity.
+    /// 2. Acquire an auto-release-permit.
+    /// 3. Asynchronously acquires a permit.
+    /// 4. Check the number of permits in every stage.
+    #[test]
+    fn ut_auto_release_sem_acquire_test() {
+        let sem = Arc::new(AutoRelSemaphore::new(1).unwrap());
+        let sem2 = sem.clone();
+        let handle = crate::spawn(async move {
+            let _permit2 = sem2.acquire().await.unwrap();
+            assert_eq!(sem2.current_permits(), 0);
+        });
+        crate::block_on(handle).expect("block_on failed");
+        assert_eq!(sem.current_permits(), 1);
+    }
+
+    /// UT test cases for `Semaphore::release()`.
+    ///
+    /// # Brief
+    /// 1. Create a counting semaphore with an initial capacity.
+    /// 2. Call `Semaphore::release()` to add a permit to the semaphore.
+    /// 3. Check the number of permits before and after releasing.
+    #[test]
+    fn ut_release_test() {
+        let sem = Semaphore::new(2).unwrap();
+        assert_eq!(sem.current_permits(), 2);
+        sem.release();
+        assert_eq!(sem.current_permits(), 3);
+    }
+
+    /// UT test cases for `AutoRelSemaphore::close()`.
+    ///
+    /// # Brief
+    /// 1. Create a counting auto-release-semaphore with an initial capacity.
+    /// 2. Close the semaphore.
+    /// 3. Fail to acquire an auto-release-permit.
+    #[test]
+    fn ut_auto_release_sem_close_test() {
+        let sem = Arc::new(AutoRelSemaphore::new(2).unwrap());
+        let sem2 = sem.clone();
+        assert!(!sem.is_closed());
+        sem.close();
+        assert!(sem.is_closed());
+        let permit = sem.try_acquire();
+        assert!(permit.is_err());
+        let handle = crate::spawn(async move {
+            let permit2 = sem2.acquire().await;
+            assert!(permit2.is_err());
+        });
+        crate::block_on(handle).expect("block_on failed");
+    }
+
+    /// Stress test cases for `AutoRelSemaphore::acquire()`.
+    ///
+    /// # Brief
+    /// 1. Create a counting auto-release-semaphore with an initial capacity.
+    /// 2. Repeating acquiring an auto-release-permit for a huge number of
+    ///    times.
+    /// 3. Check the correctness of function of semaphore.
+    #[test]
+    fn ut_auto_release_sem_stress_test() {
+        let sem = Arc::new(AutoRelSemaphore::new(5).unwrap());
+        let mut tasks: Vec<JoinHandle<()>> = Vec::new();
+
+        for _ in 0..1000 {
+            let sem2 = sem.clone();
+            tasks.push(crate::spawn(async move {
+                let _permit = sem2.acquire().await;
+            }));
+        }
+        for t in tasks {
+            let _ = crate::block_on(t);
+        }
+        let permit1 = sem.try_acquire();
+        assert!(permit1.is_ok());
+        let permit2 = sem.try_acquire();
+        assert!(permit2.is_ok());
+        let permit3 = sem.try_acquire();
+        assert!(permit3.is_ok());
+        let permit4 = sem.try_acquire();
+        assert!(permit4.is_ok());
+        let permit5 = sem.try_acquire();
+        assert!(permit5.is_ok());
+        assert!(sem.try_acquire().is_err());
+    }
+
+    /// Stress test cases for `AutoRelSemaphore::acquire()` and
+    /// `AutoRelSemaphore::drop()`.
+    ///
+    /// # Brief
+    /// 1. Create a counting auto-release-semaphore with an initial capacity.
+    /// 2. Repeating acquiring a pair of auto-release-permit for a few times.
+    /// 3. Check the correctness of the future of `Permit`.
+    #[test]
+    fn ut_async_stress_test() {
+        let mut tasks: Vec<JoinHandle<()>> = Vec::new();
+
+        for _ in 0..50 {
+            let sem = Arc::new(AutoRelSemaphore::new(1).unwrap());
+            let sem2 = sem.clone();
+            tasks.push(crate::spawn(async move {
+                let _permit = sem.acquire().await;
+            }));
+            tasks.push(crate::spawn(async move {
+                let _permit = sem2.acquire().await;
+            }));
+        }
+        for t in tasks {
+            let _ = crate::block_on(t);
+        }
+    }
+
+    /// UT test cases for `Semaphore::try_acquire()`.
+    ///
+    /// # Brief
+    /// 1. Create a counting semaphore with an initial capacity.
+    /// 2. Acquire permits successfully.
+    /// 3. Fail to acquire a permit when all permits are consumed.
+    #[test]
+    fn ut_try_acquire_test() {
+        let sem = Semaphore::new(2).unwrap();
+        let permit = sem.try_acquire();
+        assert!(permit.is_ok());
+        drop(permit);
+        assert_eq!(sem.current_permits(), 1);
+        let permit2 = sem.try_acquire();
+        assert!(permit2.is_ok());
+        drop(permit2);
+        assert_eq!(sem.current_permits(), 0);
+        let permit3 = sem.try_acquire();
+        assert!(permit3.is_err());
+    }
+
+    /// UT test cases for `Semaphore::acquire()`.
+    ///
+    /// # Brief
+    /// 1. Create a counting semaphore with an initial capacity.
+    /// 2. Acquire a permit.
+    /// 3. Asynchronously acquires a permit.
+    /// 4. Check the number of permits in every stage.
+    #[test]
+    fn ut_acquire_test() {
+        let sem = Arc::new(Semaphore::new(0).unwrap());
+        let sem2 = sem.clone();
+        let handle = crate::spawn(async move {
+            let _permit2 = sem2.acquire().await.unwrap();
+            assert_eq!(sem2.current_permits(), 0);
+        });
+        sem.release();
+        crate::block_on(handle).expect("block_on failed");
+        assert_eq!(sem.current_permits(), 0);
+    }
+}

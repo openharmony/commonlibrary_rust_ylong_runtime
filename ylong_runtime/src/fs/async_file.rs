@@ -532,7 +532,10 @@ impl FileInner {
 
 #[cfg(test)]
 mod test {
+    use std::io::SeekFrom;
+
     use crate::fs::{remove_file, File};
+    use crate::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 
     /// UT test for `set_len`
     ///
@@ -575,5 +578,119 @@ mod test {
             let res = remove_file(file_path).await;
             assert!(res.is_ok());
         });
+    }
+
+    /// UT test cases for asynchronous file Seek
+    ///
+    /// # Brief
+    /// 1. Generate an asynchronous file IO with create.
+    /// 2. Start a task to perform a write operation.
+    /// 3. Start another task for seek and read operations.
+    #[test]
+    fn ut_fs_file_seek() {
+        let file_path = "file13.txt";
+        let handle = crate::spawn(async move {
+            let mut file = File::create(file_path).await.unwrap();
+            let buf = vec![65, 66, 67, 68, 69, 70, 71, 72, 73];
+            let res = file.write(&buf).await.unwrap();
+            assert_eq!(res, 9);
+            file.sync_all().await.unwrap();
+        });
+        crate::block_on(handle).unwrap();
+
+        let handle2 = crate::spawn(async move {
+            let mut file = File::open(file_path).await.unwrap();
+            let ret = file.seek(SeekFrom::Current(3)).await.unwrap();
+            assert_eq!(ret, 3);
+
+            let mut buf = [0; 1];
+            let ret = file.read(&mut buf).await.unwrap();
+            assert_eq!(ret, 1);
+            assert_eq!(buf, [68]);
+
+            let ret = file.seek(SeekFrom::Current(1)).await.unwrap();
+            assert_eq!(ret, 5);
+
+            let mut buf = [0; 1];
+            let ret = file.read(&mut buf).await.unwrap();
+            assert_eq!(ret, 1);
+            assert_eq!(buf, [70]);
+
+            let ret = file.seek(SeekFrom::Current(2)).await.unwrap();
+            assert_eq!(ret, 8);
+
+            let mut buf = [0; 2];
+            let ret = file.read(&mut buf).await.unwrap();
+            assert_eq!(ret, 1);
+            assert_eq!(buf, [73, 0]);
+
+            let ret = file.seek(SeekFrom::Start(0)).await.unwrap();
+            assert_eq!(ret, 0);
+            let mut buf = [0; 9];
+            let ret = file.read(&mut buf).await.unwrap();
+            assert_eq!(ret, 9);
+            assert_eq!(buf, [65, 66, 67, 68, 69, 70, 71, 72, 73]);
+
+            let ret = file.seek(SeekFrom::End(-1)).await.unwrap();
+            assert_eq!(ret, 8);
+            let mut buf = [0; 2];
+            let ret = file.read(&mut buf).await.unwrap();
+            assert_eq!(ret, 1);
+            assert_eq!(buf, [73, 0]);
+        });
+
+        crate::block_on(handle2).unwrap();
+        std::fs::remove_file(file_path).unwrap();
+    }
+
+    /// UT test cases for Asynchronous file set permission
+    ///
+    /// # Brief
+    /// 1. Generate an asynchronous file IO with create.
+    /// 2. Asynchronously get the permissions of the file.
+    /// 3. Change the permission to read only, set it to this file.
+    #[test]
+    fn ut_fs_file_set_permission() {
+        let file_path = "file14.txt";
+        let handle = crate::spawn(async move {
+            let file = File::create(file_path).await.unwrap();
+            let mut perms = file.metadata().await.unwrap().permissions();
+            perms.set_readonly(true);
+            let ret = file.set_permissions(perms).await;
+            assert!(ret.is_ok());
+            let mut perms = file.metadata().await.unwrap().permissions();
+            #[allow(clippy::permissions_set_readonly_false)]
+            perms.set_readonly(false);
+            let ret = file.set_permissions(perms).await;
+            assert!(ret.is_ok());
+        });
+        crate::block_on(handle).unwrap();
+        std::fs::remove_file(file_path).unwrap();
+    }
+
+    /// UT test cases for asynchronous file sync
+    ///
+    /// # Brief
+    /// 1. Generate an asynchronous file IO with create.
+    /// 2. Call sync_all and sync_data after asynchronous write.
+    #[test]
+    fn ut_fs_file_sync_all() {
+        let file_path = "file15.txt";
+        let handle = crate::spawn(async move {
+            let mut file = File::create(file_path).await.unwrap();
+            let buf = [2; 20000];
+            let ret = file.write_all(&buf).await;
+            assert!(ret.is_ok());
+            let ret = file.sync_all().await;
+            assert!(ret.is_ok());
+
+            let buf = [2; 20000];
+            let ret = file.write_all(&buf).await;
+            assert!(ret.is_ok());
+            let ret = file.sync_data().await;
+            assert!(ret.is_ok());
+        });
+        crate::block_on(handle).unwrap();
+        std::fs::remove_file(file_path).unwrap();
     }
 }

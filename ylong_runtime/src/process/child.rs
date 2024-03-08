@@ -434,3 +434,130 @@ macro_rules! impl_common_traits {
 impl_common_traits!(ChildStdin);
 impl_common_traits!(ChildStdout);
 impl_common_traits!(ChildStderr);
+
+#[cfg(test)]
+mod test {
+    use std::os::fd::{AsFd, AsRawFd};
+    use std::process::Stdio;
+
+    use crate::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command};
+
+    /// UT test cases for Child.
+    ///
+    /// # Brief
+    /// 1. Create a ylong_runtime's `Child` with std `Child`.
+    /// 2. Check stdin/stdout/stderr.
+    /// 3. Call `wait()` to exit Child.
+    #[test]
+    fn ut_process_child_new_test() {
+        let mut command = std::process::Command::new("echo");
+        let std_child = command.spawn().unwrap();
+
+        let handle = crate::spawn(async move {
+            let mut child = Child::new(std_child, false, None, None, None).unwrap();
+            assert!(!child.kill_on_drop);
+            assert!(child.stdin.is_none());
+            assert!(child.stdout.is_none());
+            assert!(child.stderr.is_none());
+            assert!(child.id().is_some());
+            let status = child.wait().await.unwrap();
+            assert!(status.success());
+        });
+        crate::block_on(handle).unwrap();
+    }
+
+    /// UT test cases for Child.
+    ///
+    /// # Brief
+    /// 1. Create a `Command` with arg.
+    /// 2. Use `spawn()` create a child handle
+    /// 3. Use `try_wait()` waiting result until the child handle is ok.
+    #[test]
+    fn ut_process_try_wait_test() {
+        let mut command = std::process::Command::new("echo");
+        let std_child = command.spawn().unwrap();
+        let handle = crate::spawn(async {
+            let mut child = Child::new(std_child, false, None, None, None).unwrap();
+
+            loop {
+                if child.try_wait().unwrap().is_some() {
+                    break;
+                }
+            }
+            assert!(child.try_wait().unwrap().is_some());
+        });
+        crate::block_on(handle).unwrap();
+    }
+
+    /// UT test cases for stdio.
+    ///
+    /// # Brief
+    /// 1. Create a `Command` with arg.
+    /// 2. Use `spawn()` create a child handle
+    /// 3. Use `wait()` waiting result.
+    #[test]
+    fn ut_process_stdio_test() {
+        let handle = crate::spawn(async {
+            let mut command = Command::new("echo");
+            command
+                .arg("Hello, world!")
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped());
+            let mut child = command.spawn().unwrap();
+
+            let child_stdin = child.take_stdin().unwrap();
+            assert!(child_stdin.into_owned_fd().is_ok());
+            let child_stdout = child.take_stdout().unwrap();
+            assert!(child_stdout.into_owned_fd().is_ok());
+            let child_stderr = child.take_stderr().unwrap();
+            assert!(child_stderr.into_owned_fd().is_ok());
+
+            drop(child);
+
+            let mut child = command.spawn().unwrap();
+
+            let child_stdin = child.take_stdin().unwrap();
+            assert!(child_stdin.as_fd().as_raw_fd() >= 0);
+            assert!(child_stdin.as_raw_fd() >= 0);
+            assert!(TryInto::<Stdio>::try_into(child_stdin).is_ok());
+
+            let child_stdout = child.take_stdout().unwrap();
+            assert!(child_stdout.as_fd().as_raw_fd() >= 0);
+            assert!(child_stdout.as_raw_fd() >= 0);
+            assert!(TryInto::<Stdio>::try_into(child_stdout).is_ok());
+
+            let child_stderr = child.take_stderr().unwrap();
+            assert!(child_stderr.as_fd().as_raw_fd() >= 0);
+            assert!(child_stderr.as_raw_fd() >= 0);
+            assert!(TryInto::<Stdio>::try_into(child_stderr).is_ok());
+            drop(child);
+        });
+        crate::block_on(handle).unwrap();
+    }
+
+    /// UT test cases for ChildStd.
+    ///
+    /// # Brief
+    /// 1. Create a `std::process::Command`.
+    /// 2. Use `spawn()` create a child handle
+    /// 3. Use `from_std()` to convert std to ylong_runtime::process::ChildStd.
+    #[test]
+    fn ut_process_child_stdio_convert_test() {
+        let mut command = std::process::Command::new("echo");
+        command
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        let mut child = command.spawn().unwrap();
+        let handle = crate::spawn(async move {
+            let stdin = child.stdin.take().unwrap();
+            assert!(ChildStdin::from_std(stdin).is_ok());
+            let stdout = child.stdout.take().unwrap();
+            assert!(ChildStdout::from_std(stdout).is_ok());
+            let stderr = child.stderr.take().unwrap();
+            assert!(ChildStderr::from_std(stderr).is_ok());
+        });
+        crate::block_on(handle).unwrap();
+    }
+}

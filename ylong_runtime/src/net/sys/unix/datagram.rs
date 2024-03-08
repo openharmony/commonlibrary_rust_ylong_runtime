@@ -235,7 +235,7 @@ impl UnixDatagram {
     /// ```
     pub fn try_send(&self, buf: &[u8]) -> Result<usize> {
         self.source
-            .try_io(Interest::READABLE, || (*self.source).send(buf))
+            .try_io(Interest::WRITABLE, || (*self.source).send(buf))
     }
 
     /// Creates an unnamed pair of connected sockets.
@@ -451,37 +451,38 @@ impl AsFd for UnixDatagram {
 
 #[cfg(test)]
 mod test {
+    use std::io;
+    use std::os::fd::{AsFd, AsRawFd};
+
     use crate::net::UnixDatagram;
 
-    const PATH: &str = "/tmp/uds_path1";
-
-    async fn server() {
-        let socket = UnixDatagram::bind(PATH).unwrap();
-
-        let mut buf = vec![0; 11];
-        socket.recv(buf.as_mut_slice()).await.expect("recv failed");
-        assert_eq!(
-            std::str::from_utf8(&buf).unwrap(),
-            "hello world".to_string()
-        );
-
-        std::fs::remove_file(PATH).unwrap();
-    }
-
-    async fn client() {
-        let socket = UnixDatagram::unbound().unwrap();
-        loop {
-            if socket.connect(PATH).is_ok() {
-                socket.send(b"hello world").await.expect("send failed");
-                break;
-            };
-        }
+    /// Uds UnixDatagram test case.
+    ///
+    /// # Title
+    /// ut_uds_datagram_baisc_test
+    ///
+    /// # Brief
+    /// 1. Create a std UnixDatagram with `pair()`.
+    /// 2. Convert std UnixDatagram to Ylong_runtime UnixDatagram.
+    /// 3. Check result is correct.
+    #[test]
+    fn ut_uds_datagram_baisc_test() {
+        let (datagram, _) = std::os::unix::net::UnixDatagram::pair().unwrap();
+        let handle = crate::spawn(async {
+            let res = UnixDatagram::from_std(datagram);
+            assert!(res.is_ok());
+            let datagram = res.unwrap();
+            assert!(datagram.as_fd().as_raw_fd() >= 0);
+            assert!(datagram.as_raw_fd() >= 0);
+            assert!(datagram.take_error().is_ok());
+        });
+        crate::block_on(handle).unwrap();
     }
 
     /// uds UnixDatagram test case.
     ///
     /// # Title
-    /// uds_datagram_test
+    /// ut_uds_datagram_read_write_test
     ///
     /// # Brief
     /// 1. Creates a server and a client.
@@ -491,13 +492,72 @@ mod test {
     /// Each execution will leave a file under PATH which must be deleted,
     /// otherwise the next bind operation will fail.
     #[test]
-    fn uds_datagram_test() {
-        std::thread::spawn(|| {
-            let handle = crate::spawn(client());
-            crate::block_on(handle).unwrap();
-        });
+    fn ut_uds_datagram_read_write_test() {
+        const PATH: &str = "/tmp/uds_datagram_test_path1";
+        let _ = std::fs::remove_file(PATH);
 
-        let handle = crate::spawn(server());
+        let handle2 = crate::spawn(async {
+            let socket = UnixDatagram::bind(PATH).unwrap();
+
+            let handle = crate::spawn(async {
+                let socket = UnixDatagram::unbound().unwrap();
+                socket.connect(PATH).unwrap();
+
+                socket.send(b"hello world").await.expect("send failed");
+            });
+
+            let mut buf = vec![0; 11];
+            socket.recv(buf.as_mut_slice()).await.expect("recv failed");
+            assert_eq!(
+                std::str::from_utf8(&buf).unwrap(),
+                "hello world".to_string()
+            );
+
+            handle.await.unwrap();
+        });
+        crate::block_on(handle2).unwrap();
+        let _ = std::fs::remove_file(PATH);
+    }
+
+    /// Uds UnixDatagram try_xxx() test case.
+    ///
+    /// # Title
+    /// ut_uds_datagram_try_test
+    ///
+    /// # Brief
+    /// 1. Creates a server and a client with `pair()`.
+    /// 2. Server send message with `writable()` and `try_send()`.
+    /// 3. Client receive message with `readable()` and `try_recv()`.
+    /// 4. Check result is correct.
+    #[test]
+    fn ut_uds_datagram_try_test() {
+        let handle = crate::spawn(async {
+            let (server, client) = UnixDatagram::pair().unwrap();
+            loop {
+                server.writable().await.unwrap();
+                match server.try_send(b"hello") {
+                    Ok(n) => {
+                        assert_eq!(n, "hello".len());
+                        break;
+                    }
+                    Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+                    Err(e) => panic!("{e:?}"),
+                }
+            }
+            loop {
+                client.readable().await.unwrap();
+                let mut data = vec![0; 5];
+                match client.try_recv(&mut data) {
+                    Ok(n) => {
+                        assert_eq!(n, "hello".len());
+                        assert_eq!(std::str::from_utf8(&data).unwrap(), "hello".to_string());
+                        break;
+                    }
+                    Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+                    Err(e) => panic!("{e:?}"),
+                }
+            }
+        });
         crate::block_on(handle).unwrap();
     }
 }

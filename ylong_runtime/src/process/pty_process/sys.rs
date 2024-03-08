@@ -226,6 +226,7 @@ impl AsRawFd for PtsInner {
 
 #[cfg(test)]
 mod tests {
+    use std::io::{Read, Write};
     use std::os::fd::{AsFd, AsRawFd, OwnedFd};
 
     use crate::process::pty_process::sys::PtyInner;
@@ -242,9 +243,26 @@ mod tests {
         let pts = pty.pts(1);
         assert!(pts.is_ok());
         let pts = pts.unwrap();
-        let _ = pts.as_fd();
-        let _ = pts.as_raw_fd();
+        assert!(pts.as_fd().as_raw_fd() >= 0);
+        assert!(pts.as_raw_fd() >= 0);
         let fd = OwnedFd::from(pts);
         assert!(fd.as_raw_fd() >= 0);
+    }
+
+    /// Basic UT test cases for `PtyInner` read and write.
+    ///
+    /// # Brief
+    /// 1. Open a new `PtyInner`.
+    /// 2. Write something into `PtyInner`.
+    /// 3. Check read result is correct.
+    #[test]
+    fn ut_pty_read_write_test() {
+        let mut pty = PtyInner::open().unwrap();
+        let arg = "hello world!";
+        pty.write_all(arg.as_bytes()).unwrap();
+
+        let mut buf = [0; 12];
+        pty.read_exact(&mut buf).unwrap();
+        assert_eq!(buf, arg.as_bytes());
     }
 }
