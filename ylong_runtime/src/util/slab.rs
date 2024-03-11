@@ -252,7 +252,7 @@ impl<T: Entry> Slab<T> {
     ///
     /// Using atomic variables
     pub unsafe fn compact(&mut self) {
-        for (_, page) in (self.pages[1..]).iter().enumerate() {
+        for page in (self.pages[1..]).iter() {
             // The `slots` of the current `page` are being used, or the current `page` is
             // not allocated and not cleaned up.
             if page.used.load(Relaxed) != 0 || !page.allocated.load(Relaxed) {

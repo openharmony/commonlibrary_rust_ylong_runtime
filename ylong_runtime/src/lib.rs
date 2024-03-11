@@ -83,7 +83,7 @@ cfg_net! {
     pub mod net;
 }
 
-#[cfg(unix)]
+#[cfg(target_os = "linux")]
 cfg_process! {
     pub mod process;
 }

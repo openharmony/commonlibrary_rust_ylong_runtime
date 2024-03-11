@@ -106,7 +106,7 @@ impl Inner {
                 self.state.swap(IDLE, SeqCst);
                 return ParkFlag::NotPark;
             }
-            Err(actual) => panic!("inconsistent park state; actual = {}", actual),
+            Err(actual) => panic!("inconsistent park state; actual = {actual}"),
         }
 
         let park_flag = driver.run();
@@ -115,7 +115,7 @@ impl Inner {
             // got notified by real io events or not
             NOTIFIED => ParkFlag::NotPark,
             PARKED_ON_DRIVER => park_flag,
-            n => panic!("inconsistent park_timeout state: {}", n),
+            n => panic!("inconsistent park_timeout state: {n}"),
         }
     }
 
@@ -131,7 +131,7 @@ impl Inner {
                 self.state.swap(IDLE, SeqCst);
                 return;
             }
-            Err(actual) => panic!("inconsistent park state; actual = {}", actual),
+            Err(actual) => panic!("inconsistent park state; actual = {actual}"),
         }
 
         loop {
@@ -161,7 +161,7 @@ impl Inner {
                 self.state.swap(IDLE, SeqCst);
                 return;
             }
-            Err(actual) => panic!("inconsistent park state; actual = {}", actual),
+            Err(actual) => panic!("inconsistent park state; actual = {actual}"),
         }
 
         loop {
@@ -193,7 +193,7 @@ impl Inner {
                 self.condvar.notify_one();
             }
             PARKED_ON_DRIVER => handle.wake(),
-            actual => panic!("inconsistent state in unpark; actual = {}", actual),
+            actual => panic!("inconsistent state in unpark; actual = {actual}"),
         }
     }
 

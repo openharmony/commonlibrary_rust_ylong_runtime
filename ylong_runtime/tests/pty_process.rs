@@ -11,7 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![cfg(all(unix, feature = "process"))]
+#![cfg(all(target_os = "linux", feature = "process"))]
 
 use std::ffi::OsStr;
 use std::os::fd::{AsFd, AsRawFd, OwnedFd};

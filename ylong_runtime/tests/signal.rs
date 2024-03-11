@@ -13,7 +13,7 @@
 
 #![cfg(feature = "signal")]
 
-#[cfg(target_os = "linux")]
+#[cfg(unix)]
 mod linux_test {
     use std::sync::atomic::AtomicUsize;
     use std::sync::atomic::Ordering::{Acquire, Release};

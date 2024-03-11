@@ -15,11 +15,11 @@ use std::io;
 
 use crate::{Interest, Selector, Token};
 
-/// Source::as_raw_fd() return
-#[cfg(target_os = "linux")]
+/// Fd type on Linux
+#[cfg(unix)]
 pub type Fd = i32;
 
-/// Source::as_raw_fd() return
+/// RawSocket on Windows
 #[cfg(target_os = "windows")]
 pub type Fd = std::os::windows::io::RawSocket;
 

@@ -36,7 +36,7 @@ type Action = libc::sighandler_t;
 type Action = libc::sigaction;
 
 #[cfg(not(windows))]
-use crate::linux::sig_handler;
+use crate::unix::sig_handler;
 #[cfg(windows)]
 use crate::windows::sig_handler;
 

@@ -23,7 +23,7 @@ pub mod sys;
 #[cfg(feature = "udp")]
 pub use sys::{ConnectedUdpSocket, UdpSocket};
 pub use sys::{Event, EventTrait, Events, Selector};
-#[cfg(target_os = "linux")]
+#[cfg(unix)]
 pub use sys::{SocketAddr, UnixDatagram, UnixListener, UnixStream};
 #[cfg(feature = "tcp")]
 pub use sys::{TcpListener, TcpStream};

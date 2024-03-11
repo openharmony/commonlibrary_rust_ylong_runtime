@@ -16,12 +16,12 @@ use std::mem::{size_of, MaybeUninit};
 use std::net::{self, SocketAddr};
 use std::os::unix::io::{AsRawFd, FromRawFd};
 
-use libc::{
-    c_int, sockaddr_in, sockaddr_in6, sockaddr_storage, socklen_t, SOCK_CLOEXEC, SOCK_NONBLOCK,
-};
+use libc::{c_int, sockaddr_in, sockaddr_in6, sockaddr_storage, socklen_t};
 
 use super::{TcpSocket, TcpStream};
 use crate::source::Fd;
+#[cfg(target_os = "macos")]
+use crate::sys::socket::set_non_block;
 use crate::{Interest, Selector, Source, Token};
 
 /// A socket server.
@@ -53,16 +53,30 @@ impl TcpListener {
         let mut addr: MaybeUninit<sockaddr_storage> = MaybeUninit::uninit();
         let mut length = size_of::<sockaddr_storage>() as socklen_t;
 
+        #[cfg(target_os = "linux")]
         let stream = match syscall!(accept4(
             self.inner.as_raw_fd(),
             addr.as_mut_ptr() as *mut _,
             &mut length,
-            SOCK_CLOEXEC | SOCK_NONBLOCK,
+            libc::SOCK_CLOEXEC | libc::SOCK_NONBLOCK,
         )) {
             Ok(socket) => unsafe { net::TcpStream::from_raw_fd(socket) },
             Err(err) => {
                 return Err(err);
             }
+        };
+
+        #[cfg(target_os = "macos")]
+        let stream = match syscall!(accept(
+            self.inner.as_raw_fd(),
+            addr.as_mut_ptr() as *mut _,
+            &mut length
+        )) {
+            Ok(socket) => {
+                set_non_block(socket)?;
+                unsafe { net::TcpStream::from_raw_fd(socket) }
+            }
+            Err(e) => return Err(e),
         };
 
         let ret = unsafe { trans_addr_2_socket(addr.as_ptr()) };

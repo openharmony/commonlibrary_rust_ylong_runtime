@@ -24,7 +24,7 @@ cfg_net! {
     use crate::net::IoDriver;
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(target_family = "unix")]
 cfg_signal! {
     use crate::signal::unix::SignalDriver;
 }
@@ -39,7 +39,7 @@ pub(crate) enum ParkFlag {
 pub(crate) struct Driver {
     #[cfg(feature = "net")]
     io: IoDriver,
-    #[cfg(all(feature = "signal", target_os = "linux"))]
+    #[cfg(all(feature = "signal", target_family = "unix"))]
     signal: SignalDriver,
     #[cfg(feature = "time")]
     time: Arc<TimeDriver>,
@@ -57,12 +57,12 @@ impl Driver {
             #[cfg(feature = "time")]
             time: time_handle,
         };
-        #[cfg(all(feature = "signal", target_os = "linux"))]
+        #[cfg(all(feature = "signal", target_family = "unix"))]
         let signal_driver = SignalDriver::initialize(&handle);
         let driver = Driver {
             #[cfg(feature = "net")]
             io: io_driver,
-            #[cfg(all(feature = "signal", target_os = "linux"))]
+            #[cfg(all(feature = "signal", target_family = "unix"))]
             signal: signal_driver,
             #[cfg(feature = "time")]
             time: time_driver,
@@ -76,11 +76,11 @@ impl Driver {
         let _duration = self.time.run();
         #[cfg(feature = "net")]
         self.io.drive(_duration).expect("io driver running failed");
-        #[cfg(all(feature = "signal", target_os = "linux"))]
+        #[cfg(all(feature = "signal", target_family = "unix"))]
         if self.io.process_signal() {
             self.signal.broadcast();
         }
-        #[cfg(all(unix, feature = "process"))]
+        #[cfg(all(target_os = "linux", feature = "process"))]
         crate::process::GlobalZombieChild::get_instance().release_zombie();
         if cfg!(feature = "net") {
             ParkFlag::NotPark
@@ -100,11 +100,11 @@ impl Driver {
         self.io
             .drive(Some(Duration::from_millis(0)))
             .expect("io driver running failed");
-        #[cfg(all(feature = "signal", target_os = "linux"))]
+        #[cfg(all(feature = "signal", target_family = "unix"))]
         if self.io.process_signal() {
             self.signal.broadcast();
         }
-        #[cfg(all(unix, feature = "process"))]
+        #[cfg(all(target_os = "linux", feature = "process"))]
         crate::process::GlobalZombieChild::get_instance().release_zombie();
     }
 }

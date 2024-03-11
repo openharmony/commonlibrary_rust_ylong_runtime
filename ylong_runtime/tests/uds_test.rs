@@ -11,7 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![cfg(all(target_os = "linux", feature = "net"))]
+#![cfg(all(target_family = "unix", feature = "net"))]
 
 use ylong_runtime::io::{AsyncReadExt, AsyncWriteExt};
 use ylong_runtime::net::{UnixDatagram, UnixListener, UnixStream};

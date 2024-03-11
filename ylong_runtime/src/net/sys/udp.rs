@@ -1547,8 +1547,8 @@ mod tests {
             let interface = 0_u32;
             let mut multi_addr = None;
 
-            for i in 0..0xFFFF {
-                let addr = Ipv6Addr::new(0xFF02, 0, 0, 0, 0, 0, 0, i);
+            for i in 10..0xFFFF {
+                let addr = Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, i);
                 if sender.join_multicast_v6(&addr, interface).is_ok() {
                     multi_addr = Some(addr);
                     break;

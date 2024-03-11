@@ -13,9 +13,9 @@
 
 //! Asynchronous signal handling.
 
-#[cfg(target_os = "linux")]
+#[cfg(unix)]
 pub mod unix;
-#[cfg(target_os = "linux")]
+#[cfg(unix)]
 pub use unix::{signal, SignalKind};
 
 #[cfg(target_os = "windows")]

@@ -116,7 +116,7 @@ impl Parker {
                 self.state.swap(IDLE, AcqRel);
                 return (false, false);
             }
-            Err(actual) => panic!("inconsistent park state; actual = {}", actual),
+            Err(actual) => panic!("inconsistent park state; actual = {actual}"),
         }
 
         let park = match driver.run() {
@@ -129,7 +129,7 @@ impl Parker {
             NOTIFIED => (false, false),
             NOTIFIED_BLOCK => (false, true),
             PARKED_ON_DRIVER => (park, false),
-            n => panic!("inconsistent park_timeout state: {}", n),
+            n => panic!("inconsistent park_timeout state: {n}"),
         }
     }
 
@@ -148,7 +148,7 @@ impl Parker {
                 self.state.swap(IDLE, AcqRel);
                 return false;
             }
-            Err(actual) => panic!("inconsistent park state; actual = {}", actual),
+            Err(actual) => panic!("inconsistent park state; actual = {actual}"),
         }
 
         while !*lock {
@@ -159,7 +159,7 @@ impl Parker {
         match self.state.swap(IDLE, AcqRel) {
             NOTIFIED => false,
             NOTIFIED_BLOCK => true,
-            n => panic!("inconsistent park_timeout state: {}", n),
+            n => panic!("inconsistent park_timeout state: {n}"),
         }
     }
 
@@ -174,7 +174,7 @@ impl Parker {
                     self.condvar.notify_one();
                 }
                 PARKED_ON_DRIVER => self.handle.wake(),
-                actual => panic!("inconsistent state in unpark; actual = {}", actual),
+                actual => panic!("inconsistent state in unpark; actual = {actual}"),
             }
         } else {
             match self.state.swap(NOTIFIED, AcqRel) {
@@ -187,7 +187,7 @@ impl Parker {
                     self.condvar.notify_one();
                 }
                 PARKED_ON_DRIVER => self.handle.wake(),
-                actual => panic!("inconsistent state in unpark; actual = {}", actual),
+                actual => panic!("inconsistent state in unpark; actual = {actual}"),
             }
         }
     }

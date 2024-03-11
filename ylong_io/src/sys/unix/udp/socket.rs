@@ -15,9 +15,10 @@ use std::net::SocketAddr;
 use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 use std::{io, mem, net};
 
-use libc::{c_int, AF_INET, AF_INET6, SOCK_CLOEXEC, SOCK_DGRAM, SOCK_NONBLOCK};
+use libc::{c_int, AF_INET, AF_INET6, SOCK_DGRAM};
 
 use super::super::socket_addr::socket_addr_trans;
+use crate::sys::socket::socket_new;
 use crate::UdpSocket;
 
 pub(crate) struct UdpSock {
@@ -34,13 +35,10 @@ impl UdpSock {
     }
 
     pub(crate) fn create_socket(domain: c_int, socket_type: c_int) -> io::Result<UdpSock> {
-        let socket_type = socket_type | SOCK_NONBLOCK | SOCK_CLOEXEC;
-        match syscall!(socket(domain, socket_type, 0)) {
-            Ok(socket) => Ok(UdpSock {
-                socket: socket as c_int,
-            }),
-            Err(err) => Err(err),
-        }
+        let socket = socket_new(domain, socket_type)?;
+        Ok(UdpSock {
+            socket: socket as c_int,
+        })
     }
 
     pub(crate) fn bind(self, addr: SocketAddr) -> io::Result<UdpSocket> {

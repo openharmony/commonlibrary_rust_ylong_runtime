@@ -17,14 +17,14 @@
 
 use std::os::raw::c_long;
 
-#[cfg(target_os = "linux")]
-pub mod linux;
+#[cfg(target_family = "unix")]
+pub mod unix;
 
 #[cfg(target_os = "windows")]
 pub mod windows;
 
-#[cfg(target_os = "linux")]
-use crate::util::num_cpus::linux::get_cpu_num_online;
+#[cfg(target_family = "unix")]
+use crate::util::num_cpus::unix::get_cpu_num_online;
 #[cfg(target_os = "windows")]
 use crate::util::num_cpus::windows::get_cpu_num_online;
 

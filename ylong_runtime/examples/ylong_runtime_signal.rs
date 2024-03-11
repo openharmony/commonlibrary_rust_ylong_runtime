@@ -34,7 +34,7 @@ fn print_time(duration: Duration) {
     println!("duration : {:?}", formatted_time);
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(target_family = "unix")]
 fn run_multi_thread_signal() {
     let num = Arc::new(AtomicUsize::new(0));
     let mut handles = Vec::new();

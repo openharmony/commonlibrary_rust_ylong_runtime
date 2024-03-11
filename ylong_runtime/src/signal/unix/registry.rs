@@ -22,6 +22,7 @@ use std::sync::Once;
 use ylong_io::UnixStream;
 use ylong_signal::register_signal_action;
 
+use crate::signal::SignalKind;
 use crate::sync::watch::{channel, Receiver, Sender};
 
 pub(crate) struct Event {
@@ -85,7 +86,9 @@ impl Default for Registry {
     fn default() -> Self {
         Self {
             stream: SignalStream::default(),
-            events: (0..=libc::SIGRTMAX()).map(|_| Event::default()).collect(),
+            events: (0..=SignalKind::get_max())
+                .map(|_| Event::default())
+                .collect(),
         }
     }
 }

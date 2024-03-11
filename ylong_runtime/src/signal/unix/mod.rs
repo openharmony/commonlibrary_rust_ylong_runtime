@@ -32,6 +32,14 @@ use crate::sync::watch::Receiver;
 pub struct SignalKind(c_int);
 
 impl SignalKind {
+    pub(crate) fn get_max() -> i32 {
+        #[cfg(target_os = "linux")]
+        let max = libc::SIGRTMAX();
+        #[cfg(not(target_os = "linux"))]
+        let max = 33;
+        max
+    }
+
     /// Generates [`SignalKind`] from valid numeric value.
     ///
     /// # Examples
@@ -321,7 +329,7 @@ impl SignalKind {
     /// }
     /// ```
     pub fn is_forbidden(&self) -> bool {
-        if self.0 < 0 || self.0 > libc::SIGRTMAX() {
+        if self.0 < 0 || self.0 > SignalKind::get_max() {
             return true;
         }
         SIGNAL_BLOCK_LIST.contains(&self.0)
