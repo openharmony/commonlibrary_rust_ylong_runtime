@@ -26,10 +26,15 @@ use crate::executor::driver::{Driver, Handle, ParkFlag};
 use crate::executor::Schedule;
 use crate::task::{JoinHandle, Task, TaskBuilder, VirtualTableType};
 
+// Idle state
 const IDLE: usize = 0;
+// Suspended on condvar
 const PARKED_ON_CONDVAR: usize = 1;
+// Suspended on driver
 const PARKED_ON_DRIVER: usize = 2;
+// notified by the spawned task
 const NOTIFIED: usize = 3;
+// notified by the blocked task
 const NOTIFIED_BLOCK: usize = 4;
 
 pub(crate) struct CurrentThreadSpawner {
@@ -108,13 +113,14 @@ impl Parker {
             .compare_exchange(IDLE, PARKED_ON_DRIVER, AcqRel, Acquire)
         {
             Ok(_) => {}
-            Err(NOTIFIED_BLOCK) => {
-                self.state.swap(IDLE, AcqRel);
-                return (false, true);
-            }
-            Err(NOTIFIED) => {
-                self.state.swap(IDLE, AcqRel);
-                return (false, false);
+            Err(NOTIFIED_BLOCK) | Err(NOTIFIED) => {
+                return match self.state.swap(IDLE, AcqRel) {
+                    // No need to park on condvar, need to awaken the blocked task.
+                    NOTIFIED_BLOCK => (false, true),
+                    // No need to park on condvar, no need to awaken the blocked task.
+                    NOTIFIED => (false, false),
+                    actual => panic!("invalid park state when notifying; actual = {actual}"),
+                };
             }
             Err(actual) => panic!("inconsistent park state; actual = {actual}"),
         }
@@ -140,13 +146,14 @@ impl Parker {
             .compare_exchange(IDLE, PARKED_ON_CONDVAR, AcqRel, Acquire)
         {
             Ok(_) => {}
-            Err(NOTIFIED_BLOCK) => {
-                self.state.swap(IDLE, AcqRel);
-                return true;
-            }
-            Err(NOTIFIED) => {
-                self.state.swap(IDLE, AcqRel);
-                return false;
+            Err(NOTIFIED_BLOCK) | Err(NOTIFIED) => {
+                return match self.state.swap(IDLE, AcqRel) {
+                    // Need to awaken the blocked task.
+                    NOTIFIED_BLOCK => true,
+                    // No need to awaken the blocked task.
+                    NOTIFIED => false,
+                    actual => panic!("invalid park state when notifying; actual = {actual}"),
+                };
             }
             Err(actual) => panic!("inconsistent park state; actual = {actual}"),
         }
