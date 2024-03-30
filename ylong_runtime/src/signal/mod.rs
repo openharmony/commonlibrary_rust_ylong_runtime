@@ -120,11 +120,12 @@ impl Signal {
     /// On Windows system
     ///
     /// ```no run
+    /// use ylong_runtime::futures::poll_fn;
     /// use ylong_runtime::signal::{signal, SignalKind};
     /// async fn io_func() {
     ///     let handle = ylong_runtime::spawn(async move {
     ///         let mut signal = signal(SignalKind::ctrl_c()).unwrap();
-    ///         signal.recv().await;
+    ///         poll_fn(|cx| signal.poll_recv(cx)).await;
     ///     });
     ///     let _ = ylong_runtime::block_on(handle);
     /// }
@@ -133,11 +134,12 @@ impl Signal {
     /// On Unix system
     ///
     /// ```no run
+    /// use ylong_runtime::futures::poll_fn;
     /// use ylong_runtime::signal::{signal, SignalKind};
     /// async fn io_func() {
     ///     let handle = ylong_runtime::spawn(async move {
     ///         let mut signal = signal(SignalKind::child()).unwrap();
-    ///         signal.recv().await;
+    ///         poll_fn(|cx| signal.poll_recv(cx)).await;
     ///     });
     ///     let _ = ylong_runtime::block_on(handle);
     /// }
