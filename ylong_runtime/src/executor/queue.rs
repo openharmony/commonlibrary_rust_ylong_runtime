@@ -12,7 +12,6 @@
 // limitations under the License.
 
 use std::cell::UnsafeCell;
-use std::collections::linked_list::LinkedList;
 use std::mem::MaybeUninit;
 #[cfg(feature = "metrics")]
 use std::sync::atomic::AtomicU64;
@@ -24,7 +23,8 @@ use std::{cmp, ptr};
 /// Schedule strategy implementation, includes FIFO LIFO priority and
 /// work-stealing work-stealing strategy include stealing half of every worker
 /// or the largest amount of worker
-use crate::task::Task;
+use crate::task::{Header, Task};
+use crate::util::linked_list::LinkedList;
 
 unsafe fn non_atomic_load(data: &AtomicU16) -> u16 {
     ptr::read(data as *const AtomicU16 as *const u16)
@@ -409,7 +409,11 @@ impl InnerBuffer {
 
 impl Drop for InnerBuffer {
     fn drop(&mut self) {
-        while self.pop_front().is_some() {}
+        let mut head = self.pop_front();
+        while let Some(task) = head {
+            task.shutdown();
+            head = self.pop_front();
+        }
     }
 }
 
@@ -419,7 +423,17 @@ pub(crate) struct GlobalQueue {
     /// The total number of tasks which has entered global queue.
     #[cfg(feature = "metrics")]
     count: AtomicU64,
-    globals: Mutex<LinkedList<Task>>,
+    globals: Mutex<LinkedList<Header>>,
+}
+
+impl Drop for GlobalQueue {
+    fn drop(&mut self) {
+        while !self.is_empty() {
+            // we just check the queue is not empty
+            let task = self.pop_front().unwrap();
+            task.shutdown();
+        }
+    }
 }
 
 impl GlobalQueue {
@@ -440,9 +454,9 @@ impl GlobalQueue {
         let len = tasks.len() + 1;
         for task_ptr in tasks {
             let task = unsafe { ptr::read(task_ptr.get()).assume_init() };
-            list.push_back(task);
+            list.push_front(task.into_header());
         }
-        list.push_back(task);
+        list.push_front(task.into_header());
         self.len.fetch_add(len, AcqRel);
         #[cfg(feature = "metrics")]
         self.count.fetch_add(len as u64, AcqRel);
@@ -463,16 +477,16 @@ impl GlobalQueue {
         let mut curr = rear;
 
         let mut list = self.globals.lock().unwrap();
-        let first_task = list.pop_front()?;
+        let first_task = unsafe { Task::from_raw(list.pop_back()?) };
 
         let mut count = 1;
 
         for _ in 1..num {
-            if let Some(task) = list.pop_front() {
+            if let Some(task) = list.pop_back() {
                 let idx = (curr & MASK) as usize;
                 let ptr = inner_buf.buffer[idx].get();
                 unsafe {
-                    ptr::write((*ptr).as_mut_ptr(), task);
+                    ptr::write((*ptr).as_mut_ptr(), Task::from_raw(task));
                 }
                 curr = curr.wrapping_add(1);
                 count += 1;
@@ -498,25 +512,24 @@ impl GlobalQueue {
             return None;
         }
         let mut list = self.globals.lock().unwrap();
-        let task = list.pop_front();
-        drop(list);
+        let task = list
+            .pop_back()
+            .map(|header| unsafe { Task::from_raw(header) });
         if task.is_some() {
             self.len.fetch_sub(1, AcqRel);
         }
+        drop(list);
         task
     }
 
     pub(super) fn push_back(&self, task: Task) {
         let mut list = self.globals.lock().unwrap();
-        list.push_back(task);
-        drop(list);
+        let header = task.into_header();
+        list.push_front(header);
         self.len.fetch_add(1, AcqRel);
+        drop(list);
         #[cfg(feature = "metrics")]
         self.count.fetch_add(1, AcqRel);
-    }
-
-    pub(super) fn get_global(&self) -> &Mutex<LinkedList<Task>> {
-        &self.globals
     }
 
     #[cfg(feature = "metrics")]
@@ -530,9 +543,8 @@ impl GlobalQueue {
     }
 }
 
-#[cfg(feature = "multi_instance_runtime")]
 #[cfg(test)]
-mod test {
+pub(crate) mod test {
     use std::future::Future;
     use std::pin::Pin;
     use std::sync::atomic::Ordering::Acquire;
@@ -597,20 +609,27 @@ mod test {
         create_new().await
     }
 
-    #[test]
-    fn ut_inner_buffer() {
-        ut_inner_buffer_new();
-        ut_inner_buffer_len();
-        ut_inner_buffer_is_empty();
-        ut_inner_buffer_push_back();
-        ut_inner_buffer_pop_front();
-        ut_inner_buffer_steal_into();
+    impl LocalQueue {
+        fn pop_front_and_release(&self) {
+            let task = self.pop_front();
+            if let Some(task) = task {
+                task.shutdown();
+            }
+        }
+
+        fn steal_into_and_release(&self, other: &LocalQueue) {
+            let task = self.steal_into(other);
+            if let Some(task) = task {
+                task.shutdown();
+            }
+        }
     }
 
     /// UT test cases for InnerBuffer::new()
     ///
     /// # Brief
     /// 1. Checking the parameters after initialization is completed
+    #[test]
     fn ut_inner_buffer_new() {
         let inner_buffer = InnerBuffer::new(LOCAL_QUEUE_CAP as u16);
         assert_eq!(inner_buffer.cap, LOCAL_QUEUE_CAP as u16);
@@ -629,7 +648,7 @@ mod test {
         S: Schedule,
     {
         let (task, handle) = Task::create_task(builder, scheduler, task, virtual_table_type);
-        task.0.drop_ref();
+        // task.0.drop_ref();
         (task, handle)
     }
 
@@ -641,6 +660,7 @@ mod test {
     /// 2. After entering a task into the queue space, determine again whether
     ///    it is empty or not, and it should be non-empty property value should
     ///    be related to the entry after the initialization is completed
+    #[test]
     fn ut_inner_buffer_is_empty() {
         let inner_buffer = InnerBuffer::new(LOCAL_QUEUE_CAP as u16);
         assert!(inner_buffer.is_empty());
@@ -673,6 +693,7 @@ mod test {
     ///    the local queue length as well as the global queue length value, no
     ///    exception branch, and the property value should be related to the
     ///    entry after the initialization is completed
+    #[test]
     fn ut_inner_buffer_len() {
         let inner_buffer = InnerBuffer::new(LOCAL_QUEUE_CAP as u16);
         assert_eq!(inner_buffer.len(), 0);
@@ -724,6 +745,7 @@ mod test {
     ///    that they are functionally correct there is an exception branch,
     ///    after the initialization is completed the property value should be
     ///    related to the entry
+    #[test]
     fn ut_inner_buffer_push_back() {
         // 1. Insert tasks up to capacity into the local queue, verifying that they are
         // functionally correct
@@ -810,6 +832,7 @@ mod test {
     ///    out more than the number of existing tasks, check whether the
     ///    function is correct should be related to the entry after the
     ///    initialization is completed
+    #[test]
     fn ut_inner_buffer_pop_front() {
         // 1. Multi-threaded take out task operation with empty local queue, check if
         // the function is correct
@@ -842,13 +865,13 @@ mod test {
 
         let thread_one = std::thread::spawn(move || {
             for _ in 0..LOCAL_QUEUE_CAP / 2 {
-                local_queue_clone_one.pop_front();
+                local_queue_clone_one.pop_front_and_release();
             }
         });
 
         let thread_two = std::thread::spawn(move || {
             for _ in 0..LOCAL_QUEUE_CAP / 2 {
-                local_queue_clone_two.pop_front();
+                local_queue_clone_two.pop_front_and_release();
             }
         });
 
@@ -880,13 +903,13 @@ mod test {
 
         let thread_one = std::thread::spawn(move || {
             for _ in 0..LOCAL_QUEUE_CAP {
-                local_queue_clone_one.pop_front();
+                local_queue_clone_one.pop_front_and_release();
             }
         });
 
         let thread_two = std::thread::spawn(move || {
             for _ in 0..LOCAL_QUEUE_CAP {
-                local_queue_clone_two.pop_front();
+                local_queue_clone_two.pop_front_and_release();
             }
         });
 
@@ -899,78 +922,36 @@ mod test {
     ///
     /// # Brief
     /// case execution
-    /// 1. In the single-threaded case, the local queue has more than half the
-    ///    number of tasks, steal from other local queues, the
-    /// number of steals is 0, check whether the function is completed
-    /// 2. In the single-threaded case, the number of tasks already in the local
+    /// 1. In the single-threaded case, the number of tasks already in the local
     ///    queue is not more than half, steal from other local queues, the
     ///    number of steals is 0, check whether the function is completed
-    /// 3. In the single-threaded case, the number of tasks already in the local
+    #[test]
+    fn ut_inner_buffer_steal_into_zero() {
+        let local_queue = LocalQueue::new();
+        let other_local_queue = LocalQueue::new();
+
+        assert!(other_local_queue.steal_into(&local_queue).is_none());
+    }
+
+    /// InnerBuffer::steal_into() UT test cases
+    ///
+    /// # Brief
+    /// case execution
+    /// 1. In the single-threaded case, the number of tasks already in the local
     ///    queue is not more than half, steal from other local queues, the
     ///    number of steals is not 0, check whether the function is completed
-    /// 4. Multi-threaded case, other queues are doing take out operations, but
-    ///    steal from this queue to see if the function is completed
-    /// 5. In the multi-threaded case, other queues are being stolen by
-    ///    non-local queues, steal from that stolen queue and see if the
-    ///    function is completed invalid value, and the property value should be
-    ///    related to the entry after the initialization is completed
-    fn ut_inner_buffer_steal_into() {
-        // 1. In the single-threaded case, the local queue has more than half the number
-        // of tasks, steal from other local queues, the number of steals is 0, check
-        // whether the function is completed
-        let local_queue = LocalQueue::new();
-        let other_local_queue = LocalQueue::new();
-        let global_queue = GlobalQueue::new();
-
+    #[test]
+    fn ut_inner_buffer_steal_into_less_than_half() {
         let builder = TaskBuilder::new();
-
         let (arc_handle, _) = Driver::initialize();
-        for _ in 0..LOCAL_QUEUE_CAP {
-            let exe_scheduler =
-                Arc::downgrade(&Arc::new(MultiThreadScheduler::new(1, arc_handle.clone())));
-            let (task, _) = create_task(
-                &builder,
-                exe_scheduler,
-                test_future(),
-                VirtualTableType::Ylong,
-            );
-            local_queue.push_back(task, &global_queue);
-        }
+        let multi_scheduler = Arc::new(MultiThreadScheduler::new(1, arc_handle));
 
-        let (arc_handle, _) = Driver::initialize();
-        for _ in 0..LOCAL_QUEUE_CAP {
-            let exe_scheduler =
-                Arc::downgrade(&Arc::new(MultiThreadScheduler::new(1, arc_handle.clone())));
-            let (task, _) = create_task(
-                &builder,
-                exe_scheduler,
-                test_future(),
-                VirtualTableType::Ylong,
-            );
-            other_local_queue.push_back(task, &global_queue);
-        }
-
-        assert!(other_local_queue.steal_into(&local_queue).is_none());
-
-        // 2. In the single-threaded case, the number of tasks already in the local
-        // queue is not more than half, steal from other local queues, the number of
-        // steals is 0, check whether the function is completed
-        let local_queue = LocalQueue::new();
-        let other_local_queue = LocalQueue::new();
-
-        assert!(other_local_queue.steal_into(&local_queue).is_none());
-
-        // 3. In the single-threaded case, the number of tasks already in the local
-        // queue is not more than half, steal from other local queues, the number of
-        // steals is not 0, check whether the function is completed
         let local_queue = LocalQueue::new();
         let other_local_queue = LocalQueue::new();
         let global_queue = GlobalQueue::new();
 
-        let (arc_handle, _) = Driver::initialize();
         for _ in 0..LOCAL_QUEUE_CAP {
-            let exe_scheduler =
-                Arc::downgrade(&Arc::new(MultiThreadScheduler::new(1, arc_handle.clone())));
+            let exe_scheduler = Arc::downgrade(&multi_scheduler);
             let (task, _) = create_task(
                 &builder,
                 exe_scheduler,
@@ -980,12 +961,24 @@ mod test {
             other_local_queue.push_back(task, &global_queue);
         }
 
-        assert!(other_local_queue.steal_into(&local_queue).is_some());
+        other_local_queue.steal_into_and_release(&local_queue);
+
         assert_eq!(other_local_queue.len(), (LOCAL_QUEUE_CAP / 2) as u16);
         assert_eq!(local_queue.len(), (LOCAL_QUEUE_CAP / 2 - 1) as u16);
+    }
 
-        // 4. Multi-threaded case, other queues are doing take out operations, but steal
-        // from this queue to see if the function is completed
+    /// InnerBuffer::steal_into() UT test cases
+    ///
+    /// # Brief
+    /// case execution
+    /// 1. Multi-threaded case, other queues are doing take out operations, but
+    ///    steal from this queue to see if the function is completed
+    #[test]
+    fn ut_inner_buffer_steal_into_multi_thread() {
+        let builder = TaskBuilder::new();
+        let (arc_handle, _) = Driver::initialize();
+        let multi_scheduler = Arc::new(MultiThreadScheduler::new(1, arc_handle));
+
         let local_queue = Arc::new(LocalQueue::new());
         let local_queue_clone = local_queue.clone();
 
@@ -994,11 +987,8 @@ mod test {
         let other_local_queue_clone_two = other_local_queue.clone();
 
         let global_queue = GlobalQueue::new();
-
-        let (arc_handle, _) = Driver::initialize();
         for _ in 0..LOCAL_QUEUE_CAP {
-            let exe_scheduler =
-                Arc::downgrade(&Arc::new(MultiThreadScheduler::new(1, arc_handle.clone())));
+            let exe_scheduler = Arc::downgrade(&multi_scheduler);
             let (task, _) = create_task(
                 &builder,
                 exe_scheduler,
@@ -1010,12 +1000,12 @@ mod test {
 
         let thread_one = std::thread::spawn(move || {
             for _ in 0..LOCAL_QUEUE_CAP / 2 {
-                other_local_queue_clone_one.pop_front();
+                other_local_queue_clone_one.pop_front_and_release();
             }
         });
 
         let thread_two = std::thread::spawn(move || {
-            other_local_queue_clone_two.steal_into(&local_queue_clone);
+            other_local_queue_clone_two.steal_into_and_release(&local_queue_clone);
         });
 
         thread_one.join().expect("failed");
@@ -1025,9 +1015,24 @@ mod test {
             other_local_queue.len() + local_queue.len() + 1,
             (LOCAL_QUEUE_CAP / 2) as u16
         );
+    }
 
-        // 5. In the multi-threaded case, other queues are being stolen by non-local
-        // queues, steal from that stolen queue and see if the function is completed
+    /// InnerBuffer::steal_into() UT test cases
+    ///
+    /// # Brief
+    /// case execution
+    /// 1. In the multi-threaded case, other queues are being stolen by
+    ///    non-local queues, steal from that stolen queue and see if the
+    ///    function is completed invalid value, and the property value should be
+    ///    related to the entry after the initialization is completed
+    #[test]
+    fn ut_inner_buffer_steal_into_multi_threaded_complex() {
+        let global_queue = GlobalQueue::new();
+
+        let builder = TaskBuilder::new();
+        let (arc_handle, _) = Driver::initialize();
+        let multi_scheduler = Arc::new(MultiThreadScheduler::new(1, arc_handle));
+
         let local_queue_one = Arc::new(LocalQueue::new());
         let local_queue_one_clone = local_queue_one.clone();
 
@@ -1038,10 +1043,8 @@ mod test {
         let other_local_queue_clone_one = other_local_queue.clone();
         let other_local_queue_clone_two = other_local_queue.clone();
 
-        let (arc_handle, _) = Driver::initialize();
         for _ in 0..LOCAL_QUEUE_CAP {
-            let exe_scheduler =
-                Arc::downgrade(&Arc::new(MultiThreadScheduler::new(1, arc_handle.clone())));
+            let exe_scheduler = Arc::downgrade(&multi_scheduler);
             let (task, _) = create_task(
                 &builder,
                 exe_scheduler,
@@ -1053,11 +1056,11 @@ mod test {
 
         let thread_one = std::thread::spawn(move || {
             park();
-            other_local_queue_clone_one.steal_into(&local_queue_one_clone);
+            other_local_queue_clone_one.steal_into_and_release(&local_queue_one_clone);
         });
 
         let thread_two = std::thread::spawn(move || {
-            other_local_queue_clone_two.steal_into(&local_queue_two_clone);
+            other_local_queue_clone_two.steal_into_and_release(&local_queue_two_clone);
         });
 
         thread_two.join().expect("failed");
@@ -1066,5 +1069,50 @@ mod test {
 
         assert_eq!(local_queue_two.len(), (LOCAL_QUEUE_CAP / 2 - 1) as u16);
         assert_eq!(local_queue_one.len(), (LOCAL_QUEUE_CAP / 4 - 1) as u16);
+    }
+
+    /// InnerBuffer::steal_into() UT test cases
+    ///
+    /// # Brief
+    /// case execution
+    /// 1. In the single-threaded case, the local queue has more than half the
+    ///    number of tasks, steal from other local queues, the number of steals
+    ///    is 0, check whether the function is completed
+    #[test]
+    fn ut_inner_buffer_steal_into_more_than_half() {
+        // 1. In the single-threaded case, the local queue has more than half the number
+        // of tasks, steal from other local queues, the number of steals is 0, check
+        // whether the function is completed
+        let local_queue = LocalQueue::new();
+        let other_local_queue = LocalQueue::new();
+        let global_queue = GlobalQueue::new();
+
+        let builder = TaskBuilder::new();
+        let (arc_handle, _) = Driver::initialize();
+        let multi_scheduler = Arc::new(MultiThreadScheduler::new(1, arc_handle));
+
+        for _ in 0..LOCAL_QUEUE_CAP {
+            let exe_scheduler = Arc::downgrade(&multi_scheduler);
+            let (task, _) = create_task(
+                &builder,
+                exe_scheduler,
+                test_future(),
+                VirtualTableType::Ylong,
+            );
+            local_queue.push_back(task, &global_queue);
+        }
+
+        for _ in 0..LOCAL_QUEUE_CAP {
+            let exe_scheduler = Arc::downgrade(&multi_scheduler);
+            let (task, _) = create_task(
+                &builder,
+                exe_scheduler,
+                test_future(),
+                VirtualTableType::Ylong,
+            );
+            other_local_queue.push_back(task, &global_queue);
+        }
+
+        assert!(other_local_queue.steal_into(&local_queue).is_none());
     }
 }

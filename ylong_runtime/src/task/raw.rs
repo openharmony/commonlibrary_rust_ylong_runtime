@@ -15,7 +15,7 @@ use std::cell::UnsafeCell;
 use std::future::Future;
 use std::mem;
 use std::pin::Pin;
-use std::ptr::NonNull;
+use std::ptr::{addr_of_mut, NonNull};
 use std::sync::Weak;
 use std::task::{Context, Poll, Waker};
 
@@ -24,6 +24,7 @@ use crate::executor::Schedule;
 use crate::task::state::TaskState;
 use crate::task::task_handle::TaskHandle;
 use crate::task::{TaskBuilder, VirtualTableType};
+use crate::util::linked_list::{Link, Node};
 
 cfg_ffrt! {
     use crate::ffrt::ffrt_task::FfrtTaskCtx;
@@ -49,10 +50,62 @@ pub(crate) struct TaskVirtualTable {
     pub(crate) cancel: unsafe fn(NonNull<Header>),
 }
 
+fn get_default_vtable() -> &'static TaskVirtualTable {
+    unsafe fn default_run(_task: NonNull<Header>) -> bool {
+        false
+    }
+    unsafe fn default_schedule(_task: NonNull<Header>, _fifo: bool) {}
+    unsafe fn default_get_result(_task: NonNull<Header>, _result: *mut ()) {}
+    unsafe fn default_drop_handle(_task: NonNull<Header>) {}
+    unsafe fn default_set_waker(
+        _task: NonNull<Header>,
+        _cur_state: usize,
+        _waker: *const (),
+    ) -> bool {
+        false
+    }
+    unsafe fn default_drop_ref(_task: NonNull<Header>) {}
+    unsafe fn default_release(_task: NonNull<Header>) {}
+    unsafe fn default_cancel(_task: NonNull<Header>) {}
+
+    &TaskVirtualTable {
+        run: default_run,
+        schedule: default_schedule,
+        get_result: default_get_result,
+        drop_join_handle: default_drop_handle,
+        drop_ref: default_drop_ref,
+        set_waker: default_set_waker,
+        release: default_release,
+        cancel: default_cancel,
+    }
+}
+
 #[repr(C)]
 pub(crate) struct Header {
     pub(crate) state: TaskState,
     pub(crate) vtable: &'static TaskVirtualTable,
+    // Node inside the global queue
+    node: Node<Header>,
+}
+
+impl Default for Header {
+    fn default() -> Self {
+        Self {
+            state: TaskState::new(),
+            vtable: get_default_vtable(),
+            node: Default::default(),
+        }
+    }
+}
+
+unsafe impl Link for Header {
+    unsafe fn node(mut ptr: NonNull<Self>) -> NonNull<Node<Self>>
+    where
+        Self: Sized,
+    {
+        let node_ptr = addr_of_mut!(ptr.as_mut().node);
+        NonNull::new_unchecked(node_ptr)
+    }
 }
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy)]
@@ -102,6 +155,7 @@ impl RawTask {
 
 #[cfg(not(feature = "ffrt"))]
 impl RawTask {
+    #[inline]
     pub(crate) fn form_raw(ptr: NonNull<Header>) -> RawTask {
         RawTask { ptr }
     }
@@ -402,6 +456,7 @@ where
         let header = Header {
             state: TaskState::new(),
             vtable,
+            node: Node::new(),
         };
         // Create task private info
         let inner = Inner::<T, S>::new(task, scheduler);

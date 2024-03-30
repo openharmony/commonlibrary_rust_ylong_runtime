@@ -46,7 +46,7 @@ pub(crate) struct MultiThreadScheduler {
     /// Used for idle and wakeup logic.
     sleeper: Sleeper,
     /// The global queue of the executor
-    global: GlobalQueue,
+    pub(crate) global: GlobalQueue,
     /// A set of all the local queues in the executor
     locals: Vec<LocalQueue>,
     pub(crate) handle: Arc<Handle>,
@@ -270,10 +270,6 @@ impl MultiThreadScheduler {
         self.sleeper.dec_searching_num();
 
         task_from_global
-    }
-
-    pub(crate) fn get_global(&self) -> &GlobalQueue {
-        &self.global
     }
 
     cfg_metrics!(
@@ -633,7 +629,6 @@ mod test {
         S: Schedule,
     {
         let (task, handle) = Task::create_task(builder, scheduler, task, virtual_table_type);
-        task.0.drop_ref();
         (task, handle)
     }
 
