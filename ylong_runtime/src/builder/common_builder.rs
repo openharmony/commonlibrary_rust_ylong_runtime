@@ -77,7 +77,7 @@ impl CommonBuilder {
     pub(crate) fn new() -> Self {
         CommonBuilder {
             worker_name: None,
-            is_affinity: true,
+            is_affinity: false,
             blocking_permanent_thread_num: BLOCKING_PERMANENT_THREAD_NUM,
             max_blocking_pool_size: Some(BLOCKING_MAX_THEAD_NUM),
             schedule_algo: ScheduleAlgo::FifoBound,

@@ -27,6 +27,7 @@ use super::worker::{get_current_ctx, run_worker, Worker};
 use super::{worker, Schedule};
 use crate::builder::multi_thread_builder::MultiThreadBuilder;
 use crate::builder::CallbackHook;
+use crate::executor::worker::WorkerContext;
 use crate::fastrand::fast_random;
 use crate::task::{JoinHandle, Task, TaskBuilder, VirtualTableType};
 #[cfg(not(target_os = "macos"))]
@@ -44,7 +45,7 @@ pub(crate) struct MultiThreadScheduler {
     /// Join Handles for all threads in the executor
     handles: RwLock<Vec<Parker>>,
     /// Used for idle and wakeup logic.
-    sleeper: Sleeper,
+    pub(crate) sleeper: Sleeper,
     /// The global queue of the executor
     pub(crate) global: GlobalQueue,
     /// A set of all the local queues in the executor
@@ -58,7 +59,7 @@ impl Schedule for MultiThreadScheduler {
     #[inline]
     fn schedule(&self, task: Task, lifo: bool) {
         if self.enqueue(task, lifo) {
-            self.wake_up_rand_one();
+            self.wake_up_rand_one(false);
         }
     }
 }
@@ -108,8 +109,25 @@ impl MultiThreadScheduler {
         self.sleeper.is_parked(worker_index)
     }
 
-    pub(crate) fn wake_up_rand_one(&self) {
-        if let Some(index) = self.sleeper.pop_worker() {
+    pub(crate) fn is_waked_by_last_search(&self, idx: usize) -> bool {
+        let mut search_list = self.sleeper.wake_by_search.lock().unwrap();
+        let is_waked_by_last_search = search_list[idx];
+        search_list[idx] = false;
+        if is_waked_by_last_search {
+            self.sleeper.inc_searching_num();
+            return true;
+        }
+        false
+    }
+
+    pub(crate) fn wake_up_rand_one_if_last_search(&self) {
+        if self.sleeper.dec_searching_num() {
+            self.wake_up_rand_one(true);
+        }
+    }
+
+    pub(crate) fn wake_up_rand_one(&self, last_search: bool) {
+        if let Some(index) = self.sleeper.pop_worker(last_search) {
             self.handles
                 .read()
                 .unwrap()
@@ -119,12 +137,23 @@ impl MultiThreadScheduler {
         }
     }
 
-    pub(crate) fn turn_to_sleep(&self, worker_index: usize) {
-        // If it's the last thread going to sleep, check if there are any tasks
-        // left. If yes, wakes up a thread.
-        if self.sleeper.push_worker(worker_index) && !self.has_no_work() {
-            self.wake_up_rand_one();
+    pub(crate) fn turn_to_sleep(&self, worker_inner: &mut worker::Inner, worker_index: usize) {
+        let is_last_search = if worker_inner.is_searching {
+            worker_inner.is_searching = false;
+            self.sleeper.dec_searching_num()
+        } else {
+            false
+        };
+        let is_last_active = self.sleeper.push_worker(worker_index);
+
+        if (is_last_search || is_last_active) && !self.has_no_work() {
+            self.wake_up_rand_one(true);
         }
+    }
+
+    #[inline]
+    pub(crate) fn turn_from_sleep(&self, worker_index: &usize) {
+        self.sleeper.pop_worker_by_id(worker_index);
     }
 
     pub(crate) fn create_local_queue(&self, index: usize) -> LocalQueue {
@@ -147,37 +176,43 @@ impl MultiThreadScheduler {
     }
 
     // The returned value indicates whether or not to wake up another worker
+    fn enqueue_under_ctx(&self, mut task: Task, worker_ctx: &WorkerContext, lifo: bool) -> bool {
+        // if the current context is another runtime, push it to the global queue
+        if !std::ptr::eq(&self.global, &worker_ctx.worker.scheduler.global) {
+            self.global.push_back(task);
+            return true;
+        }
+
+        if lifo {
+            let mut lifo_slot = worker_ctx.worker.lifo.borrow_mut();
+            let prev_task = lifo_slot.take();
+            if let Some(prev) = prev_task {
+                // there is some task in lifo slot, therefore we put the prev task
+                // into run queue, and put the current task into the lifo slot
+                *lifo_slot = Some(task);
+                task = prev;
+            } else {
+                // there is no task in lifo slot, return immediately
+                *lifo_slot = Some(task);
+                return false;
+            }
+        }
+
+        let local_run_queue = self.locals.get(worker_ctx.worker.index).unwrap();
+        local_run_queue.push_back(task, &self.global);
+        true
+    }
+
+    // The returned value indicates whether or not to wake up another worker
     // We need to wake another worker under these circumstances:
     // 1. The task has been inserted into the global queue
     // 2. The lifo slot is taken, we push the old task into the local queue
-    pub(crate) fn enqueue(&self, mut task: Task, lifo: bool) -> bool {
+    pub(crate) fn enqueue(&self, task: Task, lifo: bool) -> bool {
         let cur_worker = get_current_ctx();
 
-        // WorkerContext::Curr will never enter here.
+        // currently we are inside a runtime's context
         if let Some(worker_ctx) = cur_worker {
-            if !std::ptr::eq(&self.global, &worker_ctx.worker.scheduler.global) {
-                self.global.push_back(task);
-                return true;
-            }
-
-            if lifo {
-                let mut lifo_slot = worker_ctx.worker.lifo.borrow_mut();
-                let prev_task = lifo_slot.take();
-                if let Some(prev) = prev_task {
-                    // there is some task in lifo slot, therefore we put the prev task
-                    // into run queue, and put the current task into the lifo slot
-                    *lifo_slot = Some(task);
-                    task = prev;
-                } else {
-                    // there is no task in lifo slot, return immediately
-                    *lifo_slot = Some(task);
-                    return false;
-                }
-            }
-
-            let local_run_queue = self.locals.get(worker_ctx.worker.index).unwrap();
-            local_run_queue.push_back(task, &self.global);
-            return true;
+            return self.enqueue_under_ctx(task, worker_ctx, lifo);
         }
 
         // If the local queue of the current worker is full, push the task into the
@@ -186,90 +221,118 @@ impl MultiThreadScheduler {
         true
     }
 
-    pub(crate) fn dequeue(&self, index: usize, worker_inner: &mut worker::Inner) -> Option<Task> {
-        let local_run_queue = &worker_inner.run_queue;
+    // gets task from the global queue or the thread's own local queue
+    fn get_task_from_queues(&self, worker_inner: &mut worker::Inner) -> Option<Task> {
         let count = worker_inner.count;
+        let local_run_queue = &worker_inner.run_queue;
 
-        let task = {
-            // For every 61 times of execution, dequeue a task from the global queue first.
-            // Otherwise, dequeue a task from the local queue. However, if the local queue
-            // has no task, dequeue a task from the global queue instead.
-            if count % GLOBAL_POLL_INTERVAL as u32 == 0 {
-                let limit = local_run_queue.remaining() as usize;
-                // If the local queue is empty, multiple tasks are stolen from the global queue
-                // to the local queue. If the local queue has tasks, only dequeue one task from
-                // the global queue and run it.
-                let task = if limit == LOCAL_QUEUE_CAP {
+        // For every 61 times of execution, dequeue a task from the global queue first.
+        // Otherwise, dequeue a task from the local queue. However, if the local queue
+        // has no task, dequeue a task from the global queue instead.
+        if count % GLOBAL_POLL_INTERVAL as u32 == 0 {
+            let mut limit = local_run_queue.remaining() as usize;
+            // If the local queue is empty, multiple tasks are stolen from the global queue
+            // to the local queue. If the local queue has tasks, only dequeue one task from
+            // the global queue and run it.
+            if limit != LOCAL_QUEUE_CAP {
+                limit = 0;
+            }
+            let task = self
+                .global
+                .pop_batch(self.num_workers, local_run_queue, limit);
+            match task {
+                Some(task) => Some(task),
+                None => local_run_queue.pop_front(),
+            }
+        } else {
+            let local_task = local_run_queue.pop_front();
+            match local_task {
+                Some(task) => Some(task),
+                None => {
+                    let limit = local_run_queue.remaining() as usize;
                     self.global
                         .pop_batch(self.num_workers, local_run_queue, limit)
-                } else {
-                    self.global.pop_front()
-                };
-                match task {
-                    Some(task) => Some(task),
-                    None => local_run_queue.pop_front(),
-                }
-            } else {
-                let local_task = local_run_queue.pop_front();
-                match local_task {
-                    Some(task) => Some(task),
-                    None => {
-                        let limit = local_run_queue.remaining() as usize;
-                        if limit > 1 {
-                            self.global
-                                .pop_batch(self.num_workers, local_run_queue, limit)
-                        } else {
-                            self.global.pop_front()
-                        }
-                    }
                 }
             }
-        };
-
-        if task.is_some() {
-            return task;
         }
+    }
+
+    fn get_task_from_searching(&self, worker_inner: &mut worker::Inner) -> Option<Task> {
+        const STEAL_TIME: usize = 3;
 
         // There is no task in the local queue or the global queue, so we try to steal
         // tasks from another worker's local queue.
-        // The number of stealing worker should be less than half of the total worker
+        // The number of stealing workers should be less than half of the total worker
         // number.
-
-        if !self.sleeper.try_inc_searching_num() {
+        // Only increases the searching number only when the worker is not searching
+        if !worker_inner.is_searching && !self.sleeper.try_inc_searching_num() {
             return None;
         }
 
-        // start to searching.
+        worker_inner.is_searching = true;
+
+        let local_run_queue = &worker_inner.run_queue;
+        for i in 0..STEAL_TIME {
+            if let Some(task) = self.steal(local_run_queue) {
+                return Some(task);
+            }
+            if i < STEAL_TIME - 1 {
+                thread::sleep(Duration::from_micros(1));
+            }
+        }
+
+        None
+    }
+
+    pub(crate) fn dequeue(
+        &self,
+        worker_inner: &mut worker::Inner,
+        worker_ctx: &WorkerContext,
+    ) -> Option<Task> {
+        // dequeues from the global queue or the thread's own local queue
+        if let Some(task) = self.get_task_from_queues(worker_inner) {
+            return Some(task);
+        }
+
+        if let Ok(mut driver) = worker_inner.parker.get_driver().try_lock() {
+            driver.run_once();
+        }
+        worker_ctx.wake_yield();
+        if !worker_inner.run_queue.is_empty() {
+            return None;
+        }
+
+        self.get_task_from_searching(worker_inner)
+    }
+
+    fn steal(&self, destination: &LocalQueue) -> Option<Task> {
         let num = self.locals.len();
         let start = (fast_random() >> 56) as usize;
 
         for i in 0..num {
             let i = (start + i) % num;
             // skip the current worker's local queue
-            if i == index {
+            let target = self.locals.get(i).unwrap();
+
+            if std::ptr::eq(target, destination) {
                 continue;
             }
-            let target = self.locals.get(i).unwrap();
-            if let Some(task) = target.steal_into(local_run_queue) {
+
+            if let Some(task) = target.steal_into(destination) {
                 #[cfg(feature = "metrics")]
                 self.steal_times
                     .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
-                if self.sleeper.dec_searching_num() {
-                    self.wake_up_rand_one()
-                };
                 return Some(task);
             }
         }
-        // if there is no task to steal, we check global queue for one last time
-        let task_from_global = self.global.pop_front();
 
-        // end searching
-        // regardless of whether a task can be stolen from the global queue,
-        // wake_up_rand_one is not called.
-        self.sleeper.dec_searching_num();
-
-        task_from_global
+        // if there is no task to steal, we check global queue for tasks
+        self.global.pop_batch(
+            self.num_workers,
+            destination,
+            destination.remaining() as usize,
+        )
     }
 
     cfg_metrics!(
@@ -545,13 +608,14 @@ mod test {
     use std::sync::mpsc::channel;
     use std::sync::{Arc, Mutex};
     use std::task::{Context, Poll};
-    use std::thread::spawn;
+    use std::thread;
 
     use crate::builder::RuntimeBuilder;
     use crate::executor::async_pool::{get_cpu_core, AsyncPoolSpawner, MultiThreadScheduler};
     use crate::executor::driver::Driver;
     use crate::executor::parker::Parker;
-    use crate::executor::Schedule;
+    use crate::executor::queue::LocalQueue;
+    use crate::executor::{worker, Schedule};
     use crate::task::{JoinHandle, Task, TaskBuilder, VirtualTableType};
 
     pub struct TestFuture {
@@ -699,7 +763,7 @@ mod test {
 
         let mut parker = Parker::new(arc_driver);
         let parker_cpy = parker.clone();
-        let _ = spawn(move || {
+        let _ = thread::spawn(move || {
             parker.park();
             *flag_clone.lock().unwrap() = 1;
             tx.send(()).unwrap()
@@ -729,7 +793,7 @@ mod test {
         let mut parker = Parker::new(arc_driver);
         let parker_cpy = parker.clone();
 
-        let _ = spawn(move || {
+        let _ = thread::spawn(move || {
             parker.park();
             *flag_clone.lock().unwrap() = 1;
             tx.send(()).unwrap()
@@ -750,28 +814,33 @@ mod test {
     #[test]
     fn ut_executor_mng_info_wake_up_rand_one() {
         let (arc_handle, arc_driver) = Driver::initialize();
+        let mut parker = Parker::new(arc_driver);
         let executor_mng_info = MultiThreadScheduler::new(1, arc_handle);
-        executor_mng_info.turn_to_sleep(0);
+        let local_queue = LocalQueue {
+            inner: executor_mng_info.locals[0].inner.clone(),
+        };
+        let mut worker_inner = worker::Inner::new(local_queue, parker.clone());
+        worker_inner.is_searching = true;
+        executor_mng_info.sleeper.inc_searching_num();
+        executor_mng_info.turn_to_sleep(&mut worker_inner, 0);
 
         let flag = Arc::new(Mutex::new(0));
         let (tx, rx) = channel();
 
         let (flag_clone, tx) = (flag.clone(), tx);
-
-        let mut parker = Parker::new(arc_driver);
         let parker_cpy = parker.clone();
 
-        let _ = spawn(move || {
+        let _ = thread::spawn(move || {
             parker.park();
             *flag_clone.lock().unwrap() = 1;
             tx.send(()).unwrap()
         });
 
         executor_mng_info.handles.write().unwrap().push(parker_cpy);
-
-        executor_mng_info.wake_up_rand_one();
+        executor_mng_info.wake_up_rand_one(false);
         rx.recv().unwrap();
         assert_eq!(*flag.lock().unwrap(), 1);
+        assert_eq!(executor_mng_info.sleeper.pop_worker(false), None);
     }
 
     /// UT test cases for ExecutorMngInfo::wake_up_if_one_task_left()
@@ -782,19 +851,22 @@ mod test {
     #[test]
     fn ut_executor_mng_info_wake_up_if_one_task_left() {
         let (arc_handle, arc_driver) = Driver::initialize();
+        let mut parker = Parker::new(arc_driver);
         let executor_mng_info = MultiThreadScheduler::new(1, arc_handle.clone());
 
-        executor_mng_info.turn_to_sleep(0);
+        let local_queue = LocalQueue {
+            inner: executor_mng_info.locals[0].inner.clone(),
+        };
+        let mut worker_inner = worker::Inner::new(local_queue, parker.clone());
+        executor_mng_info.turn_to_sleep(&mut worker_inner, 0);
 
         let flag = Arc::new(Mutex::new(0));
         let (tx, rx) = channel();
 
         let (flag_clone, tx) = (flag.clone(), tx);
-
-        let mut parker = Parker::new(arc_driver);
         let parker_cpy = parker.clone();
 
-        let _ = spawn(move || {
+        let _ = thread::spawn(move || {
             parker.park();
             *flag_clone.lock().unwrap() = 1;
             tx.send(()).unwrap()
@@ -814,11 +886,12 @@ mod test {
         executor_mng_info.enqueue(task, true);
 
         if !executor_mng_info.has_no_work() {
-            executor_mng_info.wake_up_rand_one();
+            executor_mng_info.wake_up_rand_one(false);
         }
 
         rx.recv().unwrap();
         assert_eq!(*flag.lock().unwrap(), 1);
+        assert_eq!(executor_mng_info.sleeper.pop_worker(false), None);
     }
 
     /// UT test cases for ExecutorMngInfo::from_woken_to_sleep()
@@ -828,19 +901,26 @@ mod test {
     ///     to park state. If the last thread is in park state, check whether
     ///     there is a task, and if so, wake up this thread.
     #[test]
-    fn ut_from_woken_to_sleep() {
+    fn ut_executor_mng_info_from_woken_to_sleep() {
         let (arc_handle, arc_driver) = Driver::initialize();
         let executor_mng_info = MultiThreadScheduler::new(1, arc_handle.clone());
 
         let flag = Arc::new(Mutex::new(0));
         let (tx, rx) = channel();
-
         let (flag_clone, tx) = (flag.clone(), tx);
 
         let mut parker = Parker::new(arc_driver);
+
+        let local_queue = LocalQueue {
+            inner: executor_mng_info.locals[0].inner.clone(),
+        };
+        let mut worker_inner = worker::Inner::new(local_queue, parker.clone());
+        worker_inner.is_searching = true;
+        executor_mng_info.sleeper.inc_searching_num();
+
         let parker_cpy = parker.clone();
 
-        let _ = spawn(move || {
+        let _ = thread::spawn(move || {
             parker.park();
             *flag_clone.lock().unwrap() = 1;
             tx.send(()).unwrap()
@@ -858,9 +938,10 @@ mod test {
         );
 
         executor_mng_info.enqueue(task, true);
-        executor_mng_info.turn_to_sleep(0);
+        executor_mng_info.turn_to_sleep(&mut worker_inner, 0);
         rx.recv().unwrap();
         assert_eq!(*flag.lock().unwrap(), 1);
+        assert_eq!(executor_mng_info.sleeper.pop_worker(false), None);
     }
 
     /// UT test cases for AsyncPoolSpawner::new()

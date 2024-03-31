@@ -18,7 +18,6 @@ use std::task::{Context, Poll};
 
 cfg_not_ffrt!(
     use crate::executor::worker;
-    use crate::executor::worker::WorkerContext;
 );
 
 /// Yields the current task and wakes it for a reschedule.
@@ -73,17 +72,6 @@ impl Future for YieldTask {
         } else {
             Poll::Ready(())
         }
-    }
-}
-
-#[cfg(not(feature = "ffrt"))]
-pub(crate) fn wake_yielded_tasks(worker_ctx: &WorkerContext) {
-    let mut yielded = worker_ctx.worker.yielded.borrow_mut();
-    if yielded.is_empty() {
-        return;
-    }
-    for waker in yielded.drain(..) {
-        waker.wake();
     }
 }
 

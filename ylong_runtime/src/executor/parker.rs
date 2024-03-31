@@ -49,7 +49,7 @@ impl Parker {
     }
 
     pub(crate) fn park(&mut self) {
-        self.inner.park();
+        self.inner.park()
     }
 
     pub(crate) fn unpark(&self, handle: Arc<Handle>) {
@@ -76,7 +76,7 @@ impl Inner {
         for _ in 0..3 {
             if self
                 .state
-                .compare_exchange_weak(NOTIFIED, IDLE, SeqCst, SeqCst)
+                .compare_exchange(NOTIFIED, IDLE, SeqCst, SeqCst)
                 .is_ok()
             {
                 return;
