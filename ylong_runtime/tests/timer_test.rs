@@ -18,7 +18,7 @@ use std::time::{Duration, Instant};
 use ylong_runtime::time::{sleep, sleep_until};
 
 async fn download() {
-    const TOTAL_SIZE: usize = 100 * 1024;
+    const TOTAL_SIZE: usize = 10 * 1024;
     const RECV_SIZE: usize = 1024;
 
     let mut left = TOTAL_SIZE;
