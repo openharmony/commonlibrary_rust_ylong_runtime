@@ -167,14 +167,15 @@ unsafe impl Sync for CancelHandle {}
 
 #[cfg(all(test, feature = "time"))]
 mod test {
-    /// UT test cases for `is_finished` in `JoinHandle``.
+    use std::time::Duration;
+
+    /// UT test cases for `is_finished` in `JoinHandle`.
     ///
     /// # Brief
     /// 1. create two JoinHandle
     /// 2. check the correctness of the JoinHandle for completion
     #[test]
     fn ut_test_join_handle_is_finished() {
-        use std::time::Duration;
         let handle1 = crate::spawn(async { 1 });
 
         let handle2 = crate::spawn(async {
@@ -188,5 +189,21 @@ mod test {
         assert!(handle1.is_finished());
         assert!(!handle2.is_finished());
         handle2.cancel();
+    }
+
+    /// UT test cases for `CancelHandle`.
+    ///
+    /// # Brief
+    /// 1. create a CancelHandle with JoinHandle
+    /// 2. check the correctness of the JoinHandle for completion
+    #[test]
+    fn ut_test_cancel_handle() {
+        let handle = crate::spawn(async { 1 });
+        let cancel = handle.get_cancel_handle();
+        while !cancel.is_finished() {
+            std::hint::spin_loop();
+        }
+        handle.cancel();
+        assert!(handle.is_finished());
     }
 }

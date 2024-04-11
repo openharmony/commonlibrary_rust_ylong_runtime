@@ -281,3 +281,29 @@ impl<R: AsyncRead + AsyncWrite> AsyncWrite for AsyncBufReader<R> {
         unsafe { Pin::new_unchecked(&mut this.inner).poll_shutdown(cx) }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use crate::io::AsyncBufReader;
+
+    /// UT test cases for `AsyncBufReader`.
+    ///
+    /// # Brief
+    /// 1. create a `AsyncBufReader`.
+    /// 2. check pos and filled.
+    /// 3. set pos and filled.
+    /// 4. call `discard_buffer()` function.
+    /// 5. check pos and filled.
+    #[test]
+    fn ut_test_stdio_basic() {
+        let stdin = crate::io::stdin();
+        let mut buf = AsyncBufReader::new(stdin);
+        assert_eq!(buf.pos, 0);
+        assert_eq!(buf.filled, 0);
+        buf.pos = 1;
+        buf.filled = 1;
+        buf.discard_buffer();
+        assert_eq!(buf.pos, 0);
+        assert_eq!(buf.filled, 0);
+    }
+}

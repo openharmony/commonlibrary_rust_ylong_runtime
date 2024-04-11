@@ -538,7 +538,7 @@ impl AsyncPoolSpawner {
 }
 
 #[cfg(test)]
-mod test {
+pub(crate) mod test {
     use std::future::Future;
     use std::pin::Pin;
     use std::sync::atomic::Ordering::{Acquire, Release};

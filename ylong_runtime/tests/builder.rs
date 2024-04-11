@@ -12,7 +12,7 @@
 // limitations under the License.
 
 #[cfg(feature = "multi_instance_runtime")]
-mod test {
+mod multi_test {
     use std::sync::{Arc, Mutex};
 
     use ylong_runtime::builder::RuntimeBuilder;
@@ -78,6 +78,30 @@ mod test {
         drop(runtime);
         let a = x.lock().unwrap();
         assert_eq!(*a, 1);
+    }
+}
+
+#[cfg(feature = "current_thread_runtime")]
+mod current_test {
+    use ylong_runtime::builder::RuntimeBuilder;
+
+    /// SDV test cases for `new_current_thread()`.
+    ///
+    /// # Brief
+    /// 1. Create Runtime.
+    /// 2. Spawn a new task and block_on it.
+    /// 3. Check result is correct.
+    /// 4. Block_on a task and check result.
+    #[test]
+    fn sdv_set_builder_after_start() {
+        let runtime = RuntimeBuilder::new_current_thread().build().unwrap();
+
+        let handle = runtime.spawn(async { 1 });
+        let result = runtime.block_on(handle).unwrap();
+        assert_eq!(result, 1);
+
+        let result = runtime.block_on(async { 1 });
+        assert_eq!(result, 1);
     }
 }
 

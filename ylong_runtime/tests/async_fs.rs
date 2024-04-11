@@ -27,8 +27,9 @@ use ylong_runtime::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 /// 3. Start another task to read and write the same data as you read.
 #[test]
 fn sdv_async_fs_write() {
+    let file_path = "tmp_file1";
     let handle = ylong_runtime::spawn(async move {
-        let mut file = File::create("tmp_file").await.unwrap();
+        let mut file = File::create(file_path).await.unwrap();
         let buf = "hello".as_bytes().to_vec();
         let res = file.write(&buf).await.unwrap();
         assert_eq!(res, 5);
@@ -37,14 +38,14 @@ fn sdv_async_fs_write() {
     ylong_runtime::block_on(handle).unwrap();
 
     let handle1 = ylong_runtime::spawn(async move {
-        let mut file = File::open("tmp_file").await.unwrap();
+        let mut file = File::open(file_path).await.unwrap();
         let mut buf = [0; 5];
         let res = file.read(&mut buf).await.unwrap();
         assert_eq!(res, 5);
         assert_eq!(&buf, "hello".as_bytes());
     });
     ylong_runtime::block_on(handle1).unwrap();
-    fs::remove_file("tmp_file").unwrap();
+    fs::remove_file(file_path).unwrap();
 }
 
 /// SDV test cases for asynchronous file reading
@@ -55,14 +56,15 @@ fn sdv_async_fs_write() {
 /// 3. Start two tasks to read, write and read the same data.
 #[test]
 fn sdv_async_fs_read() {
+    let file_path = "tmp_file2";
     let handle = ylong_runtime::spawn(async move {
-        let mut file = File::create("tmp_file2").await.unwrap();
+        let mut file = File::create(file_path).await.unwrap();
         let buf = vec![1, 2, 3, 4, 5];
         let res = file.write(&buf).await.unwrap();
         assert_eq!(res, 5);
         file.sync_all().await.unwrap();
 
-        let mut file = File::open("tmp_file2").await.unwrap();
+        let mut file = File::open(file_path).await.unwrap();
         let mut buf = [0; 5];
         let res = file.read(&mut buf).await.unwrap();
         assert_eq!(res, 5);
@@ -71,14 +73,14 @@ fn sdv_async_fs_read() {
     ylong_runtime::block_on(handle).unwrap();
 
     let handle2 = ylong_runtime::spawn(async move {
-        let mut file = File::open("tmp_file2").await.unwrap();
+        let mut file = File::open(file_path).await.unwrap();
         let mut buf = [0; 5];
         let res = file.read(&mut buf).await.unwrap();
         assert_eq!(res, 5);
         assert_eq!(buf, [1, 2, 3, 4, 5]);
     });
     ylong_runtime::block_on(handle2).unwrap();
-    fs::remove_file("tmp_file2").unwrap();
+    fs::remove_file(file_path).unwrap();
 }
 
 /// SDV test cases for asynchronous file multi-threaded read and write
@@ -89,15 +91,16 @@ fn sdv_async_fs_read() {
 /// 3. Start another task to perform a read operation.
 #[test]
 fn sdv_async_fs_rw() {
+    let file_path = "tmp_file3";
     let handle = ylong_runtime::spawn(async move {
-        let _ = File::create("tmp_file3").await.unwrap();
+        let _ = File::create(file_path).await.unwrap();
     });
     ylong_runtime::block_on(handle).unwrap();
 
     let handle = ylong_runtime::spawn(async move {
         let mut file = OpenOptions::new()
             .append(true)
-            .open("tmp_file3")
+            .open(file_path)
             .await
             .unwrap();
         let buf = vec![45, 46, 47, 48, 49];
@@ -115,9 +118,9 @@ fn sdv_async_fs_rw() {
     ylong_runtime::block_on(handle).unwrap();
 
     let handle2 = ylong_runtime::spawn(async move {
-        let mut file = File::open("tmp_file3").await;
+        let mut file = File::open(file_path).await;
         while file.is_err() {
-            file = File::open("tmp_file3").await;
+            file = File::open(file_path).await;
         }
         let mut file = file.unwrap();
 
@@ -145,7 +148,7 @@ fn sdv_async_fs_rw() {
         assert_eq!(&buf, &buf2);
     });
     ylong_runtime::block_on(handle2).unwrap();
-    fs::remove_file("tmp_file3").unwrap();
+    fs::remove_file(file_path).unwrap();
 }
 
 /// SDV test cases for Asynchronous file multi-threaded read and write
@@ -156,21 +159,22 @@ fn sdv_async_fs_rw() {
 /// 3. Start another task for reading large amounts of data.
 #[test]
 fn sdv_async_fs_read_to_end() {
+    let file_path = "tmp_file4";
     let handle = ylong_runtime::spawn(async move {
-        let mut file = File::create("tmp_file7").await.unwrap();
+        let mut file = File::create(file_path).await.unwrap();
         let buf = [2; 40000];
         file.write_all(&buf).await.unwrap();
         file.sync_all().await.unwrap();
     });
     ylong_runtime::block_on(handle).unwrap();
     let handle1 = ylong_runtime::spawn(async move {
-        let mut file = File::open("tmp_file7").await.unwrap();
+        let mut file = File::open(file_path).await.unwrap();
         let mut vec_buf = Vec::new();
         let ret = file.read_to_end(&mut vec_buf).await.unwrap();
         assert_eq!(ret, 40000);
     });
     ylong_runtime::block_on(handle1).unwrap();
-    fs::remove_file("tmp_file7").unwrap();
+    fs::remove_file(file_path).unwrap();
 }
 
 /// SDV test cases for asynchronous file Seek
@@ -181,8 +185,9 @@ fn sdv_async_fs_read_to_end() {
 /// 3. Start another task for seek and read operations.
 #[test]
 fn sdv_async_fs_seek() {
+    let file_path = "tmp_file5";
     let handle = ylong_runtime::spawn(async move {
-        let mut file = File::create("tmp_file4").await.unwrap();
+        let mut file = File::create(file_path).await.unwrap();
         let buf = vec![65, 66, 67, 68, 69, 70, 71, 72, 73];
         let res = file.write(&buf).await.unwrap();
         assert_eq!(res, 9);
@@ -191,7 +196,7 @@ fn sdv_async_fs_seek() {
     ylong_runtime::block_on(handle).unwrap();
 
     let handle2 = ylong_runtime::spawn(async move {
-        let mut file = File::open("tmp_file4").await.unwrap();
+        let mut file = File::open(file_path).await.unwrap();
         let ret = file.seek(SeekFrom::Current(3)).await.unwrap();
         assert_eq!(ret, 3);
 
@@ -232,7 +237,7 @@ fn sdv_async_fs_seek() {
     });
 
     ylong_runtime::block_on(handle2).unwrap();
-    fs::remove_file("tmp_file4").unwrap();
+    fs::remove_file(file_path).unwrap();
 }
 
 /// SDV test cases for Asynchronous file set permission
@@ -243,8 +248,9 @@ fn sdv_async_fs_seek() {
 /// 3. Change the permission to read only, set it to this file.
 #[test]
 fn sdv_async_fs_set_permission() {
+    let file_path = "tmp_file6";
     let handle = ylong_runtime::spawn(async move {
-        let file = File::create("tmp_file5").await.unwrap();
+        let file = File::create(file_path).await.unwrap();
         let mut perms = file.metadata().await.unwrap().permissions();
         perms.set_readonly(true);
         let ret = file.set_permissions(perms).await;
@@ -256,7 +262,7 @@ fn sdv_async_fs_set_permission() {
         assert!(ret.is_ok());
     });
     ylong_runtime::block_on(handle).unwrap();
-    fs::remove_file("tmp_file5").unwrap();
+    fs::remove_file(file_path).unwrap();
 }
 
 /// SDV test cases for asynchronous file sync
@@ -266,8 +272,9 @@ fn sdv_async_fs_set_permission() {
 /// 2. Call sync_all and sync_data after asynchronous write.
 #[test]
 fn sdv_async_fs_sync_all() {
+    let file_path = "tmp_file7";
     let handle = ylong_runtime::spawn(async move {
-        let mut file = File::create("tmp_file6").await.unwrap();
+        let mut file = File::create(file_path).await.unwrap();
         let buf = [2; 20000];
         let ret = file.write_all(&buf).await;
         assert!(ret.is_ok());
@@ -281,5 +288,82 @@ fn sdv_async_fs_sync_all() {
         assert!(ret.is_ok());
     });
     ylong_runtime::block_on(handle).unwrap();
-    fs::remove_file("tmp_file6").unwrap();
+    fs::remove_file(file_path).unwrap();
+}
+
+/// SDV test for `set_len`
+///
+/// # Brief
+///
+/// 1. Creates a new file.
+/// 2. Removes the file with `set_len()`, check result is Ok(()).
+/// 3. Deletes the file.
+#[test]
+fn sdv_async_fs_set_len() {
+    let file_path = "tmp_file8";
+    ylong_runtime::block_on(async {
+        let file = File::create(file_path).await.unwrap();
+        let res = file.set_len(10).await;
+        assert!(res.is_ok());
+
+        let res = ylong_runtime::fs::remove_file(file_path).await;
+        assert!(res.is_ok());
+    });
+}
+
+/// SDV test for `try_clone`
+///
+/// # Brief
+///
+/// 1. Creates a new file.
+/// 2. Creates a new File instance with `try_clone()`, check result is Ok(()).
+/// 3. Deletes the file.
+#[test]
+fn sdv_async_fs_try_clone() {
+    let file_path = "tmp_file9";
+    ylong_runtime::block_on(async {
+        let file = File::create(file_path).await.unwrap();
+        let res = file.try_clone().await;
+        assert!(res.is_ok());
+
+        let res = ylong_runtime::fs::remove_file(file_path).await;
+        assert!(res.is_ok());
+    });
+}
+
+/// SDV test for `OpenOptions`
+///
+/// # Brief
+///
+/// 1. Creates a new file.
+/// 2. Creates a new File instance with `try_clone()`, check result is Ok(()).
+/// 3. Deletes the file.
+#[test]
+fn sdv_async_fs_open_options() {
+    let file_path = "tmp_file10";
+    ylong_runtime::block_on(async {
+        let mut file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .create_new(true)
+            .open(file_path)
+            .await
+            .unwrap();
+
+        let pos = file.stream_position().await.unwrap();
+
+        let arg = "hello world";
+        file.write_all(arg.as_bytes()).await.unwrap();
+
+        let res = file.seek(SeekFrom::Start(pos)).await.unwrap();
+        assert_eq!(res, 0);
+
+        let mut buf = [0; 11];
+        file.read_exact(&mut buf).await.unwrap();
+        assert_eq!(arg.as_bytes(), buf);
+
+        let res = ylong_runtime::fs::remove_file(file_path).await;
+        assert!(res.is_ok());
+    });
 }

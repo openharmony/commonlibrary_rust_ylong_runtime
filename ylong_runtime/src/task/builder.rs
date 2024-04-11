@@ -99,9 +99,10 @@ mod test {
     /// 4. Checks if the object is_stat property is false
     /// 5. Checks if the object is_insert_front property is false
     fn ut_builder_new() {
-        let builder = TaskBuilder::new();
-        assert_eq!(builder.name, None);
-        assert!(builder.qos.is_none());
+        let builder1 = TaskBuilder::new();
+        let builder2 = builder1.clone();
+        assert_eq!(builder1.name, None);
+        assert!(builder2.qos.is_none());
     }
 
     /// UT test cases for Builder::name

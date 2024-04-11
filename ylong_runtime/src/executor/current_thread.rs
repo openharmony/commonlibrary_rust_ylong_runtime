@@ -357,8 +357,12 @@ mod test {
         use crate::net::{TcpListener, TcpStream};
         use crate::io::{AsyncReadExt, AsyncWriteExt};
 
-        pub async fn ylong_tcp_server(addr: SocketAddr) {
-            let tcp = TcpListener::bind(addr).await.unwrap();
+        const ADDR: &str = "127.0.0.1:0";
+
+        pub async fn ylong_tcp_server(tx: crate::sync::oneshot::Sender<SocketAddr>) {
+            let tcp = TcpListener::bind(ADDR).await.unwrap();
+            let addr = tcp.local_addr().unwrap();
+            tx.send(addr).unwrap();
             let (mut stream, _) = tcp.accept().await.unwrap();
             for _ in 0..3 {
                 let mut buf = [0; 100];
@@ -370,7 +374,8 @@ mod test {
             }
         }
 
-        pub async fn ylong_tcp_client(addr: SocketAddr) {
+        pub async fn ylong_tcp_client(rx: crate::sync::oneshot::Receiver<SocketAddr>) {
+            let addr = rx.await.unwrap();
             let mut tcp = TcpStream::connect(addr).await;
             while tcp.is_err() {
                 tcp = TcpStream::connect(addr).await;
@@ -485,16 +490,16 @@ mod test {
         use crate::builder::RuntimeBuilder;
 
         let spawner = RuntimeBuilder::new_current_thread().build().unwrap();
-        let addr = "127.0.0.1:8701".parse().unwrap();
-        let join_handle = spawner.spawn(ylong_tcp_server(addr));
+        let (tx, rx) = crate::sync::oneshot::channel();
+        let join_handle = spawner.spawn(ylong_tcp_server(tx));
 
-        spawner.block_on(ylong_tcp_client(addr));
+        spawner.block_on(ylong_tcp_client(rx));
         spawner.block_on(join_handle).unwrap();
 
         let spawner = RuntimeBuilder::new_current_thread().build().unwrap();
-        let addr = "127.0.0.1:8702".parse().unwrap();
-        let join_handle = spawner.spawn(ylong_tcp_client(addr));
-        spawner.block_on(ylong_tcp_server(addr));
+        let (tx, rx) = crate::sync::oneshot::channel();
+        let join_handle = spawner.spawn(ylong_tcp_client(rx));
+        spawner.block_on(ylong_tcp_server(tx));
         spawner.block_on(join_handle).unwrap();
     }
 }

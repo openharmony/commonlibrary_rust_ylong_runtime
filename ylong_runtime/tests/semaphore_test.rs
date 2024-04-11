@@ -25,7 +25,7 @@ use ylong_runtime::task::JoinHandle;
 /// 3. Asynchronously acquires a permit.
 /// 4. Check the number of permits in every stage.
 #[test]
-fn auto_release_sem_acquire_test() {
+fn sdv_auto_release_sem_acquire_test() {
     let sem = Arc::new(AutoRelSemaphore::new(1).unwrap());
     let sem2 = sem.clone();
     let handle = ylong_runtime::spawn(async move {
@@ -45,7 +45,7 @@ fn auto_release_sem_acquire_test() {
 /// 4. Acquire an auto-release-permit successfully after the last one is
 ///    recycled.
 #[test]
-fn auto_release_sem_try_acquire_test() {
+fn sdv_auto_release_sem_try_acquire_test() {
     let sem = AutoRelSemaphore::new(1).unwrap();
     let permit = sem.try_acquire();
     assert!(permit.is_ok());
@@ -63,7 +63,7 @@ fn auto_release_sem_try_acquire_test() {
 /// 2. Call `Semaphore::release()` to add a permit to the semaphore.
 /// 3. Check the number of permits before and after releasing.
 #[test]
-fn release_test() {
+fn sdv_release_test() {
     let sem = Semaphore::new(2).unwrap();
     assert_eq!(sem.current_permits(), 2);
     sem.release();
@@ -77,7 +77,7 @@ fn release_test() {
 /// 2. Close the semaphore.
 /// 3. Fail to acquire an auto-release-permit.
 #[test]
-fn auto_release_sem_close_test() {
+fn sdv_auto_release_sem_close_test() {
     let sem = Arc::new(AutoRelSemaphore::new(2).unwrap());
     let sem2 = sem.clone();
     assert!(!sem.is_closed());
@@ -99,7 +99,7 @@ fn auto_release_sem_close_test() {
 /// 2. Repeating acquiring an auto-release-permit for a huge number of times.
 /// 3. Check the correctness of function of semaphore.
 #[test]
-fn auto_release_sem_stress_test() {
+fn sdv_auto_release_sem_stress_test() {
     let sem = Arc::new(AutoRelSemaphore::new(5).unwrap());
     let mut tasks: Vec<JoinHandle<()>> = Vec::new();
 
@@ -134,7 +134,7 @@ fn auto_release_sem_stress_test() {
 ///    times.
 /// 3. Check the correctness of the future of `Permit`.
 #[test]
-fn async_stress_test() {
+fn sdv_async_stress_test() {
     let mut tasks: Vec<JoinHandle<()>> = Vec::new();
 
     for _ in 0..50000 {
@@ -159,7 +159,7 @@ fn async_stress_test() {
 /// 2. Acquire permits successfully.
 /// 3. Fail to acquire a permit when all permits are consumed.
 #[test]
-fn try_acquire_test() {
+fn sdv_try_acquire_test() {
     let sem = Semaphore::new(2).unwrap();
     let permit = sem.try_acquire();
     assert!(permit.is_ok());
@@ -181,7 +181,7 @@ fn try_acquire_test() {
 /// 3. Asynchronously acquires a permit.
 /// 4. Check the number of permits in every stage.
 #[test]
-fn acquire_test() {
+fn sdv_acquire_test() {
     let sem = Arc::new(Semaphore::new(0).unwrap());
     let sem2 = sem.clone();
     let handle = ylong_runtime::spawn(async move {

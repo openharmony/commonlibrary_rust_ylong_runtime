@@ -631,11 +631,12 @@ impl AsRawFd for TcpStream {
 #[cfg(test)]
 mod test {
     use std::net::Ipv4Addr;
-    use std::thread;
     use std::time::Duration;
 
     use crate::io::AsyncWriteExt;
     use crate::net::{TcpListener, TcpStream};
+
+    const ADDR: &str = "127.0.0.1:0";
 
     /// UT test cases for `TcpStream`.
     ///
@@ -647,35 +648,34 @@ mod test {
     /// 4. Check result is correct.
     #[test]
     fn ut_tcp_stream_basic() {
-        fn test_tcp_server() {
-            crate::block_on(async {
-                let addr = "127.0.0.1:9092";
-                let listener = TcpListener::bind(addr).await.unwrap();
-                listener.accept().await.unwrap();
-            })
-        }
-        thread::spawn(test_tcp_server);
-
         crate::block_on(async {
-            let addr = "127.0.0.1:9092";
-            loop {
-                if let Ok(stream) = TcpStream::connect(addr).await {
-                    assert_eq!(stream.peer_addr().unwrap(), addr.parse().unwrap());
-                    assert_eq!(
-                        stream.local_addr().unwrap().ip(),
-                        Ipv4Addr::new(127, 0, 0, 1)
-                    );
-                    stream.set_ttl(101).unwrap();
-                    assert_eq!(stream.ttl().unwrap(), 101);
-                    stream.set_nodelay(true).unwrap();
-                    assert!(stream.nodelay().unwrap());
-                    assert!(stream.linger().unwrap().is_none());
-                    stream.set_linger(Some(Duration::from_secs(1))).unwrap();
-                    assert_eq!(stream.linger().unwrap(), Some(Duration::from_secs(1)));
-                    assert!(stream.take_error().unwrap().is_none());
-                    break;
+            let listener = TcpListener::bind(ADDR).await.unwrap();
+            let addr = listener.local_addr().unwrap();
+
+            let handle = crate::spawn(async move {
+                let mut stream = TcpStream::connect(addr).await;
+                while stream.is_err() {
+                    stream = TcpStream::connect(addr).await;
                 }
-            }
+                let stream = stream.unwrap();
+                assert_eq!(stream.peer_addr().unwrap(), addr);
+                assert_eq!(
+                    stream.local_addr().unwrap().ip(),
+                    Ipv4Addr::new(127, 0, 0, 1)
+                );
+                stream.set_ttl(101).unwrap();
+                assert_eq!(stream.ttl().unwrap(), 101);
+                stream.set_nodelay(true).unwrap();
+                assert!(stream.nodelay().unwrap());
+                assert!(stream.linger().unwrap().is_none());
+                stream.set_linger(Some(Duration::from_secs(1))).unwrap();
+                assert_eq!(stream.linger().unwrap(), Some(Duration::from_secs(1)));
+                assert!(stream.take_error().unwrap().is_none());
+            });
+
+            listener.accept().await.unwrap();
+
+            handle.await.unwrap();
         });
     }
 
@@ -688,28 +688,27 @@ mod test {
     /// 4. Check result is correct.
     #[test]
     fn ut_tcp_stream_peek() {
-        fn test_tcp_server() {
-            crate::block_on(async {
-                let addr = "127.0.0.1:9093";
-                let listener = TcpListener::bind(addr).await.unwrap();
-                let (mut stream, _) = listener.accept().await.unwrap();
-                stream.write(b"hello").await.unwrap();
-            })
-        }
-        thread::spawn(test_tcp_server);
-
         crate::block_on(async {
-            let addr = "127.0.0.1:9093";
-            loop {
-                if let Ok(stream) = TcpStream::connect(addr).await {
-                    let mut buf = [0; 100];
-                    let len = stream.peek(&mut buf).await.expect("peek failed");
-                    let buf = &buf[0..len];
-                    assert_eq!(len, 5);
-                    assert_eq!(String::from_utf8_lossy(buf), "hello");
-                    break;
+            let listener = TcpListener::bind(ADDR).await.unwrap();
+            let addr = listener.local_addr().unwrap();
+
+            let handle = crate::spawn(async move {
+                let mut stream = TcpStream::connect(addr).await;
+                while stream.is_err() {
+                    stream = TcpStream::connect(addr).await;
                 }
-            }
+                let stream = stream.unwrap();
+                let mut buf = [0; 100];
+                let len = stream.peek(&mut buf).await.expect("peek failed");
+                let buf = &buf[0..len];
+                assert_eq!(len, 5);
+                assert_eq!(String::from_utf8_lossy(buf), "hello");
+            });
+
+            let (mut stream, _) = listener.accept().await.unwrap();
+            stream.write(b"hello").await.unwrap();
+
+            handle.await.unwrap();
         });
     }
 
@@ -722,28 +721,27 @@ mod test {
     /// 4. Check result is correct.
     #[test]
     fn ut_tcp_stream_try() {
-        fn test_tcp_server() {
-            crate::block_on(async {
-                let addr = "127.0.0.1:9095";
-                let listener = TcpListener::bind(addr).await.unwrap();
-                let (stream, _) = listener.accept().await.unwrap();
-                stream.writable().await.unwrap();
-                stream.try_write(b"hello").unwrap();
-            })
-        }
-        thread::spawn(test_tcp_server);
-
         crate::block_on(async {
-            let addr = "127.0.0.1:9095";
-            loop {
-                if let Ok(stream) = TcpStream::connect(addr).await {
-                    let mut buf = vec![0; 5];
-                    stream.readable().await.unwrap();
-                    stream.try_read(&mut buf).unwrap();
-                    assert_eq!(buf, b"hello");
-                    break;
+            let listener = TcpListener::bind(ADDR).await.unwrap();
+            let addr = listener.local_addr().unwrap();
+
+            let handle = crate::spawn(async move {
+                let mut stream = TcpStream::connect(addr).await;
+                while stream.is_err() {
+                    stream = TcpStream::connect(addr).await;
                 }
-            }
+                let stream = stream.unwrap();
+                let mut buf = vec![0; 5];
+                stream.readable().await.unwrap();
+                stream.try_read(&mut buf).unwrap();
+                assert_eq!(buf, b"hello");
+            });
+
+            let (stream, _) = listener.accept().await.unwrap();
+            stream.writable().await.unwrap();
+            stream.try_write(b"hello").unwrap();
+
+            handle.await.unwrap();
         });
     }
 }

@@ -305,7 +305,7 @@ impl UnixStream {
     /// ```
     pub fn try_write(&self, buf: &[u8]) -> Result<usize> {
         self.source
-            .try_io(Interest::READABLE, || (&*self.source).write(buf))
+            .try_io(Interest::WRITABLE, || (&*self.source).write(buf))
     }
 
     /// Returns the error of the `SO_ERROR` option.
@@ -386,5 +386,103 @@ impl AsRawFd for UnixStream {
 impl AsFd for UnixStream {
     fn as_fd(&self) -> BorrowedFd<'_> {
         unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::io;
+    use std::os::fd::{AsFd, AsRawFd};
+
+    use crate::io::{AsyncReadExt, AsyncWriteExt};
+    use crate::net::UnixStream;
+
+    /// Uds UnixStream test case.
+    ///
+    /// # Title
+    /// ut_uds_stream_baisc_test
+    ///
+    /// # Brief
+    /// 1. Create a std UnixStream with `pair()`.
+    /// 2. Convert std UnixStream to Ylong_runtime UnixStream.
+    /// 3. Check result is correct.
+    #[test]
+    fn ut_uds_stream_baisc_test() {
+        let (stream, _) = std::os::unix::net::UnixStream::pair().unwrap();
+        let handle = crate::spawn(async {
+            let res = UnixStream::from_std(stream);
+            assert!(res.is_ok());
+            let stream = res.unwrap();
+            assert!(stream.as_fd().as_raw_fd() >= 0);
+            assert!(stream.as_raw_fd() >= 0);
+            assert!(stream.take_error().is_ok());
+        });
+        crate::block_on(handle).unwrap();
+    }
+
+    /// uds UnixStream test case.
+    ///
+    /// # Title
+    /// ut_uds_stream_pair_test
+    ///
+    /// # Brief
+    /// 1. Creates a server and a client with `pair()`.
+    /// 2. Server Sends message and client recv it.
+    #[test]
+    fn ut_uds_stream_pair_test() {
+        let handle = crate::spawn(async {
+            let (mut server, mut client) = UnixStream::pair().unwrap();
+
+            server.write_all(b"hello").await.unwrap();
+            server.flush().await.unwrap();
+
+            let mut read_buf = [0_u8; 5];
+            let len = client.read(&mut read_buf).await.unwrap();
+            assert_eq!(std::str::from_utf8(&read_buf).unwrap(), "hello".to_string());
+            assert_eq!(len, "hello".len());
+        });
+        crate::block_on(handle).unwrap();
+    }
+
+    /// Uds UnixStream try_xxx() test case.
+    ///
+    /// # Title
+    /// ut_uds_stream_try_test
+    ///
+    /// # Brief
+    /// 1. Creates a server and a client with `pair()`.
+    /// 2. Server send message with `writable()` and `try_write()`.
+    /// 3. Client receive message with `readable()` and `try_read()`.
+    /// 4. Check result is correct.
+    #[test]
+    fn ut_uds_stream_try_test() {
+        let handle = crate::spawn(async {
+            let (server, client) = UnixStream::pair().unwrap();
+            loop {
+                server.writable().await.unwrap();
+                match server.try_write(b"hello") {
+                    Ok(n) => {
+                        assert_eq!(n, "hello".len());
+                        break;
+                    }
+                    Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+                    Err(e) => panic!("{e:?}"),
+                }
+            }
+            loop {
+                client.readable().await.unwrap();
+                let mut data = vec![0; 5];
+                match client.try_read(&mut data) {
+                    Ok(n) => {
+                        assert_eq!(n, "hello".len());
+                        assert_eq!(std::str::from_utf8(&data).unwrap(), "hello".to_string());
+                        break;
+                    }
+                    Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => continue,
+                    Err(e) => panic!("{e:?}"),
+                }
+            }
+        });
+        crate::block_on(handle).unwrap();
     }
 }

@@ -121,3 +121,29 @@ cfg_time! {
 
     impl Error for RecvTimeoutError {}
 }
+
+#[cfg(test)]
+mod test {
+    use crate::sync::error::{RecvError, RecvTimeoutError, TryRecvError};
+
+    /// UT test cases for Error.
+    ///
+    /// # Brief
+    /// 1. create two JoinHandle
+    /// 2. check the correctness of the JoinHandle for completion
+    #[test]
+    fn ut_test_sync_error_display() {
+        let recv_err = RecvError;
+        assert_eq!(format!("{recv_err}"), "channel is closed");
+
+        let try_recv_err1 = TryRecvError::Empty;
+        assert_eq!(format!("{try_recv_err1}"), "channel is empty");
+        let try_recv_err2 = TryRecvError::Closed;
+        assert_eq!(format!("{try_recv_err2}"), "channel is closed");
+
+        let try_timeout1 = RecvTimeoutError::Closed;
+        assert_eq!(format!("{try_timeout1}"), "channel is closed");
+        let try_timeout2 = RecvTimeoutError::Timeout;
+        assert_eq!(format!("{try_timeout2}"), "channel receiving timeout");
+    }
+}

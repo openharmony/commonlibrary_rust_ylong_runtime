@@ -48,14 +48,12 @@ use crate::net::AsyncSource;
 ///     let connected_sender = match sender.connect(receiver_addr).await {
 ///         Ok(socket) => socket,
 ///         Err(e) => {
-///             assert_eq!(0, 1, "Connect UdpSocket Failed {}", e);
 ///             return Err(e);
 ///         }
 ///     };
 ///     let connected_receiver = match receiver.connect(sender_addr).await {
 ///         Ok(socket) => socket,
 ///         Err(e) => {
-///             assert_eq!(0, 1, "Connect UdpSocket Failed {}", e);
 ///             return Err(e);
 ///         }
 ///     };
@@ -1445,12 +1443,46 @@ impl AsRawFd for ConnectedUdpSocket {
 
 #[cfg(test)]
 mod tests {
-    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV6};
+    use std::io;
+    use std::net::{Ipv4Addr, Ipv6Addr};
 
     use crate::futures::poll_fn;
     use crate::io::ReadBuf;
-    use crate::net::UdpSocket;
+    use crate::net::{ConnectedUdpSocket, UdpSocket};
     use crate::{block_on, spawn};
+
+    const ADDR: &str = "127.0.0.1:0";
+
+    // Try to bind a udp in local_addr and connect to peer_addr, Either of the two
+    // has an AddrInUse error will retry until success.
+    async fn udp_try_bind_connect<F>(
+        addr: &str,
+        mut f: F,
+    ) -> io::Result<(ConnectedUdpSocket, ConnectedUdpSocket)>
+    where
+        F: FnMut(&UdpSocket),
+    {
+        loop {
+            let local_udp_socket = UdpSocket::bind(addr).await?;
+            let peer_udp_socket = UdpSocket::bind(addr).await?;
+
+            f(&local_udp_socket);
+
+            let local_addr = local_udp_socket.local_addr().unwrap();
+            let peer_addr = peer_udp_socket.local_addr().unwrap();
+            let local_connect = match local_udp_socket.connect(peer_addr).await {
+                Ok(socket) => socket,
+                Err(e) if e.kind() == io::ErrorKind::AddrInUse => continue,
+                Err(e) => return Err(e),
+            };
+            let peer_connect = match peer_udp_socket.connect(local_addr).await {
+                Ok(socket) => socket,
+                Err(e) if e.kind() == io::ErrorKind::AddrInUse => continue,
+                Err(e) => return Err(e),
+            };
+            return Ok((local_connect, peer_connect));
+        }
+    }
 
     /// Basic UT test cases for `UdpSocket` with `SocketAddrV4`.
     ///
@@ -1463,39 +1495,34 @@ mod tests {
     #[test]
     fn ut_udp_basic_v4() {
         block_on(async {
-            let sender_addr = "127.0.0.1:8181";
-            let receiver_addr = "127.0.0.1:8182";
-
-            let sender = UdpSocket::bind(sender_addr).await.unwrap();
-            let receiver = UdpSocket::bind(receiver_addr).await.unwrap();
-
-            sender.set_ttl(101).unwrap();
-            assert_eq!(sender.ttl().unwrap(), 101);
-            assert!(sender.take_error().unwrap().is_none());
-            sender.set_multicast_loop_v4(false).unwrap();
-            assert!(!sender.multicast_loop_v4().unwrap());
-            sender.set_multicast_ttl_v4(42).unwrap();
-            assert_eq!(sender.multicast_ttl_v4().unwrap(), 42);
-
             let interface = Ipv4Addr::new(0, 0, 0, 0);
             let mut multi_addr = None;
 
-            for i in 0..255 {
-                let addr = Ipv4Addr::new(224, 0, 0, i);
-                if sender.join_multicast_v4(&addr, &interface).is_ok() {
-                    multi_addr = Some(addr);
-                    break;
+            let socket_deal = |sender: &UdpSocket| {
+                sender.set_ttl(101).unwrap();
+                assert_eq!(sender.ttl().unwrap(), 101);
+                assert!(sender.take_error().unwrap().is_none());
+                sender.set_multicast_loop_v4(false).unwrap();
+                assert!(!sender.multicast_loop_v4().unwrap());
+                sender.set_multicast_ttl_v4(42).unwrap();
+                assert_eq!(sender.multicast_ttl_v4().unwrap(), 42);
+
+                for i in 0..255 {
+                    let addr = Ipv4Addr::new(224, 0, 0, i);
+                    if sender.join_multicast_v4(&addr, &interface).is_ok() {
+                        multi_addr = Some(addr);
+                        break;
+                    }
                 }
-            }
 
-            if let Some(addr) = multi_addr {
-                sender
-                    .leave_multicast_v4(&addr, &interface)
-                    .expect("Cannot leave the multicast group");
-            }
+                if let Some(addr) = multi_addr {
+                    sender
+                        .leave_multicast_v4(&addr, &interface)
+                        .expect("Cannot leave the multicast group");
+                }
+            };
 
-            let connected_sender = sender.connect(receiver_addr).await.unwrap();
-            let _connected_receiver = receiver.connect(sender_addr).await.unwrap();
+            let (connected_sender, _) = udp_try_bind_connect(ADDR, socket_deal).await.unwrap();
 
             connected_sender.set_ttl(101).unwrap();
             assert_eq!(connected_sender.ttl().unwrap(), 101);
@@ -1526,43 +1553,29 @@ mod tests {
     #[test]
     fn ut_udp_basic_v6() {
         block_on(async {
-            let sender_addr: SocketAddr = SocketAddr::V6(SocketAddrV6::new(
-                Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1),
-                32511,
-                0,
-                0,
-            ));
-            let receiver_addr: SocketAddr = SocketAddr::V6(SocketAddrV6::new(
-                Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1),
-                32512,
-                0,
-                0,
-            ));
+            let addr = "::1:0";
 
-            let sender = UdpSocket::bind(sender_addr).await.unwrap();
-            let receiver = UdpSocket::bind(receiver_addr).await.unwrap();
-            sender.set_multicast_loop_v6(false).unwrap();
-            assert!(!sender.multicast_loop_v6().unwrap());
-
-            let interface = 0_u32;
+            let interface = 1_u32;
             let mut multi_addr = None;
+            let socket_deal = |sender: &UdpSocket| {
+                sender.set_multicast_loop_v6(false).unwrap();
+                assert!(!sender.multicast_loop_v6().unwrap());
 
-            for i in 10..0xFFFF {
-                let addr = Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, i);
-                if sender.join_multicast_v6(&addr, interface).is_ok() {
-                    multi_addr = Some(addr);
-                    break;
+                for i in 10..0xFFFF {
+                    let addr = Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, i);
+                    if sender.join_multicast_v6(&addr, interface).is_ok() {
+                        multi_addr = Some(addr);
+                        break;
+                    }
                 }
-            }
 
-            if let Some(addr) = multi_addr {
-                sender
-                    .leave_multicast_v6(&addr, interface)
-                    .expect("Cannot leave the multicast group");
-            }
-
-            let connected_sender = sender.connect(receiver_addr).await.unwrap();
-            let _connected_receiver = receiver.connect(sender_addr).await.unwrap();
+                if let Some(addr) = multi_addr {
+                    sender
+                        .leave_multicast_v6(&addr, interface)
+                        .expect("Cannot leave the multicast group");
+                }
+            };
+            let (connected_sender, _) = udp_try_bind_connect(addr, socket_deal).await.unwrap();
 
             connected_sender.set_multicast_loop_v6(false).unwrap();
             assert!(!connected_sender.multicast_loop_v6().unwrap());
@@ -1587,25 +1600,9 @@ mod tests {
     /// 4. Check if the test results are correct.
     #[test]
     fn ut_send_recv_poll() {
-        let sender_addr = "127.0.0.1:8083";
-        let receiver_addr = "127.0.0.1:8084";
         let handle = spawn(async move {
-            let sender = UdpSocket::bind(sender_addr)
-                .await
-                .expect("Bind Socket Failed");
-            let receiver = UdpSocket::bind(receiver_addr)
-                .await
-                .expect("Bind Socket Failed");
-
-            let connected_sender = sender
-                .connect(receiver_addr)
-                .await
-                .expect("Connect Socket Failed");
-            let connected_receiver = receiver
-                .connect(sender_addr)
-                .await
-                .expect("Connect Socket Failed");
-
+            let (connected_sender, connected_receiver) =
+                udp_try_bind_connect(ADDR, |_| {}).await.unwrap();
             let n = poll_fn(|cx| connected_sender.poll_send(cx, b"Hello"))
                 .await
                 .expect("Sender Send Failed");
@@ -1632,18 +1629,13 @@ mod tests {
     /// 4. Check if the test results are correct.
     #[test]
     fn ut_send_to_recv_from_poll() {
-        let sender_addr = "127.0.0.1:8087";
-        let receiver_addr = "127.0.0.1:8088";
-        let receiver_addr_socket = "127.0.0.1:8088".parse().unwrap();
         let handle = spawn(async move {
-            let sender = UdpSocket::bind(sender_addr)
-                .await
-                .expect("Bind Socket Failed");
-            let receiver = UdpSocket::bind(receiver_addr)
-                .await
-                .expect("Bind Socket Failed");
+            let sender = UdpSocket::bind(ADDR).await.expect("Bind Socket Failed");
+            let receiver = UdpSocket::bind(ADDR).await.expect("Bind Socket Failed");
 
-            let n = poll_fn(|cx| sender.poll_send_to(cx, b"Hello", receiver_addr_socket))
+            let sender_addr = sender.local_addr().unwrap();
+            let receiver_addr = receiver.local_addr().unwrap();
+            let n = poll_fn(|cx| sender.poll_send_to(cx, b"Hello", receiver_addr))
                 .await
                 .expect("Sender Send Failed");
             assert_eq!(n, "Hello".len());
@@ -1654,7 +1646,7 @@ mod tests {
                 .await
                 .unwrap();
             assert_eq!(read.filled(), b"Hello");
-            assert_eq!(addr, sender_addr.parse().unwrap());
+            assert_eq!(addr, sender_addr);
         });
         block_on(handle).expect("block_on failed");
     }
@@ -1668,12 +1660,8 @@ mod tests {
     /// 4. Check if the test results are correct.
     #[test]
     fn ut_set_get_broadcast() {
-        let local_addr = "127.0.0.1:8091";
-
         let handle = spawn(async move {
-            let broadcast_socket = UdpSocket::bind(local_addr)
-                .await
-                .expect("Bind Socket Failed");
+            let broadcast_socket = UdpSocket::bind(ADDR).await.expect("Bind Socket Failed");
             broadcast_socket
                 .set_broadcast(true)
                 .expect("set_broadcast failed");
@@ -1683,8 +1671,7 @@ mod tests {
         block_on(handle).expect("block_on failed");
 
         let handle = spawn(async move {
-            let socket = UdpSocket::bind(local_addr).await.unwrap();
-            let broadcast_socket = socket.connect("127.0.0.1:8092").await.unwrap();
+            let (broadcast_socket, _) = udp_try_bind_connect(ADDR, |_| {}).await.unwrap();
             broadcast_socket
                 .set_broadcast(true)
                 .expect("set_broadcast failed");
@@ -1702,19 +1689,13 @@ mod tests {
     /// 3. Check if the test results are correct.
     #[test]
     fn ut_get_local_addr() {
-        let local_addr = "127.0.0.1:8093";
-        let remote_addr = "127.0.0.1:8094";
-
         let handle = spawn(async move {
-            let sock = UdpSocket::bind(local_addr)
-                .await
-                .expect("Bind Socket Failed");
-            let connected_sock = sock
-                .connect(remote_addr)
-                .await
-                .expect("Connect Socket Failed");
-            let local_addr1 = connected_sock.local_addr().expect("local_addr failed");
-            assert_eq!(local_addr1, local_addr.parse().unwrap());
+            let mut local_addr = None;
+            let socket_deal = |socket: &UdpSocket| local_addr = Some(socket.local_addr().unwrap());
+            let (connected_sock, _) = udp_try_bind_connect(ADDR, socket_deal).await.unwrap();
+
+            let connect_local_addr = connected_sock.local_addr().expect("local_addr failed");
+            assert_eq!(connect_local_addr, local_addr.unwrap());
         });
         block_on(handle).expect("block_on failed");
     }
@@ -1728,120 +1709,17 @@ mod tests {
     /// 3. Check if the test results are correct.
     #[test]
     fn ut_get_peer_addr() {
-        let local_addr = "127.0.0.1:8095";
-        let peer_addr = "127.0.0.1:8096";
         let handle = spawn(async move {
-            let sock = UdpSocket::bind(local_addr)
-                .await
-                .expect("Bind Socket Failed");
-            let connected_sock = sock
-                .connect(peer_addr)
-                .await
-                .expect("Connect Socket Failed");
+            let mut local_addr = None;
+            let socket_deal = |socket: &UdpSocket| local_addr = Some(socket.local_addr().unwrap());
+            let (_, peer_socket) = udp_try_bind_connect(ADDR, socket_deal).await.unwrap();
+
             assert_eq!(
-                connected_sock.peer_addr().expect("peer_addr failed"),
-                peer_addr.parse().unwrap()
+                peer_socket.peer_addr().expect("peer_addr failed"),
+                local_addr.unwrap()
             );
         });
         block_on(handle).expect("block_on failed");
-    }
-
-    macro_rules! socket_addr {
-        ($sender_addr:ident, $receiver_addr:ident) => {
-            let handle = spawn(async move {
-                let sender = UdpSocket::bind($sender_addr)
-                    .await
-                    .expect("Bind Socket Failed");
-                let connected_sender = sender
-                    .connect($receiver_addr)
-                    .await
-                    .expect("Connect Socket Failed");
-
-                let n = connected_sender
-                    .send(b"Hello")
-                    .await
-                    .expect("send message Failed");
-                assert_eq!(n, 5);
-            });
-            block_on(handle).expect("block_on failed");
-        };
-    }
-
-    /// UT test cases for `ToSocketAddrs` blocking.
-    ///
-    /// # Brief
-    /// 1. Create UdpSocket with "localhost".
-    /// 2. Connect to the remote address.
-    /// 3. Check if the test results are correct.
-    #[test]
-    fn ut_udp_to_socket_addrs_blocking() {
-        let sender_addr = "localhost:8097";
-        let receiver_addr = "localhost:8098";
-        socket_addr!(sender_addr, receiver_addr);
-    }
-
-    /// UT test cases for `ToSocketAddrs` (&str, u16).
-    ///
-    /// # Brief
-    /// 1. Create UdpSocket with (&str, u16).
-    /// 2. Connect to the remote address.
-    /// 3. Check if the test results are correct.
-    #[test]
-    fn ut_udp_to_socket_addrs_str_u16() {
-        let sender_addr = ("localhost", 8099);
-        let receiver_addr = ("localhost", 8100);
-        socket_addr!(sender_addr, receiver_addr);
-
-        let sender_addr = ("127.0.0.1", 8113);
-        let receiver_addr = ("127.0.0.1", 8114);
-        socket_addr!(sender_addr, receiver_addr);
-
-        let sender_addr = ("::1", 8115);
-        let receiver_addr = ("::1", 8116);
-        socket_addr!(sender_addr, receiver_addr);
-    }
-
-    /// UT test cases for `ToSocketAddrs` (IpAddr, u16).
-    ///
-    /// # Brief
-    /// 1. Create UdpSocket with (IpAddr, u16).
-    /// 2. Connect to the remote address.
-    /// 3. Check if the test results are correct.
-    #[test]
-    fn ut_udp_to_socket_addrs_ipaddr_u16() {
-        let sender_addr = (IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8101);
-        let receiver_addr = (IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8102);
-        socket_addr!(sender_addr, receiver_addr);
-
-        let sender_addr = (IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), 8107);
-        let receiver_addr = (IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), 8108);
-        socket_addr!(sender_addr, receiver_addr);
-    }
-
-    /// UT test cases for `ToSocketAddrs` (Ipv4Addr, u16).
-    ///
-    /// # Brief
-    /// 1. Create UdpSocket with (Ipv4Addr, u16).
-    /// 2. Connect to the remote address.
-    /// 3. Check if the test results are correct.
-    #[test]
-    fn ut_udp_to_socket_addrs_ipv4addr_u16() {
-        let sender_addr = (Ipv4Addr::new(127, 0, 0, 1), 8103);
-        let receiver_addr = (Ipv4Addr::new(127, 0, 0, 1), 8104);
-        socket_addr!(sender_addr, receiver_addr);
-    }
-
-    /// UT test cases for `ToSocketAddrs` (Ipv6Addr, u16).
-    ///
-    /// # Brief
-    /// 1. Create UdpSocket with (Ipv6Addr, u16).
-    /// 2. Connect to the remote address.
-    /// 3. Check if the test results are correct.
-    #[test]
-    fn ut_udp_to_socket_addrs_ipv6addr_u16() {
-        let sender_addr = (Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1), 8105);
-        let receiver_addr = (Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1), 8106);
-        socket_addr!(sender_addr, receiver_addr);
     }
 
     /// UT test cases for `send_to()` and `peek_from()`.
@@ -1854,17 +1732,11 @@ mod tests {
     /// 4. Check if the test results are correct.
     #[test]
     fn ut_send_to_peek_from() {
-        let sender_addr = "127.0.0.1:8125";
-        let receiver_addr = "127.0.0.1:8126";
-
         let handle = spawn(async move {
-            let sender = UdpSocket::bind(sender_addr)
-                .await
-                .expect("Bind Socket Failed");
-            let receiver = UdpSocket::bind(receiver_addr)
-                .await
-                .expect("Bind Socket Failed");
+            let sender = UdpSocket::bind(ADDR).await.expect("Bind Socket Failed");
+            let receiver = UdpSocket::bind(ADDR).await.expect("Bind Socket Failed");
 
+            let receiver_addr = receiver.local_addr().unwrap();
             let buf = [2; 6];
             sender
                 .send_to(&buf, receiver_addr)
@@ -1894,16 +1766,11 @@ mod tests {
     /// 5. Check if the test results are correct.
     #[test]
     fn ut_send_to_try_peek_from() {
-        let sender_addr = "127.0.0.1:8117";
-        let receiver_addr = "127.0.0.1:8118";
-
         let handle = spawn(async move {
-            let sender = UdpSocket::bind(sender_addr)
-                .await
-                .expect("Bind Socket Failed");
-            let receiver = UdpSocket::bind(receiver_addr)
-                .await
-                .expect("Bind Socket Failed");
+            let sender = UdpSocket::bind(ADDR).await.expect("Bind Socket Failed");
+            let receiver = UdpSocket::bind(ADDR).await.expect("Bind Socket Failed");
+
+            let receiver_addr = receiver.local_addr().unwrap();
 
             let buf = [2; 6];
             let number_of_bytes = sender
@@ -1934,18 +1801,14 @@ mod tests {
     /// 4. Check if the test results are correct.
     #[test]
     fn ut_send_to_peek_from_poll() {
-        let sender_addr = "127.0.0.1:8119";
-        let receiver_addr = "127.0.0.1:8120";
-        let receiver_addr_socket = "127.0.0.1:8120".parse().unwrap();
         let handle = spawn(async move {
-            let sender = UdpSocket::bind(sender_addr)
-                .await
-                .expect("Bind Socket Failed");
-            let receiver = UdpSocket::bind(receiver_addr)
-                .await
-                .expect("Bind Socket Failed");
+            let sender = UdpSocket::bind(ADDR).await.expect("Bind Socket Failed");
+            let receiver = UdpSocket::bind(ADDR).await.expect("Bind Socket Failed");
 
-            let n = poll_fn(|cx| sender.poll_send_to(cx, b"Hello", receiver_addr_socket))
+            let sender_addr = sender.local_addr().unwrap();
+            let receiver_addr = receiver.local_addr().unwrap();
+
+            let n = poll_fn(|cx| sender.poll_send_to(cx, b"Hello", receiver_addr))
                 .await
                 .expect("Sender Send Failed");
             assert_eq!(n, "Hello".len());
@@ -1956,7 +1819,7 @@ mod tests {
                 .await
                 .unwrap();
             assert_eq!(read.filled(), b"Hello");
-            assert_eq!(addr, sender_addr.parse().unwrap());
+            assert_eq!(addr, sender_addr);
         });
         block_on(handle).expect("block_on failed");
     }
@@ -1971,16 +1834,13 @@ mod tests {
     /// 5. Check if the test results are correct.
     #[test]
     fn ut_connected_peek() {
-        let sender_addr = "127.0.0.1:8121";
-        let receiver_addr = "127.0.0.1:8122";
-
         let handle = spawn(async move {
-            let sender = UdpSocket::bind(sender_addr)
-                .await
-                .expect("Bind Socket Failed");
-            let receiver = UdpSocket::bind(receiver_addr)
-                .await
-                .expect("Bind Socket Failed");
+            let sender = UdpSocket::bind(ADDR).await.expect("Bind Socket Failed");
+            let receiver = UdpSocket::bind(ADDR).await.expect("Bind Socket Failed");
+
+            let sender_addr = sender.local_addr().unwrap();
+            let receiver_addr = receiver.local_addr().unwrap();
+
             let connect_socket = receiver.connect(sender_addr).await.unwrap();
 
             let send_buf = [2; 6];
@@ -2012,16 +1872,13 @@ mod tests {
     /// 5. Check if the test results are correct.
     #[test]
     fn ut_connected_try_peek() {
-        let sender_addr = "127.0.0.1:8123";
-        let receiver_addr = "127.0.0.1:8124";
-
         let handle = spawn(async move {
-            let sender = UdpSocket::bind(sender_addr)
-                .await
-                .expect("Bind Socket Failed");
-            let receiver = UdpSocket::bind(receiver_addr)
-                .await
-                .expect("Bind Socket Failed");
+            let sender = UdpSocket::bind(ADDR).await.expect("Bind Socket Failed");
+            let receiver = UdpSocket::bind(ADDR).await.expect("Bind Socket Failed");
+
+            let sender_addr = sender.local_addr().unwrap();
+            let receiver_addr = receiver.local_addr().unwrap();
+
             let connect_socket = receiver.connect(sender_addr).await.unwrap();
 
             let send_buf = [2; 6];

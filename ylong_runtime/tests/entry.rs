@@ -20,6 +20,7 @@ mod async_fs;
 mod async_pool;
 mod async_read;
 mod block_on;
+mod error;
 mod join_set;
 mod mpsc_test;
 mod mutex;

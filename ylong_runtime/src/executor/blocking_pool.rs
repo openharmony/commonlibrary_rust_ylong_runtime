@@ -208,9 +208,10 @@ impl BlockPoolSpawner {
         let mut shared = self.inner.shared.lock().unwrap();
 
         // if the shutdown flag is on, cancel the task
-        if shared.shutdown {
-            panic!("The blocking runtime has already been shutdown, cannot spawn tasks");
-        }
+        assert!(
+            !shared.shutdown,
+            "The blocking runtime has already been shutdown, cannot spawn tasks"
+        );
 
         shared.queue.push_back(task);
 

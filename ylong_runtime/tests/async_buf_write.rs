@@ -192,3 +192,33 @@ fn sdv_buf_writer_write_vectored_2() {
     ylong_runtime::block_on(server).unwrap();
     ylong_runtime::block_on(client).unwrap();
 }
+
+/// SDV test cases for `stdout` and `stderr``.
+///
+/// # Brief
+/// 1. create a `stdout` and a `stderr`.
+/// 2. write something into `stdout` and `stderr`.
+/// 3. check operation is ok.
+#[test]
+fn sdv_buf_writer_stdio_write() {
+    let handle = ylong_runtime::spawn(async {
+        let stdout = ylong_runtime::io::stdout();
+        let mut buf_writer = AsyncBufWriter::new(stdout);
+        let res = buf_writer.write_all(b"something").await;
+        assert!(res.is_ok());
+        let res = buf_writer.flush().await;
+        assert!(res.is_ok());
+        let res = buf_writer.shutdown().await;
+        assert!(res.is_ok());
+
+        let stderr = ylong_runtime::io::stderr();
+        let mut buf_writer = AsyncBufWriter::new(stderr);
+        let res = buf_writer.write_all(b"something").await;
+        assert!(res.is_ok());
+        let res = buf_writer.flush().await;
+        assert!(res.is_ok());
+        let res = buf_writer.shutdown().await;
+        assert!(res.is_ok());
+    });
+    ylong_runtime::block_on(handle).unwrap();
+}
