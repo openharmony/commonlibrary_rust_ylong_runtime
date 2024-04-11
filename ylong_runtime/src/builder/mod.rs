@@ -167,7 +167,7 @@ mod test {
         #[cfg(not(feature = "ffrt"))]
         {
             assert_eq!(thread_pool_builder.common.blocking_permanent_thread_num, 0);
-            assert_eq!(thread_pool_builder.common.max_blocking_pool_size, Some(50));
+            assert_eq!(thread_pool_builder.common.max_blocking_pool_size, None);
             assert_eq!(thread_pool_builder.common.keep_alive_time, None);
             assert_eq!(thread_pool_builder.core_thread_size, None);
             assert_eq!(thread_pool_builder.common.stack_size, None);
@@ -278,6 +278,7 @@ mod current_thread_test {
 #[cfg(test)]
 mod ylong_executor_test {
     use crate::builder::{RuntimeBuilder, ScheduleAlgo};
+    use crate::util::num_cpus::get_cpu_num;
 
     /// UT test cases for ThreadPoolBuilder::is_affinity()
     ///
@@ -310,8 +311,7 @@ mod ylong_executor_test {
             RuntimeBuilder::new_multi_thread().blocking_permanent_thread_num(1);
         assert_eq!(thread_pool_builder.common.blocking_permanent_thread_num, 1);
 
-        let blocking_permanent_thread_num =
-            thread_pool_builder.common.max_blocking_pool_size.unwrap();
+        let blocking_permanent_thread_num = get_cpu_num() as u8;
         let thread_pool_builder = RuntimeBuilder::new_multi_thread()
             .blocking_permanent_thread_num(blocking_permanent_thread_num);
         assert_eq!(
@@ -323,13 +323,12 @@ mod ylong_executor_test {
             RuntimeBuilder::new_multi_thread().blocking_permanent_thread_num(0);
         assert_eq!(thread_pool_builder.common.blocking_permanent_thread_num, 0);
 
-        let permanent_blocking_thread_num =
-            thread_pool_builder.common.max_blocking_pool_size.unwrap() + 1;
+        let permanent_blocking_thread_num = get_cpu_num() as u8 + 1;
         let thread_pool_builder = RuntimeBuilder::new_multi_thread()
             .blocking_permanent_thread_num(permanent_blocking_thread_num);
         assert_eq!(
             thread_pool_builder.common.blocking_permanent_thread_num,
-            thread_pool_builder.common.max_blocking_pool_size.unwrap()
+            permanent_blocking_thread_num
         );
     }
 

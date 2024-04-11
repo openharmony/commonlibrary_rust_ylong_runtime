@@ -33,6 +33,9 @@ use crate::task::{JoinHandle, TaskBuilder};
 pub struct File {
     file: Arc<SyncFile>,
     inner: Mutex<FileInner>,
+    // controls how many bytes the buffer could reserve during read
+    // and how many bytes the buffer could extend per time during write
+    buf_size_limit: usize,
 }
 
 struct FileInner {
@@ -92,6 +95,8 @@ impl FileState {
     }
 }
 
+const DEFAULT_BUF_LIMIT: usize = 2 * 1024 * 1024;
+
 impl File {
     /// Creates a new [`File`] struct.
     pub fn new(file: SyncFile) -> File {
@@ -102,6 +107,7 @@ impl File {
                 write_err: None,
                 idx: 0,
             }),
+            buf_size_limit: DEFAULT_BUF_LIMIT,
         }
     }
 
@@ -337,6 +343,32 @@ impl File {
         let file = async_op(move || file.try_clone()).await?;
         Ok(Self::new(file))
     }
+
+    /// Sets the buffer size limit for [`AsyncRead`] and [`AsyncWrite`]
+    /// operation of this file.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # async fn set_file_buffer_limit() {
+    /// use ylong_runtime::fs::File;
+    /// use ylong_runtime::io::{AsyncReadExt, AsyncWriteExt};
+    /// let mut file = File::open("foo.txt").await.unwrap();
+    /// file.set_buffer_size_limit(1024 * 1024 * 2);
+    /// let mut buf = vec![0; 1024 * 1024 * 16];
+    /// // write the buffer in chunks up to 2MB each
+    /// let _ = file.write_all(&mut buf).await;
+    ///
+    /// let mut file = File::open("foo.txt").await.unwrap();
+    /// file.set_buffer_size_limit(1024 * 1024 * 2);
+    /// let mut read_buf = vec![];
+    /// // read the file in chunks up to 2MB each
+    /// let _ = file.read_to_end(&mut read_buf);
+    /// # }
+    /// ```
+    pub fn set_buffer_size_limit(&mut self, buf_size_limit: usize) {
+        self.buf_size_limit = buf_size_limit;
+    }
 }
 
 impl AsyncSeek for File {
@@ -416,7 +448,7 @@ impl AsyncRead for File {
 
                     // Make sure there is enough space to read. File_buf's size might be bigger than
                     // the read_buf's size since other thread might also read into the read_buf.
-                    r_buf.reserve(buf.remaining());
+                    r_buf.reserve(buf.remaining(), file.buf_size_limit);
 
                     // State transition
                     let file = file.file.clone();
@@ -476,7 +508,7 @@ impl AsyncWrite for File {
                     let mut w_buf = file_buf.take().unwrap();
 
                     let unread = w_buf.drop_unread();
-                    let n = w_buf.append(buf);
+                    let n = w_buf.append(buf, file.buf_size_limit);
                     let file = file.file.clone();
 
                     inner.state =
@@ -538,6 +570,7 @@ impl FileInner {
 mod test {
     use std::io::SeekFrom;
 
+    use crate::fs::async_file::DEFAULT_BUF_LIMIT;
     use crate::fs::{remove_file, File};
     use crate::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 
@@ -692,6 +725,30 @@ mod test {
             let ret = file.write_all(&buf).await;
             assert!(ret.is_ok());
             let ret = file.sync_data().await;
+            assert!(ret.is_ok());
+        });
+        crate::block_on(handle).unwrap();
+        std::fs::remove_file(file_path).unwrap();
+    }
+
+    /// UT for setting the buffer's size limit
+    ///
+    /// # Brief
+    /// 1. Creates a new file, checks if its buffer size limit equals to
+    /// DEFAULT_BUF_LIMIT 2. Sets a new limit for file buffer
+    /// 3. Writes the entire buffer into the file
+    #[test]
+    fn ut_fs_set_buf_size_limit() {
+        let file_path = "file16.txt";
+        let handle = crate::spawn(async move {
+            let mut file = File::create(file_path).await.unwrap();
+            assert_eq!(file.buf_size_limit, DEFAULT_BUF_LIMIT);
+
+            file.set_buffer_size_limit(1024 * 1024 * 4);
+            assert_eq!(file.buf_size_limit, 1024 * 1024 * 4);
+
+            let buf = [2; 20000];
+            let ret = file.write_all(&buf).await;
             assert!(ret.is_ok());
         });
         crate::block_on(handle).unwrap();

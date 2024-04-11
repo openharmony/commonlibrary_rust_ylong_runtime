@@ -21,8 +21,6 @@ pub(crate) struct FileBuf {
     idx: usize,
 }
 
-const MAX_BUF_LEN: usize = 16384;
-
 impl FileBuf {
     #[inline]
     pub(crate) fn with_capacity(n: usize) -> FileBuf {
@@ -51,16 +49,16 @@ impl FileBuf {
     }
 
     #[inline]
-    pub(crate) fn append(&mut self, other: &[u8]) -> usize {
-        let n = std::cmp::min(other.len(), MAX_BUF_LEN);
+    pub(crate) fn append(&mut self, other: &[u8], buf_size_limit: usize) -> usize {
+        let n = std::cmp::min(other.len(), buf_size_limit);
         self.buf.extend_from_slice(&other[..n]);
         n
     }
 
     #[allow(clippy::uninit_vec)]
     #[inline]
-    pub(crate) fn reserve(&mut self, size: usize) {
-        let len = std::cmp::min(size, MAX_BUF_LEN);
+    pub(crate) fn reserve(&mut self, size: usize, buf_size_limit: usize) {
+        let len = std::cmp::min(size, buf_size_limit);
         self.buf.reserve(len.saturating_sub(self.buf.len()));
         // need to set length in order to read
         unsafe { self.buf.set_len(len) }

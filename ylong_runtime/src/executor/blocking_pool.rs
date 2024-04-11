@@ -27,6 +27,7 @@ use crate::task;
 use crate::task::{JoinHandle, TaskBuilder, VirtualTableType};
 
 pub(crate) const BLOCKING_THREAD_QUIT_WAIT_TIME: Duration = Duration::from_secs(1);
+pub(crate) const DEFAULT_MAX_BLOCKING_POOL_SIZE: u8 = 16;
 
 #[derive(Clone)]
 pub(crate) struct BlockPoolSpawner {
@@ -46,7 +47,7 @@ impl BlockPoolSpawner {
             .unwrap_or(BLOCKING_THREAD_KEEP_ALIVE_TIME);
         let max_thread_num = builder
             .max_blocking_pool_size
-            .unwrap_or(BLOCKING_MAX_THEAD_NUM);
+            .unwrap_or(DEFAULT_MAX_BLOCKING_POOL_SIZE);
         BlockPoolSpawner {
             inner: Arc::new(Inner {
                 shared: Mutex::new(Shared {
@@ -101,7 +102,6 @@ impl BlockPoolSpawner {
 }
 
 const BLOCKING_THREAD_KEEP_ALIVE_TIME: Duration = Duration::from_secs(5);
-pub const BLOCKING_MAX_THEAD_NUM: u8 = 50;
 
 /// Inner struct for [`BlockPoolSpawner`].
 struct Inner {
@@ -416,7 +416,7 @@ mod test {
     use std::time::Duration;
 
     use crate::builder::RuntimeBuilder;
-    use crate::executor::blocking_pool::BlockPoolSpawner;
+    use crate::executor::blocking_pool::{BlockPoolSpawner, DEFAULT_MAX_BLOCKING_POOL_SIZE};
 
     /// UT test cases for BlockPoolSpawner::new()
     ///
@@ -433,7 +433,7 @@ mod test {
         );
         assert_eq!(
             blocking_pool.inner.max_thread_num,
-            thread_pool_builder.common.max_blocking_pool_size.unwrap()
+            DEFAULT_MAX_BLOCKING_POOL_SIZE
         );
         assert_eq!(
             blocking_pool.inner.keep_alive_time,
