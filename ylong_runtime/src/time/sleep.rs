@@ -109,7 +109,7 @@ cfg_ffrt!(
 
             if let Some(waker) = self.inner.waker.take() {
                 unsafe {
-                    drop(Box::from_raw(waker as *mut Waker));
+                    drop(Box::from_raw(waker));
                 }
             }
         }
@@ -121,7 +121,7 @@ cfg_ffrt!(
             }
             if let Some(waker) = self.inner.waker.take() {
                 unsafe {
-                    drop(Box::from_raw(waker as *mut Waker));
+                    drop(Box::from_raw(waker));
                 }
             }
         }
@@ -143,7 +143,7 @@ cfg_ffrt!(
                     let waker_ptr = Box::into_raw(waker);
 
                     if let Some(waker) = this.inner.waker.take() {
-                        unsafe { drop(Box::from_raw(waker as *mut Waker)); }
+                        unsafe { drop(Box::from_raw(waker)); }
                     }
 
                     this.inner.waker = Some(waker_ptr);

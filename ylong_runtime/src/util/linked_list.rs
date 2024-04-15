@@ -132,6 +132,7 @@ impl<L: Link + Default> LinkedList<L> {
     }
 
     /// Checks whether the list is empty.
+    #[cfg(feature = "time")]
     pub(crate) fn is_empty(&self) -> bool {
         unsafe { L::node(self.head).as_ref().next == Some(self.head) }
     }
@@ -218,6 +219,7 @@ mod tests {
     /// list.
     /// 3. Check if the list is empty before and after clear the list.
     #[test]
+    #[cfg(feature = "time")]
     fn ut_link_list_is_empty() {
         let mut list = LinkedList::<Entry>::new();
         assert!(list.is_empty());
@@ -236,7 +238,6 @@ mod tests {
     #[test]
     fn ut_link_list_push_and_pop() {
         let mut list = LinkedList::<Entry>::new();
-        assert!(list.is_empty());
         let node1 = Entry::new(1);
         let node1 = node1.get_ptr();
         let node2 = Entry::new(2);
@@ -244,14 +245,12 @@ mod tests {
         let node3 = Entry::new(3);
         let node3 = node3.get_ptr();
         list.push_front(node1);
-        assert!(!list.is_empty());
         list.push_front(node2);
         list.push_front(node3);
         assert_eq!(1, get_val(list.pop_back().unwrap()));
         assert_eq!(2, get_val(list.pop_back().unwrap()));
         assert_eq!(3, get_val(list.pop_back().unwrap()));
         assert!(list.pop_back().is_none());
-        assert!(list.is_empty());
     }
 
     /// UT test cases for `push_front()` and `remove()`.

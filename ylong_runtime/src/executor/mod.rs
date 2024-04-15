@@ -269,13 +269,20 @@ impl Runtime {
     where
         T: Future<Output = R>,
     {
+        self.block_on_inner(task)
+    }
+
+    #[cfg(not(feature = "ffrt"))]
+    fn block_on_inner<T, R>(&self, task: T) -> R
+    where
+        T: Future<Output = R>,
+    {
         // Registers handle to the current thread when block_on().
         // so that async_source can get the handle and register it.
-        #[cfg(not(feature = "ffrt"))]
         let cur_context = worker::WorkerHandle {
             _handle: self.get_handle(),
         };
-        #[cfg(not(feature = "ffrt"))]
+
         worker::CURRENT_HANDLE.with(|ctx| {
             ctx.set(&cur_context as *const _ as *const ());
         });
@@ -283,20 +290,28 @@ impl Runtime {
         let ret = match &self.async_spawner {
             #[cfg(feature = "current_thread_runtime")]
             AsyncHandle::CurrentThread(current_thread) => current_thread.block_on(task),
-            #[cfg(not(feature = "ffrt"))]
             AsyncHandle::MultiThread(_) => block_on::block_on(task),
-            #[cfg(feature = "ffrt")]
-            AsyncHandle::FfrtMultiThread => block_on::block_on(task),
         };
 
         // Sets the current thread variable to null,
         // otherwise the worker's CURRENT_WORKER can not be set under MultiThread.
-        #[cfg(not(feature = "ffrt"))]
         worker::CURRENT_HANDLE.with(|ctx| {
             ctx.set(std::ptr::null());
         });
 
         ret
+    }
+
+    #[cfg(feature = "ffrt")]
+    fn block_on_inner<T, R>(&self, task: T) -> R
+    where
+        T: Future<Output = R>,
+    {
+        match &self.async_spawner {
+            #[cfg(feature = "current_thread_runtime")]
+            AsyncHandle::CurrentThread(current_thread) => current_thread.block_on(task),
+            AsyncHandle::FfrtMultiThread => block_on::block_on(task),
+        }
     }
 }
 

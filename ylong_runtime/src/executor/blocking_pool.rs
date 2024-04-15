@@ -26,7 +26,7 @@ use crate::executor::PlaceholderScheduler;
 use crate::task;
 use crate::task::{JoinHandle, TaskBuilder, VirtualTableType};
 
-pub(crate) const BLOCKING_THREAD_QUIT_WAIT_TIME: Duration = Duration::from_secs(3);
+pub(crate) const BLOCKING_THREAD_QUIT_WAIT_TIME: Duration = Duration::from_secs(1);
 
 #[derive(Clone)]
 pub(crate) struct BlockPoolSpawner {
