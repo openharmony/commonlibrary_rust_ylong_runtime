@@ -13,7 +13,6 @@
 
 #![cfg(feature = "net")]
 
-use std::net::SocketAddr;
 use std::{io, thread};
 
 use ylong_runtime::net::UdpSocket;
@@ -98,21 +97,21 @@ fn sdv_udp_send_to_recv_from() {
 #[test]
 fn sdv_udp_recv() {
     let handle = ylong_runtime::spawn(async move {
-        let (tx, rx) = ylong_runtime::sync::oneshot::channel();
-
         let receiver = UdpSocket::bind(ADDR).await.expect("Bind Socket Failed");
+        let sender = UdpSocket::bind(ADDR).await.expect("Bind Socket Failed");
         let receiver_addr = receiver.local_addr().unwrap();
+        let sender_addr = sender.local_addr().unwrap();
+        let connected_receiver = receiver
+            .connect(sender_addr)
+            .await
+            .expect("Connect Socket Failed");
+        let connected_sender = sender
+            .connect(receiver_addr)
+            .await
+            .expect("Connect Socket Failed");
 
         let handle = thread::spawn(move || {
             let handle = ylong_runtime::spawn(async move {
-                let sender = UdpSocket::bind(ADDR).await.expect("Bind Socket Failed");
-                let sender_addr = sender.local_addr().unwrap();
-                tx.send(sender_addr).unwrap();
-                let connected_sender = sender
-                    .connect(receiver_addr)
-                    .await
-                    .expect("Connect Socket Failed");
-
                 let n = connected_sender
                     .send(b"Hello")
                     .await
@@ -121,12 +120,6 @@ fn sdv_udp_recv() {
             });
             ylong_runtime::block_on(handle).expect("block_on failed");
         });
-
-        let sender_addr = rx.await.unwrap();
-        let connected_receiver = receiver
-            .connect(sender_addr)
-            .await
-            .expect("Connect Socket Failed");
 
         let mut recv_buf = [0_u8; 12];
         let len = connected_receiver.recv(&mut recv_buf[..]).await.unwrap();
@@ -183,19 +176,8 @@ fn sdv_udp_try_recv_from() {
     ylong_runtime::block_on(handle).expect("block_on failed");
 }
 
-fn sdv_udp_try_send(
-    tx: ylong_runtime::sync::oneshot::Sender<SocketAddr>,
-    receiver_addr: SocketAddr,
-) {
+fn sdv_udp_try_send(connected_sender: ylong_runtime::net::ConnectedUdpSocket) {
     let handle = ylong_runtime::spawn(async move {
-        let sender = UdpSocket::bind(ADDR).await.expect("Bind Socket Failed");
-        let sender_addr = sender.local_addr().unwrap();
-        tx.send(sender_addr).unwrap();
-        let connected_sender = sender
-            .connect(receiver_addr)
-            .await
-            .expect("Connect Socket Failed");
-
         connected_sender.writable().await.unwrap();
         match connected_sender.try_send(b"Hello") {
             Ok(n) => assert_eq!(n, "Hello".len()),
@@ -218,18 +200,20 @@ fn sdv_udp_try_send(
 #[test]
 fn sdv_udp_try_recv() {
     let handle = ylong_runtime::spawn(async move {
-        let (tx, rx) = ylong_runtime::sync::oneshot::channel();
-
         let receiver = UdpSocket::bind(ADDR).await.expect("Bind Socket Failed");
+        let sender = UdpSocket::bind(ADDR).await.expect("Bind Socket Failed");
         let receiver_addr = receiver.local_addr().unwrap();
-
-        thread::spawn(move || sdv_udp_try_send(tx, receiver_addr));
-
-        let sender_addr = rx.await.unwrap();
+        let sender_addr = sender.local_addr().unwrap();
         let connected_receiver = receiver
             .connect(sender_addr)
             .await
             .expect("Connect Socket Failed");
+        let connected_sender = sender
+            .connect(receiver_addr)
+            .await
+            .expect("Connect Socket Failed");
+
+        thread::spawn(move || sdv_udp_try_send(connected_sender));
 
         connected_receiver.readable().await.unwrap();
         let mut recv_buf = [0_u8; 12];
@@ -254,17 +238,21 @@ fn sdv_udp_try_recv() {
 #[cfg(not(feature = "ffrt"))]
 fn sdv_udp_block_on_try_recv() {
     ylong_runtime::block_on(async {
-        let (tx, rx) = ylong_runtime::sync::oneshot::channel();
-
         let receiver = UdpSocket::bind(ADDR).await.expect("Bind Socket Failed");
         let receiver_addr = receiver.local_addr().unwrap();
-
-        thread::spawn(move || sdv_udp_try_send(tx, receiver_addr));
-        let sender_addr = rx.await.unwrap();
+        let sender = UdpSocket::bind(ADDR).await.expect("Bind Socket Failed");
+        let sender_addr = sender.local_addr().unwrap();
         let connected_receiver = receiver
             .connect(sender_addr)
             .await
-            .expect("Connect Socket Failed");
+            .expect("Connect Socket Failed.");
+        let connected_sender = sender
+            .connect(receiver_addr)
+            .await
+            .expect("Connect Socket Failed.");
+
+        thread::spawn(move || sdv_udp_try_send(connected_sender));
+
         connected_receiver.readable().await.unwrap();
         let mut recv_buf = [0_u8; 12];
         let len = connected_receiver.try_recv(&mut recv_buf[..]).unwrap();
