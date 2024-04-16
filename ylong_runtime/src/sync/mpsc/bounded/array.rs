@@ -214,10 +214,8 @@ impl<T> Drop for Array<T> {
         let head = *self.head.borrow();
         for i in 0..len {
             let mut index = head + i;
-            if index > self.capacity {
-                index -= self.capacity;
-            }
-            let node = self.data.get_mut(index).unwrap();
+            index %= self.capacity;
+            let node = self.data.get(index).unwrap();
             unsafe {
                 node.value.borrow_mut().as_mut_ptr().drop_in_place();
             }
