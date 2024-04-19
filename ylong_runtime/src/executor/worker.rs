@@ -21,7 +21,6 @@ use crate::executor::async_pool::MultiThreadScheduler;
 use crate::executor::driver::Handle;
 use crate::executor::parker::Parker;
 use crate::executor::queue::LocalQueue;
-use crate::task::yield_now::wake_yielded_tasks;
 use crate::task::Task;
 
 thread_local! {
@@ -34,11 +33,24 @@ pub(crate) struct WorkerContext {
 }
 
 impl WorkerContext {
+    #[inline]
     fn run(&mut self) {
         let worker_ref = &self.worker;
         worker_ref.run(self);
     }
 
+    pub(crate) fn wake_yield(&self) -> bool {
+        let mut yielded = self.worker.yielded.borrow_mut();
+        if yielded.is_empty() {
+            return false;
+        }
+        for waker in yielded.drain(..) {
+            waker.wake();
+        }
+        true
+    }
+
+    #[inline]
     fn release(&mut self) {
         self.worker.release();
     }
@@ -128,16 +140,22 @@ impl Worker {
             inner.increment_count();
             inner.periodic_check(self);
 
-            // get a task from the queues and execute it
             if let Some(task) = self.get_task(inner, worker_ctx) {
+                if inner.is_searching {
+                    inner.is_searching = false;
+                    self.scheduler.wake_up_rand_one_if_last_search();
+                }
                 task.run();
                 continue;
             }
-            wake_yielded_tasks(worker_ctx);
+
             // if there is no task, park the worker
             self.park_timeout(inner, worker_ctx);
-
             self.check_cancel(inner);
+
+            if !inner.is_searching && self.scheduler.is_waked_by_last_search(self.index) {
+                inner.is_searching = true;
+            }
         }
     }
 
@@ -148,7 +166,7 @@ impl Worker {
             return Some(task);
         }
 
-        self.scheduler.dequeue(self.index, inner)
+        self.scheduler.dequeue(inner, worker_ctx)
     }
 
     #[inline]
@@ -156,16 +174,26 @@ impl Worker {
         inner.check_cancel(self)
     }
 
+    fn has_work(&self, inner: &mut Inner, worker_ctx: &WorkerContext) -> bool {
+        worker_ctx.worker.lifo.borrow().is_some() || !inner.run_queue.is_empty()
+    }
+
     fn park_timeout(&self, inner: &mut Inner, worker_ctx: &WorkerContext) {
         // still has works to do, go back to work
-        if worker_ctx.worker.lifo.borrow().is_some() || !inner.run_queue.is_empty() {
+        if self.has_work(inner, worker_ctx) {
             return;
         }
-
-        self.scheduler.turn_to_sleep(self.index);
+        self.scheduler.turn_to_sleep(inner, self.index);
+        inner.is_searching = false;
 
         while !inner.is_cancel {
             inner.parker.park();
+
+            if self.has_work(inner, worker_ctx) {
+                self.scheduler.turn_from_sleep(&self.index);
+                break;
+            }
+
             if self.scheduler.is_parked(&self.index) {
                 self.check_cancel(inner);
                 continue;
@@ -201,6 +229,7 @@ pub(crate) struct Inner {
     /// local queue
     pub(crate) run_queue: LocalQueue,
     pub(crate) parker: Parker,
+    pub(crate) is_searching: bool,
 }
 
 impl Inner {
@@ -210,6 +239,7 @@ impl Inner {
             is_cancel: false,
             run_queue: run_queues,
             parker,
+            is_searching: false,
         }
     }
 }
