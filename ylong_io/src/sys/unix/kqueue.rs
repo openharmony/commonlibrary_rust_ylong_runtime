@@ -21,6 +21,10 @@ use libc::{c_int, uintptr_t};
 
 use crate::{EventTrait, Interest, Token};
 
+/// An wrapper for different OS polling system.
+/// Linux: epoll
+/// Windows: iocp
+/// macos: kqueue
 #[derive(Debug)]
 pub struct Selector {
     kq: RawFd,
@@ -117,6 +121,10 @@ impl Selector {
         kevent_check_error(events.as_mut_slice(), &[libc::ENOENT as i64])
     }
 
+    /// Try-clones the kqueue.
+    ///
+    /// If succeeds, returns a duplicate of the kqueue.
+    /// If fails, returns the last OS error.
     pub fn try_clone(&self) -> io::Result<Selector> {
         const LOWEST_FD: c_int = 3;
 
@@ -124,7 +132,8 @@ impl Selector {
         Ok(Selector { kq })
     }
 
-    // Allows the kqueue to accept user-space notifications.
+    /// Allows the kqueue to accept user-space notifications. Should be called
+    /// before `Selector::wake`
     pub fn register_waker(&self, token: Token) -> io::Result<()> {
         let event = kevent_new(
             0,
@@ -136,8 +145,8 @@ impl Selector {
         self.kevent_notify(event)
     }
 
-    // Sends a notification to wakeup the kqueue. Should be called after
-    // `register_waker`.
+    /// Sends a notification to wakeup the kqueue. Should be called after
+    /// `Selector::register_waker`.
     pub fn wake(&self, token: Token) -> io::Result<()> {
         let mut event = kevent_new(
             0,
@@ -211,6 +220,7 @@ pub type Event = libc::kevent;
 pub struct Events(Vec<Event>);
 
 impl Events {
+    /// Initializes a vector of events with an initial capacity
     pub fn with_capacity(capacity: usize) -> Self {
         Events(Vec::with_capacity(capacity))
     }

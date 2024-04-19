@@ -38,9 +38,10 @@ use crate::sys::windows::iocp::{CompletionPort, CompletionStatus};
 use crate::sys::NetInner;
 use crate::{Event, Interest, Token};
 
-/// An wrapper to block different OS polling system.
+/// An wrapper for different OS polling system.
 /// Linux: epoll
 /// Windows: iocp
+/// macos: kqueue
 #[derive(Debug)]
 pub struct Selector {
     inner: Arc<SelectorInner>,

@@ -20,9 +20,10 @@ use crate::{EventTrait, Interest, Token};
 
 static NEXT_ID: AtomicUsize = AtomicUsize::new(1);
 
-/// An wrapper to block different OS polling system.
+/// An wrapper for different OS polling system.
 /// Linux: epoll
 /// Windows: iocp
+/// macos: kqueue
 pub struct Selector {
     // selector id
     id: usize,
