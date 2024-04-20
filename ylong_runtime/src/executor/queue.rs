@@ -216,7 +216,7 @@ impl InnerBuffer {
 
             let res = self
                 .front
-                .compare_exchange_weak(head, next, AcqRel, Acquire);
+                .compare_exchange(head, next, AcqRel, Acquire);
             match res {
                 Ok(_) => break real_pos,
                 Err(actual) => head = actual,
@@ -368,7 +368,7 @@ impl InnerBuffer {
 
             let res =
                 self.front
-                    .compare_exchange_weak(src_prev_front, src_next_front, AcqRel, Acquire);
+                    .compare_exchange(src_prev_front, src_next_front, AcqRel, Acquire);
             match res {
                 Ok(_) => break n,
                 Err(actual) => src_prev_front = actual,

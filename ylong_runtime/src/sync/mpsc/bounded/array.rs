@@ -86,7 +86,7 @@ impl<T> Array<T> {
             // Compare the index of the node with the tail to avoid senders in different
             // cycles writing data to the same point at the same time.
             if (tail >> INDEX_SHIFT) == node_index {
-                match self.tail.compare_exchange_weak(
+                match self.tail.compare_exchange(
                     tail,
                     tail.wrapping_add(1 << INDEX_SHIFT),
                     AcqRel,

@@ -138,7 +138,7 @@ impl<T> Queue<T> {
             if index + 1 == CAPACITY && new_block.is_none() {
                 new_block = Some(Box::new(Block::<T>::new()));
             }
-            match self.tail.index.compare_exchange_weak(
+            match self.tail.index.compare_exchange(
                 tail,
                 tail + (1 << INDEX_SHIFT),
                 AcqRel,

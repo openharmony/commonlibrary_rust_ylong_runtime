@@ -138,7 +138,7 @@ impl<T: ?Sized> RwLock<T> {
             if read_count < 0 {
                 return Err(LockError);
             } else {
-                match self.read_count.compare_exchange_weak(
+                match self.read_count.compare_exchange(
                     read_count,
                     read_count + 1,
                     AcqRel,
