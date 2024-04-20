@@ -171,7 +171,7 @@ impl<T> Sender<T> {
                     if self
                         .channel
                         .state
-                        .compare_exchange_weak(INIT, SENT, AcqRel, Acquire)
+                        .compare_exchange(INIT, SENT, AcqRel, Acquire)
                         .is_ok()
                     {
                         self.channel.waker.wake();
