@@ -44,11 +44,7 @@
           }
         },
         {
-          "name": "//commonlibrary/rust/ylong_runtime/ylong_runtime:ylong_runtime_static",
-          "header": {
-            "header_base": [],
-            "header_files": []
-          }
+          "name": "//commonlibrary/rust/ylong_runtime/ylong_runtime:ylong_runtime_static"
         }
       ],
       "test": [

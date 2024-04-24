@@ -43,7 +43,7 @@ ohos_rust_static_library("ylong_runtime_static") {
   part_name = "ylong_runtime"
   subsystem_name = "commonlibrary"
 
-  crate_name = "ylong_runtime"
+  crate_name = "ylong_runtime_static"
   edition = "2021"
 
   features = [
