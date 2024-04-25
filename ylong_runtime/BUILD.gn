@@ -38,3 +38,29 @@ ohos_rust_shared_library("ylong_runtime") {
     "//third_party/rust/crates/libc:lib",
   ]
 }
+
+ohos_rust_static_library("ylong_runtime_static") {
+  part_name = "ylong_runtime"
+  subsystem_name = "commonlibrary"
+
+  crate_name = "ylong_runtime_static"
+  edition = "2021"
+
+  features = [
+    "fs",
+    "macros",
+    "net",
+    "process",
+    "signal",
+    "sync",
+    "time",
+  ]
+
+  sources = [ "src/lib.rs" ]
+  deps = [
+    "../ylong_io:ylong_io",
+    "../ylong_runtime_macros:ylong_runtime_macros(${host_toolchain})",
+    "../ylong_signal:ylong_signal",
+    "//third_party/rust/crates/libc:lib",
+  ]
+}
