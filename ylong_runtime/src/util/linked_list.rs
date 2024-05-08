@@ -110,6 +110,7 @@ impl<L: Link + Default> LinkedList<L> {
         unsafe {
             let head = L::node(self.head).as_mut();
             if head.prev != Some(self.head) {
+                // the queue is not empty, so prev must be some
                 let node = head.prev.take().unwrap();
                 Node::remove_node(node);
                 Some(node)
@@ -148,6 +149,7 @@ impl<L: Link + Default> LinkedList<L> {
             let head = L::node(self.head).as_ref();
             let mut p = head.next;
             while p != Some(self.head) {
+                // p is not head, therefore it must be some
                 let node = p.unwrap();
                 let next = L::node(node).as_ref().next;
                 if f(&mut *node.as_ptr()) {

@@ -109,11 +109,7 @@ impl<T> Sender<T> {
         if self.channel.rx_cnt.load(Acquire) == 0 {
             return Err(SendError(value));
         }
-        let mut lock = self
-            .channel
-            .value
-            .write()
-            .expect("Poison error occurs in watch");
+        let mut lock = self.channel.value.write().unwrap();
         *lock = value;
         self.channel.state.version_update();
         drop(lock);
@@ -438,11 +434,7 @@ impl<T> Receiver<T> {
     /// [`is_notified`]: Receiver::is_notified
     pub fn borrow(&self) -> ValueRef<'_, T> {
         let (value_version, _) = self.channel.state.load();
-        let value = self
-            .channel
-            .value
-            .read()
-            .expect("Poison error occurs in watch");
+        let value = self.channel.value.read().unwrap();
         let is_notified = self.version != value_version;
         ValueRef::new(value, is_notified)
     }
@@ -480,11 +472,7 @@ impl<T> Receiver<T> {
     /// [`is_notified`]: Receiver::is_notified
     pub fn borrow_notify(&mut self) -> ValueRef<'_, T> {
         let (value_version, _) = self.channel.state.load();
-        let value = self
-            .channel
-            .value
-            .read()
-            .expect("Poison error occurs in watch");
+        let value = self.channel.value.read().unwrap();
         let is_notified = self.version != value_version;
         self.version = value_version;
         ValueRef::new(value, is_notified)

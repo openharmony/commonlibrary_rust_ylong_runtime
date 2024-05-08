@@ -169,6 +169,7 @@ impl IoDriver {
         let addr_bit = Bit::from_usize(token.0);
         let addr = addr_bit.get_by_mask(ADDRESS);
 
+        // IoDriver at this point has been initialized, therefore resources must be some
         let io = match self
             .resources
             .as_mut()
@@ -194,9 +195,10 @@ impl IoDriver {
 #[cfg(not(feature = "ffrt"))]
 impl IoDriver {
     pub(crate) fn initialize() -> (IoHandle, IoDriver) {
-        let poll = Poll::new().unwrap();
-        let waker =
-            ylong_io::Waker::new(&poll, WAKE_TOKEN).expect("ylong_io waker construction failed");
+        let poll =
+            Poll::new().unwrap_or_else(|e| panic!("IO poller initialize failed, error: {e}"));
+        let waker = ylong_io::Waker::new(&poll, WAKE_TOKEN)
+            .unwrap_or_else(|e| panic!("ylong_io waker construction failed, error: {e}"));
         let arc_poll = Arc::new(poll);
         let events = Events::with_capacity(EVENTS_MAX_CAPACITY);
         let slab = Slab::new();
@@ -240,6 +242,7 @@ impl IoDriver {
 
         if self.tick == COMPACT_INTERVAL {
             unsafe {
+                // IoDriver at this point has been initialized, therefore resources must be some
                 self.resources.as_mut().unwrap().compact();
             }
         }

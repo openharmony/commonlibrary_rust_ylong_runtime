@@ -121,22 +121,20 @@ impl SemaphoreInner {
                 return Err(SemaphoreError::Closed);
             }
 
-            if curr > 0 {
-                match self.permits.compare_exchange(
-                    curr,
-                    curr - (1 << PERMIT_SHIFT),
-                    AcqRel,
-                    Acquire,
-                ) {
-                    Ok(_) => {
-                        return Ok(());
-                    }
-                    Err(actual) => {
-                        curr = actual;
-                    }
-                }
-            } else {
+            if curr == 0 {
                 return Err(SemaphoreError::Empty);
+            }
+
+            match self
+                .permits
+                .compare_exchange(curr, curr - (1 << PERMIT_SHIFT), AcqRel, Acquire)
+            {
+                Ok(_) => {
+                    return Ok(());
+                }
+                Err(actual) => {
+                    curr = actual;
+                }
             }
         }
     }
@@ -154,6 +152,28 @@ impl SemaphoreInner {
 
     pub(crate) fn acquire(&self) -> Permit<'_> {
         Permit::new(self)
+    }
+
+    fn update_permit(
+        &self,
+        enqueue: &mut bool,
+        curr: &mut usize,
+        permit_num: usize,
+    ) -> Option<Poll<Result<(), SemaphoreError>>> {
+        match self
+            .permits
+            .compare_exchange(*curr, *curr - permit_num, AcqRel, Acquire)
+        {
+            Ok(_) => {
+                if *enqueue {
+                    self.release();
+                    return Some(Pending);
+                }
+                return Some(Ready(Ok(())));
+            }
+            Err(actual) => *curr = actual,
+        }
+        None
     }
 
     fn poll_acquire(
@@ -175,20 +195,8 @@ impl SemaphoreInner {
                 return Ready(Err(SemaphoreError::Closed));
             }
             if curr >= permit_num {
-                match self
-                    .permits
-                    .compare_exchange(curr, curr - permit_num, AcqRel, Acquire)
-                {
-                    Ok(_) => {
-                        if *enqueue {
-                            self.release();
-                            return Pending;
-                        }
-                        return Ready(Ok(()));
-                    }
-                    Err(actual) => {
-                        curr = actual;
-                    }
+                if let Some(res) = self.update_permit(enqueue, &mut curr, permit_num) {
+                    return res;
                 }
             } else if !(*enqueue) {
                 *waker_index = Some(self.waker_list.insert(cx.waker().clone()));

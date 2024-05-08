@@ -21,28 +21,28 @@ static BLOCK_ON_RAW_WAKER_VIRTUAL_TABLE: RawWakerVTable =
     RawWakerVTable::new(clone, wake, wake_by_ref, drop);
 
 fn clone(ptr: *const ()) -> RawWaker {
-    let thread = unsafe { Arc::from_raw(ptr as *const Parker) };
+    let thread = unsafe { Arc::from_raw(ptr.cast::<Parker>()) };
 
     // increment the ref count
     mem::forget(thread.clone());
 
-    let data = Arc::into_raw(thread) as *const ();
+    let data = Arc::into_raw(thread).cast::<()>();
     RawWaker::new(data, &BLOCK_ON_RAW_WAKER_VIRTUAL_TABLE)
 }
 
 fn wake(ptr: *const ()) {
-    let thread = unsafe { Arc::from_raw(ptr as *const Parker) };
+    let thread = unsafe { Arc::from_raw(ptr.cast::<Parker>()) };
     thread.notify_one();
 }
 
 fn wake_by_ref(ptr: *const ()) {
-    let thread = unsafe { Arc::from_raw(ptr as *const Parker) };
+    let thread = unsafe { Arc::from_raw(ptr.cast::<Parker>()) };
     thread.notify_one();
     mem::forget(thread);
 }
 
 fn drop(ptr: *const ()) {
-    unsafe { mem::drop(Arc::from_raw(ptr as *const Parker)) };
+    unsafe { mem::drop(Arc::from_raw(ptr.cast::<Parker>())) };
 }
 
 pub(crate) struct ThreadParker {
@@ -63,7 +63,7 @@ impl ThreadParker {
     }
 
     pub(crate) fn waker(&self) -> Waker {
-        let data = Arc::into_raw(self.inner.clone()) as *const ();
+        let data = Arc::into_raw(self.inner.clone()).cast::<()>();
         unsafe { Waker::from_raw(RawWaker::new(data, &BLOCK_ON_RAW_WAKER_VIRTUAL_TABLE)) }
     }
 }

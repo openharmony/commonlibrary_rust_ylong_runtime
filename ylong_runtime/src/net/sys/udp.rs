@@ -162,7 +162,7 @@ impl UdpSocket {
     /// }
     /// ```
     pub async fn connect<A: ToSocketAddrs>(self, addr: A) -> io::Result<ConnectedUdpSocket> {
-        let local_addr = self.local_addr().unwrap();
+        let local_addr = self.local_addr()?;
         drop(self);
 
         let addrs = addr.to_socket_addrs().await?;
@@ -425,14 +425,12 @@ impl UdpSocket {
     ///     let local_addr = "127.0.0.1:8080";
     ///     let sock = UdpSocket::bind(local_addr).await?;
     ///     let mut buf = [0; 10];
-    ///     let (number_of_bytes, src_addr) = sock
-    ///         .try_peek_from(&mut buf)
-    ///         .await
-    ///         .expect("Didn't receive data");
+    ///     let (number_of_bytes, src_addr) =
+    ///         sock.try_peek_from(&mut buf).expect("Didn't receive data");
     ///     Ok(())
     /// }
     /// ```
-    pub async fn try_peek_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
+    pub fn try_peek_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         self.source
             .try_io(Interest::READABLE, || self.source.peek_from(buf))
     }
@@ -1783,7 +1781,6 @@ mod tests {
             receiver.readable().await.expect("Receiver isn't readable");
             let (number_of_bytes, _) = receiver
                 .try_peek_from(&mut buf)
-                .await
                 .expect("Didn't receive data");
             assert_eq!(number_of_bytes, 6);
         });

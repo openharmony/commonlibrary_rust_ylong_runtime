@@ -72,7 +72,8 @@ struct SignalStream {
 
 impl Default for SignalStream {
     fn default() -> Self {
-        let (sender, receiver) = UnixStream::pair().expect("failed to create a pair of UnixStream");
+        let (sender, receiver) = UnixStream::pair()
+            .unwrap_or_else(|e| panic!("failed to create a pair of UnixStream, error: {e}"));
         Self { sender, receiver }
     }
 }

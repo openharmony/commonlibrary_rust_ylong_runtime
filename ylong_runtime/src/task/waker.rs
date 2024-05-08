@@ -34,7 +34,7 @@ unsafe fn clone<T>(ptr: *const ()) -> RawWaker
 where
     T: Future,
 {
-    let header = ptr as *const Header;
+    let header = ptr.cast::<Header>();
     (*header).state.inc_ref();
     raw_waker::<T>(header)
 }
@@ -61,7 +61,7 @@ fn raw_waker<T>(header: *const Header) -> RawWaker
 where
     T: Future,
 {
-    let ptr = header as *const ();
+    let ptr = header.cast::<()>();
     let raw_waker_ref = &RawWakerVTable::new(clone::<T>, wake, wake_by_ref, drop);
     RawWaker::new(ptr, raw_waker_ref)
 }

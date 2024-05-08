@@ -18,6 +18,7 @@ use std::sync::{Mutex, MutexGuard, Once};
 use crate::signal::unix::signal_return_watch;
 use crate::signal::SignalKind;
 use crate::sync::watch;
+use crate::sync::watch::Receiver;
 
 pub(crate) struct GlobalZombieChild {
     child_signal: Mutex<Option<watch::Receiver<()>>>,
@@ -48,20 +49,24 @@ impl GlobalZombieChild {
     pub(crate) fn release_zombie(&self) {
         if let Ok(mut guard) = self.child_signal.try_lock() {
             match &mut *guard {
-                Some(child_signal) => {
-                    if child_signal.try_notified().and_then(Result::ok).is_some() {
-                        reap_vec(self.vec.lock().unwrap())
-                    }
-                }
-                None => {
-                    let vec = self.vec.lock().unwrap();
-                    if !vec.is_empty() {
-                        if let Ok(recv) = signal_return_watch(SignalKind::child()) {
-                            *guard = Some(recv);
-                            reap_vec(vec);
-                        }
-                    }
-                }
+                Some(child_signal) => self.release_zombie_when_some_receiver(child_signal),
+                None => self.release_zombile_when_no_receiver(&mut guard),
+            }
+        }
+    }
+
+    fn release_zombie_when_some_receiver(&self, child_signal: &mut Receiver<()>) {
+        if child_signal.try_notified().and_then(Result::ok).is_some() {
+            reap_vec(self.vec.lock().unwrap())
+        }
+    }
+
+    fn release_zombile_when_no_receiver(&self, guard: &mut MutexGuard<Option<Receiver<()>>>) {
+        let vec = self.vec.lock().unwrap();
+        if !vec.is_empty() {
+            if let Ok(recv) = signal_return_watch(SignalKind::child()) {
+                **guard = Some(recv);
+                reap_vec(vec);
             }
         }
     }

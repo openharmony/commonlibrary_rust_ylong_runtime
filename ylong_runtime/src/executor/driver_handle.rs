@@ -46,7 +46,7 @@ cfg_not_ffrt!(
     impl Handle {
         pub(crate) fn wake(&self) {
             #[cfg(feature = "net")]
-            self.io.waker.wake().expect("ylong_io wake failed");
+            self.io.waker.wake().unwrap_or_else(|e| panic!("ylong_io wake failed, error: {e}"));
         }
 
         #[cfg(any(feature = "net", feature = "time"))]

@@ -291,7 +291,7 @@ where
     T: Future,
     S: Schedule,
 {
-    let out = &mut *(res as *mut Poll<Result<T::Output, ScheduleError>>);
+    let out = &mut *(res.cast::<Poll<Result<T::Output, ScheduleError>>>());
     let task_handle = TaskHandle::<T, S>::from_raw(ptr);
     task_handle.get_result(out);
 }
@@ -310,7 +310,7 @@ where
     T: Future,
     S: Schedule,
 {
-    let waker = &*(waker as *const Waker);
+    let waker = &*(waker.cast::<Waker>());
     let task_handle = TaskHandle::<T, S>::from_raw(ptr);
     task_handle.set_waker(cur_state, waker)
 }

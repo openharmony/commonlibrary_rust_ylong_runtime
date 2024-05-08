@@ -133,7 +133,7 @@ macro_rules! impl_read_write {
             fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
                 syscall!(read(
                     self.0.as_raw_fd(),
-                    buf.as_mut_ptr() as *mut libc::c_void,
+                    buf.as_mut_ptr().cast::<libc::c_void>(),
                     buf.len() as libc::size_t
                 ))
                 .map(|res| res as usize)
@@ -144,7 +144,7 @@ macro_rules! impl_read_write {
             fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
                 syscall!(write(
                     self.0.as_raw_fd(),
-                    buf.as_ptr() as *const libc::c_void,
+                    buf.as_ptr().cast::<libc::c_void>(),
                     buf.len() as libc::size_t
                 ))
                 .map(|res| res as usize)

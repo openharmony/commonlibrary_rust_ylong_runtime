@@ -27,7 +27,7 @@ use crate::task::{Header, Task};
 use crate::util::linked_list::LinkedList;
 
 unsafe fn non_atomic_load(data: &AtomicU16) -> u16 {
-    ptr::read(data as *const AtomicU16 as *const u16)
+    ptr::read((data as *const AtomicU16).cast::<u16>())
 }
 
 /// Capacity of the local queue
@@ -214,9 +214,7 @@ impl InnerBuffer {
                 wrap(steal_pos, next_real)
             };
 
-            let res = self
-                .front
-                .compare_exchange(head, next, AcqRel, Acquire);
+            let res = self.front.compare_exchange(head, next, AcqRel, Acquire);
             match res {
                 Ok(_) => break real_pos,
                 Err(actual) => head = actual,
@@ -244,17 +242,16 @@ impl InnerBuffer {
             let next = wrap(front_real, front_real);
             let res = self.front.compare_exchange(prev, next, AcqRel, Acquire);
 
-            match res {
-                Ok(_) => {
-                    return;
-                }
-                Err(actual) => {
-                    let (actual_steal_pos, actual_real_pos) = unwrap(actual);
-                    if actual_steal_pos == actual_real_pos {
-                        panic!("steal_pos and real_pos should not be the same");
-                    }
-                    prev = actual;
-                }
+            if let Err(actual) = res {
+                let (actual_steal_pos, actual_real_pos) = unwrap(actual);
+                assert_ne!(
+                    actual_steal_pos, actual_real_pos,
+                    "steal pos: {}, real_pos: {}, they should not be the same",
+                    actual_steal_pos, actual_real_pos
+                );
+                prev = actual;
+            } else {
+                return;
             }
         }
     }
@@ -366,9 +363,9 @@ impl InnerBuffer {
             let src_steal_to = src_front_real.wrapping_add(n);
             src_next_front = wrap(src_front_steal, src_steal_to);
 
-            let res =
-                self.front
-                    .compare_exchange(src_prev_front, src_next_front, AcqRel, Acquire);
+            let res = self
+                .front
+                .compare_exchange(src_prev_front, src_next_front, AcqRel, Acquire);
             match res {
                 Ok(_) => break n,
                 Err(actual) => src_prev_front = actual,

@@ -80,6 +80,7 @@ impl<T> Array<T> {
                 return SendPosition::Closed;
             }
             let index = (tail >> INDEX_SHIFT) % self.capacity;
+            // index is bounded by capacity, unwrap is safe
             let node = self.data.get(index).unwrap();
             let node_index = node.index.load(Acquire);
 
@@ -92,12 +93,8 @@ impl<T> Array<T> {
                     AcqRel,
                     Acquire,
                 ) {
-                    Ok(_) => {
-                        return SendPosition::Pos(index);
-                    }
-                    Err(actual) => {
-                        tail = actual;
-                    }
+                    Ok(_) => return SendPosition::Pos(index),
+                    Err(actual) => tail = actual,
                 }
             } else {
                 return SendPosition::Full;
@@ -106,6 +103,7 @@ impl<T> Array<T> {
     }
 
     pub(crate) fn write(&self, index: usize, value: T) {
+        // index is bounded by capacity, unwrap is safe
         let node = self.data.get(index).unwrap();
         node.value.borrow_mut().write(value);
 
@@ -144,6 +142,7 @@ impl<T> Array<T> {
     pub(crate) fn try_recv(&self) -> Result<T, TryRecvError> {
         let head = *self.head.borrow();
         let index = head % self.capacity;
+        // index is bounded by capacity, unwrap is safe
         let node = self.data.get(index).unwrap();
         let node_index = node.index.load(Acquire);
 
@@ -215,6 +214,7 @@ impl<T> Drop for Array<T> {
         for i in 0..len {
             let mut index = head + i;
             index %= self.capacity;
+            // index is bounded by capacity, unwrap is safe
             let node = self.data.get(index).unwrap();
             unsafe {
                 node.value.borrow_mut().as_mut_ptr().drop_in_place();
@@ -241,6 +241,7 @@ impl<T> Future for Position<'_, T> {
 
         let tail = self.array.tail.load(Acquire);
         let index = (tail >> INDEX_SHIFT) % self.array.capacity;
+        // index is bounded by capacity, unwrap is safe
         let node = self.array.data.get(index).unwrap();
         let node_index = node.index.load(Acquire);
         if (tail >> INDEX_SHIFT) == node_index || tail & CLOSED == CLOSED {

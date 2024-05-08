@@ -98,10 +98,7 @@ impl<T> SpinningRwLock<T> {
     }
 
     pub(crate) fn write(&self) -> WriteGuard<T> {
-        let guard = self
-            .write_lock
-            .lock()
-            .expect("spin_rwlock get write lock failed");
+        let guard = self.write_lock.lock().unwrap();
         let version = self.version.load(Ordering::SeqCst);
 
         WriteGuard {

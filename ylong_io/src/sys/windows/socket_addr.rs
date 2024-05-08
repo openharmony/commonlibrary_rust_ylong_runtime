@@ -27,7 +27,7 @@ pub(crate) union SocketAddrWin {
 
 impl SocketAddrWin {
     pub(crate) fn as_ptr(&self) -> *const SOCKADDR {
-        self as *const _ as *const SOCKADDR
+        (self as *const SocketAddrWin).cast::<SOCKADDR>()
     }
 }
 

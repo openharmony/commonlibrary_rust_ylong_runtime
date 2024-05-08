@@ -60,11 +60,34 @@ impl TimeDriver {
         lock.cancel(clock_entry);
     }
 
+    fn handle_entry(
+        &self,
+        mut clock_entry: NonNull<Clock>,
+        waker_list: &mut [Option<Waker>; 32],
+        waker_idx: &mut usize,
+    ) {
+        // Unsafe access to timer_handle is only unsafe when Sleep Drop,
+        // but does not let `Sleep` go to `Ready` before access to timer_handle fetched
+        // by poll.
+        let clock_handle = unsafe { clock_entry.as_mut() };
+        waker_list[*waker_idx] = clock_handle.take_waker();
+        *waker_idx += 1;
+
+        clock_handle.set_result(true);
+
+        if *waker_idx == waker_list.len() {
+            for waker in waker_list.iter_mut() {
+                waker.take().unwrap().wake();
+            }
+            *waker_idx = 0;
+        }
+    }
+
     pub(crate) fn run(&self) -> Option<Duration> {
         let now = Instant::now();
         let now = now
             .checked_duration_since(self.start_time())
-            .unwrap()
+            .expect("driver's start time is later than the current time")
             .as_millis()
             .try_into()
             .unwrap_or(u64::MAX);
@@ -79,24 +102,9 @@ impl TimeDriver {
 
         loop {
             match lock.poll(now) {
-                TimeOut::ClockEntry(mut clock_entry) => {
-                    // Unsafe access to timer_handle is only unsafe when Sleep Drop,
-                    // but does not let `Sleep` go to `Ready` before access to timer_handle fetched
-                    // by poll.
-                    let clock_handle = unsafe { clock_entry.as_mut() };
-                    waker_list[waker_idx] = clock_handle.take_waker();
-                    waker_idx += 1;
+                TimeOut::ClockEntry(clock_entry) => {
                     is_wake = true;
-
-                    clock_handle.set_result(true);
-
-                    if waker_idx == waker_list.len() {
-                        for waker in waker_list.iter_mut() {
-                            waker.take().unwrap().wake();
-                        }
-
-                        waker_idx = 0;
-                    }
+                    self.handle_entry(clock_entry, &mut waker_list, &mut waker_idx);
                 }
                 TimeOut::Duration(duration) => {
                     timeout = Some(duration);
@@ -108,7 +116,10 @@ impl TimeDriver {
 
         drop(lock);
         for waker in waker_list[0..waker_idx].iter_mut() {
-            waker.take().unwrap().wake();
+            waker
+                .take()
+                .expect("waker taken from the clock is none")
+                .wake();
         }
         if is_wake {
             timeout = Some(Duration::new(0, 0));

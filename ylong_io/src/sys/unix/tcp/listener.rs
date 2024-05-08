@@ -56,7 +56,7 @@ impl TcpListener {
         #[cfg(target_os = "linux")]
         let stream = match syscall!(accept4(
             self.inner.as_raw_fd(),
-            addr.as_mut_ptr() as *mut _,
+            addr.as_mut_ptr().cast::<_>(),
             &mut length,
             libc::SOCK_CLOEXEC | libc::SOCK_NONBLOCK,
         )) {
@@ -157,9 +157,9 @@ pub(crate) unsafe fn trans_addr_2_socket(
     storage: *const libc::sockaddr_storage,
 ) -> io::Result<SocketAddr> {
     match (*storage).ss_family as c_int {
-        libc::AF_INET => Ok(SocketAddr::V4(*(storage as *const sockaddr_in as *const _))),
+        libc::AF_INET => Ok(SocketAddr::V4(*(storage.cast::<sockaddr_in>().cast::<_>()))),
         libc::AF_INET6 => Ok(SocketAddr::V6(
-            *(storage as *const sockaddr_in6 as *const _),
+            *(storage.cast::<sockaddr_in6>().cast::<_>()),
         )),
         _ => {
             let err = io::Error::new(io::ErrorKind::Other, "Cannot transfer address into socket.");

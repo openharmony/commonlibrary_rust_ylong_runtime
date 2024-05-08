@@ -68,7 +68,7 @@ impl UnixListener {
             let flags = libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
             syscall!(accept4(
                 self.inner.as_raw_fd(),
-                &mut addr as *mut libc::sockaddr_un as *mut libc::sockaddr,
+                (&mut addr as *mut libc::sockaddr_un).cast::<libc::sockaddr>(),
                 &mut socklen,
                 flags
             ))
@@ -78,7 +78,7 @@ impl UnixListener {
         let socket = {
             syscall!(accept(
                 self.inner.as_raw_fd(),
-                &mut addr as *mut libc::sockaddr_un as *mut libc::sockaddr,
+                (&mut addr as *mut libc::sockaddr_un).cast::<libc::sockaddr>(),
                 &mut socklen,
             ))
             .map(|socket| {

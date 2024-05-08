@@ -52,7 +52,7 @@ impl SignalDriver {
         // `libc::fcntl`.
         let mut receiver = Registry::get_instance()
             .try_clone_stream()
-            .expect("Signal failed to clone UnixStream");
+            .unwrap_or_else(|e| panic!("Signal failed to clone UnixStream, {e}"));
         let _ = handle.io_register_with_token(
             &mut receiver,
             SIGNAL_TOKEN,
@@ -74,7 +74,7 @@ impl SignalDriver {
         ONCE.call_once(|| unsafe {
             let mut receiver = Registry::get_instance()
                 .try_clone_stream()
-                .expect("Signal failed to clone UnixStream");
+                .unwrap_or_else(|e| panic!("Signal failed to clone UnixStream, {e}"));
             let inner = crate::net::IoHandle::get_ref();
             inner.register_source_with_token(
                 &mut receiver,

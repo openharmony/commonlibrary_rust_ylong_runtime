@@ -75,7 +75,9 @@ impl Driver {
         #[cfg(feature = "time")]
         let _duration = self.time.run();
         #[cfg(feature = "net")]
-        self.io.drive(_duration).expect("io driver running failed");
+        self.io
+            .drive(_duration)
+            .unwrap_or_else(|e| panic!("io driver running failed, error: {e}"));
         #[cfg(all(feature = "signal", target_family = "unix"))]
         if self.io.process_signal() {
             self.signal.broadcast();
@@ -99,7 +101,7 @@ impl Driver {
         #[cfg(feature = "net")]
         self.io
             .drive(Some(Duration::from_millis(0)))
-            .expect("io driver running failed");
+            .unwrap_or_else(|e| panic!("io driver running failed, error: {e}"));
         #[cfg(all(feature = "signal", target_family = "unix"))]
         if self.io.process_signal() {
             self.signal.broadcast();

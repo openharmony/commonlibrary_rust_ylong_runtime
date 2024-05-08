@@ -82,7 +82,10 @@ impl<R> JoinHandle<R> {
     pub(crate) fn set_waker(&mut self, waker: &Waker) {
         let cur = self.raw.header().state.get_current_state();
         unsafe {
-            if self.raw.set_waker(cur, waker as *const Waker as *const ()) {
+            if self
+                .raw
+                .set_waker(cur, (waker as *const Waker).cast::<()>())
+            {
                 // Task already finished, wake the waker immediately
                 waker.wake_by_ref();
             }
@@ -100,12 +103,15 @@ impl<R> Future for JoinHandle<R> {
         let mut res = Poll::Pending;
 
         let cur = self.raw.header().state.get_current_state();
-        if !state::is_care_join_handle(cur) {
-            panic!("JoinHandle should not be polled after it's dropped");
-        }
+        assert!(
+            state::is_care_join_handle(cur),
+            "JoinHandle should not be polled after it's dropped"
+        );
+
         if state::is_finished(cur) {
             unsafe {
-                self.raw.get_result(&mut res as *mut _ as *mut ());
+                self.raw
+                    .get_result((&mut res as *mut Poll<Result<R, ScheduleError>>).cast::<()>());
             }
         } else {
             unsafe {
@@ -113,7 +119,8 @@ impl<R> Future for JoinHandle<R> {
                 // Setting the waker may happen concurrently with task finishing.
                 // Therefore we check one more time to see if the task is finished.
                 if is_finished {
-                    self.raw.get_result(&mut res as *mut _ as *mut ());
+                    self.raw
+                        .get_result((&mut res as *mut Poll<Result<R, ScheduleError>>).cast::<()>());
                 }
             }
         }

@@ -37,6 +37,7 @@ cfg_ffrt! {
         type Output = R;
 
         fn poll(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
+            // Task won't be polled again after finished
             let func = self.0.take().expect("blocking tasks cannot be polled after finished");
             Poll::Ready(func())
         }

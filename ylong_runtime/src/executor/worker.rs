@@ -69,7 +69,7 @@ pub(crate) fn get_current_handle() -> Option<&'static WorkerHandle> {
         if val.is_null() {
             None
         } else {
-            Some(unsafe { &*(val as *const _ as *const WorkerHandle) })
+            Some(unsafe { &*(val.cast::<WorkerHandle>()) })
         }
     })
 }
@@ -82,7 +82,7 @@ pub(crate) fn get_current_ctx() -> Option<&'static WorkerContext> {
         if val.is_null() {
             None
         } else {
-            Some(unsafe { &*(val as *const _ as *const WorkerContext) })
+            Some(unsafe { &*(val.cast::<WorkerContext>()) })
         }
     })
 }
@@ -104,11 +104,11 @@ pub(crate) fn run_worker(worker: Arc<Worker>, handle: Arc<Handle>) {
     // store the worker to tls
     let _guard = CURRENT_WORKER.with(|cur| {
         let prev_ctx = cur.get();
-        cur.set(&cur_context as *const _ as *const ());
+        cur.set((&cur_context as *const WorkerContext).cast::<()>());
 
         let handle = CURRENT_HANDLE.with(|handle| {
             let prev_handle = handle.get();
-            handle.set(&cur_handle as *const _ as *const ());
+            handle.set((&cur_handle as *const WorkerHandle).cast::<()>());
             prev_handle
         });
 

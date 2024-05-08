@@ -105,7 +105,7 @@ fn poll_read_to_end<R: AsyncRead + Unpin>(
         buf.reserve(32);
         let len = buf.len();
         let mut read_buf = ReadBuf::uninit(unsafe {
-            from_raw_parts_mut(buf.as_mut_ptr() as *mut MaybeUninit<u8>, buf.capacity())
+            from_raw_parts_mut(buf.as_mut_ptr().cast::<MaybeUninit<u8>>(), buf.capacity())
         });
         read_buf.assume_init(len);
         read_buf.set_filled(len);
@@ -180,7 +180,8 @@ fn io_string_result(
             let mut vector = trans_err.into_bytes();
             let len = vector.len() - bytes;
             vector.truncate(len);
-            *output = String::from_utf8(vector).expect("Invalid utf-8 data");
+            *output = String::from_utf8(vector)
+                .unwrap_or_else(|e| panic!("Invalid utf-8 data, error: {e}"));
             Poll::Ready(Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 "Invalid utf-8 data",
@@ -194,7 +195,8 @@ fn io_string_result(
             let mut vector = trans_err.into_bytes();
             let len = vector.len() - read_len;
             vector.truncate(len);
-            *output = String::from_utf8(vector).expect("Invalid utf-8 data");
+            *output = String::from_utf8(vector)
+                .unwrap_or_else(|e| panic!("Invalid utf-8 data, error: {e}"));
             Poll::Ready(Err(io_err))
         }
     }

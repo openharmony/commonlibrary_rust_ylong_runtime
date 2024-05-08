@@ -24,7 +24,8 @@ pub(crate) union SocketAddrLibC {
 
 impl SocketAddrLibC {
     pub(crate) fn as_ptr(&self) -> *const sockaddr {
-        self as *const _ as *const sockaddr
+        let ptr: *const SocketAddrLibC = self;
+        ptr.cast::<sockaddr>()
     }
 }
 

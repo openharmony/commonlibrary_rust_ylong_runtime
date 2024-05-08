@@ -107,7 +107,7 @@ impl Signal {
         self.inner
             .notified()
             .await
-            .expect("Signal sender has been dropped");
+            .unwrap_or_else(|e| panic!("Signal sender has been dropped, error: {e}"));
     }
 
     /// Polls to waits for signal notification.

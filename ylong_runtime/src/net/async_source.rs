@@ -179,6 +179,7 @@ impl<E: Source> AsyncSource<E> {
         {
             let ret = self.poll_read_io(cx, || unsafe {
                 let slice = &mut *(buf.unfilled_mut() as *mut [MaybeUninit<u8>] as *mut [u8]);
+                // before AsyncSource drop, io is always Some().
                 self.io.as_ref().unwrap().read(slice)
             });
             let r_len = match ret {
@@ -201,6 +202,7 @@ impl<E: Source> AsyncSource<E> {
             &'a E: io::Write + 'a,
         {
             self.poll_write_io(cx, || {
+                // before AsyncSource drop, io is always Some().
                 self.io.as_ref().unwrap().write(buf)
             })
         }
@@ -214,6 +216,7 @@ impl<E: Source> AsyncSource<E> {
             &'a E: io::Write + 'a,
         {
             self.poll_write_io(cx, || {
+                // before AsyncSource drop, io is always Some().
                 self.io.as_ref().unwrap().write_vectored(bufs)
             })
         }
@@ -230,6 +233,7 @@ impl<E: Source> Deref for AsyncSource<E> {
     type Target = E;
 
     fn deref(&self) -> &Self::Target {
+        // before AsyncSource drop, io is always Some().
         self.io.as_ref().unwrap()
     }
 }

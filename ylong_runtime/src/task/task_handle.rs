@@ -105,9 +105,15 @@ where
     }
 
     fn set_waker_inner(&self, des_waker: Waker, cur_state: usize) -> Result<usize, usize> {
-        if !state::is_care_join_handle(cur_state) || state::is_set_waker(cur_state) {
-            panic!("set waker failed: the join handle either get dropped or the task already has a waker set");
-        }
+        assert!(
+            state::is_care_join_handle(cur_state),
+            "set waker failed: the join handle has been dropped"
+        );
+        assert!(
+            !state::is_set_waker(cur_state),
+            "set waker failed: the task already has a waker set"
+        );
+
         unsafe {
             let waker = self.inner().waker.get();
             *waker = Some(des_waker);
@@ -125,8 +131,12 @@ where
     pub(crate) fn set_waker(self, cur: usize, des_waker: &Waker) -> bool {
         let res = if state::is_set_waker(cur) {
             let is_same_waker = unsafe {
+                // the status is set_waker, so waker must be set already
                 let waker = self.inner().waker.get();
-                (*waker).as_ref().unwrap().will_wake(des_waker)
+                (*waker)
+                    .as_ref()
+                    .expect("task status is set_waker, but waker is missing")
+                    .will_wake(des_waker)
             };
             // we don't register the same waker
             if is_same_waker {
@@ -141,9 +151,10 @@ where
         };
 
         if let Err(cur) = res {
-            if !state::is_finished(cur) {
-                panic!("setting waker should only be failed due to the task's completion");
-            }
+            assert!(
+                state::is_finished(cur),
+                "setting waker should only be failed dur to task completion"
+            );
             return true;
         }
 
@@ -246,10 +257,11 @@ where
     }
 
     fn get_scheduled(&self, lifo: bool) {
+        // the scheduler must exist when calling this method
         self.inner()
             .scheduler
             .upgrade()
-            .unwrap()
+            .expect("the scheduler has already been dropped")
             .schedule(self.to_task(), lifo);
     }
 }

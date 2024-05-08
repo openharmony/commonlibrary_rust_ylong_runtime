@@ -15,7 +15,7 @@ use std::collections::VecDeque;
 use std::future::Future;
 use std::option::Option::Some;
 use std::pin::Pin;
-use std::sync::{Arc, Condvar, Mutex, Weak};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard, Weak};
 use std::task::{Context, Poll};
 use std::thread;
 use std::time::Duration;
@@ -214,50 +214,136 @@ impl BlockPoolSpawner {
         );
 
         shared.queue.push_back(task);
-
-        if shared.idle_thread_num == 0 {
-            if shared.total_thread_num == self.inner.max_thread_num {
-                // thread number has reached maximum, do nothing
-            } else {
-                // there is no idle thread and the maximum thread number has not been reached,
-                // therefore create a new thread
-                shared.total_thread_num += 1;
-                // sets all required attributes for the thread
-                let worker_id = shared.worker_id;
-                let mut builder = thread::Builder::new().name(format!("block-{worker_id}"));
-                if let Some(stack_size) = self.inner.stack_size {
-                    builder = builder.stack_size(stack_size);
-                }
-
-                let inner = self.inner.clone();
-                let join_handle = builder.spawn(move || inner.run(worker_id));
-                match join_handle {
-                    Ok(join_handle) => {
-                        shared.worker_threads.push_back((worker_id, join_handle));
-                        shared.worker_id += 1;
-                    }
-                    Err(e) => {
-                        panic!("os can't spawn worker thread: {e}");
-                    }
-                }
-            }
-        } else {
+        // there are idle threads, wake up one
+        if shared.idle_thread_num != 0 {
             shared.idle_thread_num -= 1;
             shared.notify_num += 1;
             self.inner.condvar.notify_one();
+            return;
+        }
+
+        if shared.total_thread_num == self.inner.max_thread_num {
+            // thread number has reached maximum, do nothing
+            return;
+        }
+        // there is no idle thread and the maximum thread number has not been reached,
+        // therefore create a new thread
+        shared.total_thread_num += 1;
+        // sets all required attributes for the thread
+        let worker_id = shared.worker_id;
+        let mut builder = thread::Builder::new().name(format!("block-{worker_id}"));
+        if let Some(stack_size) = self.inner.stack_size {
+            builder = builder.stack_size(stack_size);
+        }
+
+        let inner = self.inner.clone();
+        let join_handle = builder.spawn(move || inner.run(worker_id));
+        match join_handle {
+            Ok(join_handle) => {
+                shared.worker_threads.push_back((worker_id, join_handle));
+                shared.worker_id += 1;
+            }
+            Err(e) => {
+                panic!("os can't spawn worker thread: {e}");
+            }
         }
     }
 }
 
-impl Inner {
+enum WaitState {
+    Continue,
+    ExitWait,
+    Release,
+}
+
+impl<'a> Inner {
+    // return true if it is not a spurious wakeup
+    fn wait_permanent(&'a self, mut shared: MutexGuard<'a, Shared>) -> (bool, MutexGuard<Shared>) {
+        shared.current_permanent_thread_num += 1;
+        shared = self.condvar.wait(shared).unwrap();
+        shared.current_permanent_thread_num -= 1;
+        // Combining a loop to prevent spurious wakeup of condvar, if there is a
+        // spurious wakeup, the `notify_num` will be 0 and the loop will continue.
+        if shared.notify_num != 0 {
+            shared.notify_num -= 1;
+            return (true, shared);
+        }
+        (false, shared)
+    }
+
+    fn wait_temporary(
+        &'a self,
+        mut shared: MutexGuard<'a, Shared>,
+        worker_id: usize,
+    ) -> (WaitState, MutexGuard<Shared>) {
+        // if the thread is not permanent, set the keep-alive time for releasing
+        // the thread
+        let time_out_lock_res = self
+            .condvar
+            .wait_timeout(shared, self.keep_alive_time)
+            .unwrap();
+        shared = time_out_lock_res.0;
+        let timeout_result = time_out_lock_res.1;
+
+        // Combining a loop to prevent spurious wakeup of condvar, if there is a
+        // spurious wakeup, the `notify_num` will be 0 and the loop will continue.
+        if shared.notify_num != 0 {
+            shared.notify_num -= 1;
+            return (WaitState::ExitWait, shared);
+        }
+        // expires, release the thread
+        if !shared.shutdown && timeout_result.timed_out() {
+            for (thread_id, thread) in shared.worker_threads.iter().enumerate() {
+                if thread.0 == worker_id {
+                    shared.worker_threads.remove(thread_id);
+                    break;
+                }
+            }
+            return (WaitState::Release, shared);
+        }
+        (WaitState::Continue, shared)
+    }
+
+    // returns true if this thread should get released
+    fn wait(
+        &'a self,
+        mut shared: MutexGuard<'a, Shared>,
+        worker_id: usize,
+    ) -> (bool, MutexGuard<Shared>) {
+        shared.idle_thread_num += 1;
+        while !shared.shutdown {
+            // permanent waits, the thread keep alive until shutdown.
+            if shared.current_permanent_thread_num < self.max_permanent_thread_num {
+                let (is_waked_up, guard) = self.wait_permanent(shared);
+                shared = guard;
+                if is_waked_up {
+                    break;
+                }
+            } else {
+                match self.wait_temporary(shared, worker_id) {
+                    (WaitState::ExitWait, guard) => {
+                        shared = guard;
+                        break;
+                    }
+                    (WaitState::Continue, guard) => {
+                        shared = guard;
+                    }
+                    (WaitState::Release, guard) => {
+                        return (true, guard);
+                    }
+                }
+            }
+        }
+        (false, shared)
+    }
+
     fn run(&self, worker_id: usize) {
         if let Some(f) = &self.after_start {
             f()
         }
 
         let mut shared = self.shared.lock().unwrap();
-
-        'main: loop {
+        loop {
             // get a task from the global queue
             while let Some(task) = shared.queue.pop_front() {
                 drop(shared);
@@ -265,48 +351,12 @@ impl Inner {
                 shared = self.shared.lock().unwrap();
             }
 
-            shared.idle_thread_num += 1;
-            while !shared.shutdown {
-                // permanent waits, the thread keep alive until shutdown.
-                if shared.current_permanent_thread_num < self.max_permanent_thread_num {
-                    shared.current_permanent_thread_num += 1;
-                    shared = self.condvar.wait(shared).unwrap();
-                    shared.current_permanent_thread_num -= 1;
-                    // Combining a loop to prevent spurious wakeup of condvar, if there is a
-                    // spurious wakeup, the `notify_num` will be 0 and the loop will continue.
-                    if shared.notify_num != 0 {
-                        shared.notify_num -= 1;
-                        break;
-                    }
-                } else {
-                    // if the thread is not permanent, set the keep-alive time for releasing
-                    // the thread
-                    let time_out_lock_res = self
-                        .condvar
-                        .wait_timeout(shared, self.keep_alive_time)
-                        .unwrap();
-                    shared = time_out_lock_res.0;
-                    let timeout_result = time_out_lock_res.1;
-
-                    // Combining a loop to prevent spurious wakeup of condvar, if there is a
-                    // spurious wakeup, the `notify_num` will be 0 and the loop will continue.
-                    if shared.notify_num != 0 {
-                        shared.notify_num -= 1;
-                        break;
-                    }
-                    // expires, release the thread
-                    if !shared.shutdown && timeout_result.timed_out() {
-                        for (thread_id, thread) in shared.worker_threads.iter().enumerate() {
-                            if thread.0 == worker_id {
-                                shared.worker_threads.remove(thread_id);
-                                break;
-                            }
-                        }
-                        break 'main;
-                    }
-                }
+            let (is_released, guard) = self.wait(shared, worker_id);
+            shared = guard;
+            // if this thread should get released, break
+            if is_released {
+                break;
             }
-
             if shared.shutdown {
                 // empty the tasks in the global queue
                 while let Some(_task) = shared.queue.pop_front() {
@@ -317,7 +367,7 @@ impl Inner {
             }
         }
 
-        // thread exit
+        // thread exit, thread num should be maintained correctly
         shared.total_thread_num = shared
             .total_thread_num
             .checked_sub(1)
@@ -352,7 +402,11 @@ where
     type Output = R;
 
     fn poll(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let func = self.0.take().expect("no run two times");
+        // Task won't be polled again after finished
+        let func = self
+            .0
+            .take()
+            .expect("blocking tasks cannot be polled after finished");
         Poll::Ready(func())
     }
 }

@@ -213,21 +213,7 @@ impl ScheduleIO {
             let new_readiness = f(current_readiness);
             let mut new_bit = Bit::from_usize(new_readiness.as_usize());
 
-            match tick {
-                Tick::Set(t) => new_bit.set_by_mask(DRIVER_TICK, t as usize),
-                // Check the tick to see if the event has already been covered.
-                // If yes, clear the event.
-                Tick::Clear(t) => {
-                    if current_bit.get_by_mask(DRIVER_TICK) as u8 != t {
-                        return Err(io::Error::new(
-                            io::ErrorKind::Other,
-                            "Readiness has been covered.",
-                        ));
-                    }
-                    new_bit.set_by_mask(DRIVER_TICK, t as usize);
-                }
-            }
-
+            Self::handle_tick(&tick, &mut new_bit, &current_bit)?;
             new_bit.set_by_mask(GENERATION, current_generation);
             match self
                 .status
@@ -238,6 +224,24 @@ impl ScheduleIO {
                 Err(actual) => current = actual,
             }
         }
+    }
+
+    pub(crate) fn handle_tick(tick: &Tick, new_bit: &mut Bit, current_bit: &Bit) -> io::Result<()> {
+        match tick {
+            Tick::Set(t) => new_bit.set_by_mask(DRIVER_TICK, *t as usize),
+            // Check the tick to see if the event has already been covered.
+            // If yes, clear the event.
+            Tick::Clear(t) => {
+                if current_bit.get_by_mask(DRIVER_TICK) as u8 != *t {
+                    return Err(io::Error::new(
+                        io::ErrorKind::Other,
+                        "Readiness has been covered.",
+                    ));
+                }
+                new_bit.set_by_mask(DRIVER_TICK, *t as usize);
+            }
+        }
+        Ok(())
     }
 
     pub(crate) fn wake(&self, ready: Ready) {
@@ -251,13 +255,13 @@ impl ScheduleIO {
 
         if ready.is_readable() {
             if let Some(waker) = waiters.reader.take() {
-                wakers.push(Some(waker));
+                wakers.push(waker);
             }
         }
 
         if ready.is_writable() {
             if let Some(waker) = waiters.writer.take() {
-                wakers.push(Some(waker));
+                wakers.push(waker);
             }
         }
 
@@ -265,7 +269,7 @@ impl ScheduleIO {
             if ready.satisfies(waiter.interest) {
                 if let Some(waker) = waiter.waker.take() {
                     waiter.is_ready = true;
-                    wakers.push(Some(waker));
+                    wakers.push(waker);
                 }
                 return true;
             }
@@ -274,7 +278,7 @@ impl ScheduleIO {
 
         drop(waiters);
         for waker in wakers.iter_mut() {
-            waker.take().unwrap().wake();
+            waker.wake_by_ref();
         }
     }
 }
@@ -318,6 +322,108 @@ impl Readiness<'_> {
     }
 }
 
+fn poll_init(
+    schedule_io: &ScheduleIO,
+    state: &mut State,
+    waiter: &UnsafeCell<Waiter>,
+    interest: Interest,
+    cx: &mut Context<'_>,
+) -> Poll<io::Result<ReadyEvent>> {
+    let status_bit = Bit::from_usize(schedule_io.status.load(SeqCst));
+    let readiness = Ready::from_usize(status_bit.get_by_mask(READINESS));
+    let ready = readiness.intersection(interest);
+
+    // if events are ready, change status to done
+    if !ready.is_empty() {
+        let tick = status_bit.get_by_mask(DRIVER_TICK) as u8;
+        *state = State::Done;
+        return Poll::Ready(Ok(ReadyEvent::new(tick, ready)));
+    }
+
+    let mut waiters = schedule_io.waiters.lock().unwrap();
+
+    let status_bit = Bit::from_usize(schedule_io.status.load(SeqCst));
+    let mut readiness = Ready::from_usize(status_bit.get_by_mask(READINESS));
+
+    if waiters.is_shutdown {
+        readiness = Ready::ALL;
+    }
+
+    let ready = readiness.intersection(interest);
+
+    // check one more time to see if events are ready
+    if !ready.is_empty() {
+        let tick = status_bit.get_by_mask(DRIVER_TICK) as u8;
+        *state = State::Done;
+        return Poll::Ready(Ok(ReadyEvent::new(tick, ready)));
+    }
+
+    unsafe {
+        (*waiter.get()).waker = Some(cx.waker().clone());
+
+        waiters
+            .list
+            .push_front(NonNull::new_unchecked(waiter.get()));
+    }
+
+    *state = State::Waiting;
+    Poll::Pending
+}
+
+// return true if pending
+fn set_waker(
+    schedule_io: &ScheduleIO,
+    state: &mut State,
+    waiter: &UnsafeCell<Waiter>,
+    cx: &mut Context<'_>,
+) -> bool {
+    // waiters could also be accessed in other places, so get the lock
+    let waiters = schedule_io.waiters.lock().unwrap();
+
+    let waiter = unsafe { &mut *waiter.get() };
+    if waiter.is_ready {
+        *state = State::Done;
+    } else {
+        // We set a waker to this waiter in State::init,
+        // therefore waiter.waker must be a some at this point
+        if !waiter.waker.as_ref().unwrap().will_wake(cx.waker()) {
+            waiter.waker = Some(cx.waker().clone());
+        }
+        return true;
+    }
+    drop(waiters);
+    false
+}
+
+fn poll_state(
+    schedule_io: &ScheduleIO,
+    state: &mut State,
+    waiter: &UnsafeCell<Waiter>,
+    interest: Interest,
+    cx: &mut Context<'_>,
+) -> Option<Poll<io::Result<ReadyEvent>>> {
+    match *state {
+        State::Init => {
+            if let Poll::Ready(res) = poll_init(schedule_io, state, waiter, interest, cx) {
+                return Some(Poll::Ready(res));
+            }
+        }
+        State::Waiting => {
+            if set_waker(schedule_io, state, waiter, cx) {
+                return Some(Poll::Pending);
+            }
+        }
+        State::Done => {
+            let status_bit = Bit::from_usize(schedule_io.status.load(Acquire));
+            return Some(Poll::Ready(Ok(ReadyEvent::new(
+                status_bit.get_by_mask(DRIVER_TICK) as u8,
+                Ready::from_interest(interest),
+            ))));
+        }
+    }
+    None
+}
+
 impl Future for Readiness<'_> {
     type Output = io::Result<ReadyEvent>;
 
@@ -329,69 +435,8 @@ impl Future for Readiness<'_> {
         // Safety: `waiter.interest` never changes after initialization.
         let interest = unsafe { (*waiter.get()).interest };
         loop {
-            match *state {
-                State::Init => {
-                    let status_bit = Bit::from_usize(schedule_io.status.load(SeqCst));
-                    let readiness = Ready::from_usize(status_bit.get_by_mask(READINESS));
-                    let ready = readiness.intersection(interest);
-
-                    // if events are ready, change status to done
-                    if !ready.is_empty() {
-                        let tick = status_bit.get_by_mask(DRIVER_TICK) as u8;
-                        *state = State::Done;
-                        return Poll::Ready(Ok(ReadyEvent::new(tick, ready)));
-                    }
-
-                    let mut waiters = schedule_io.waiters.lock().unwrap();
-
-                    let status_bit = Bit::from_usize(schedule_io.status.load(SeqCst));
-                    let mut readiness = Ready::from_usize(status_bit.get_by_mask(READINESS));
-
-                    if waiters.is_shutdown {
-                        readiness = Ready::ALL;
-                    }
-
-                    let ready = readiness.intersection(interest);
-
-                    // check one more time to see if events are ready
-                    if !ready.is_empty() {
-                        let tick = status_bit.get_by_mask(DRIVER_TICK) as u8;
-                        *state = State::Done;
-                        return Poll::Ready(Ok(ReadyEvent::new(tick, ready)));
-                    }
-
-                    unsafe {
-                        (*waiter.get()).waker = Some(cx.waker().clone());
-
-                        waiters
-                            .list
-                            .push_front(NonNull::new_unchecked(waiter.get()));
-                    }
-
-                    *state = State::Waiting;
-                }
-                State::Waiting => {
-                    // waiters could also be accessed in other places, so get the lock
-                    let waiters = schedule_io.waiters.lock().unwrap();
-
-                    let waiter = unsafe { &mut *waiter.get() };
-                    if waiter.is_ready {
-                        *state = State::Done;
-                    } else {
-                        if !waiter.waker.as_ref().unwrap().will_wake(cx.waker()) {
-                            waiter.waker = Some(cx.waker().clone());
-                        }
-                        return Poll::Pending;
-                    }
-                    drop(waiters);
-                }
-                State::Done => {
-                    let status_bit = Bit::from_usize(schedule_io.status.load(Acquire));
-                    return Poll::Ready(Ok(ReadyEvent::new(
-                        status_bit.get_by_mask(DRIVER_TICK) as u8,
-                        Ready::from_interest(interest),
-                    )));
-                }
+            if let Some(poll_res) = poll_state(schedule_io, state, waiter, interest, cx) {
+                return poll_res;
             }
         }
     }

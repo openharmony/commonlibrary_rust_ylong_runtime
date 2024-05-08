@@ -128,6 +128,7 @@ impl MultiThreadScheduler {
 
     pub(crate) fn wake_up_rand_one(&self, last_search: bool) {
         if let Some(index) = self.sleeper.pop_worker(last_search) {
+            // index is bounded by total worker num
             self.handles
                 .read()
                 .unwrap()
@@ -157,6 +158,7 @@ impl MultiThreadScheduler {
     }
 
     pub(crate) fn create_local_queue(&self, index: usize) -> LocalQueue {
+        // this index is bounded by total worker num
         let local_run_queue = self.locals.get(index).unwrap();
         LocalQueue {
             inner: local_run_queue.inner.clone(),
@@ -166,6 +168,7 @@ impl MultiThreadScheduler {
     pub(crate) fn has_no_work(&self) -> bool {
         // check if local queues are empty
         for index in 0..self.num_workers {
+            // this index is bounded by total worker num
             let item = self.locals.get(index).unwrap();
             if !item.is_empty() {
                 return false;
@@ -198,6 +201,7 @@ impl MultiThreadScheduler {
             }
         }
 
+        // this index is bounded by total worker num
         let local_run_queue = self.locals.get(worker_ctx.worker.index).unwrap();
         local_run_queue.push_back(task, &self.global);
         true
@@ -312,6 +316,7 @@ impl MultiThreadScheduler {
         for i in 0..num {
             let i = (start + i) % num;
             // skip the current worker's local queue
+            // this index is bounded by total worker num
             let target = self.locals.get(i).unwrap();
 
             if std::ptr::eq(target, destination) {
