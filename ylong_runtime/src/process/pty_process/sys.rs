@@ -22,17 +22,6 @@ use std::process::Stdio;
 use ylong_io::sys::SourceFd;
 use ylong_io::{Interest, Selector, Source, Token};
 
-macro_rules! syscall {
-    ($fn: ident ( $($arg: expr),* $(,)* ) ) => {{
-        let res = unsafe { libc::$fn($($arg, )*) };
-        if res == -1 {
-            Err(std::io::Error::last_os_error())
-        } else {
-            Ok(res)
-        }
-    }};
-}
-
 #[derive(Debug)]
 pub(crate) struct PtyInner(OwnedFd);
 

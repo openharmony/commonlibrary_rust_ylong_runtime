@@ -16,6 +16,8 @@ use std::io;
 use std::ops::Deref;
 use std::sync::Arc;
 
+#[cfg(target_os = "linux")]
+use libc::{gid_t, uid_t};
 use ylong_io::{Interest, Source};
 
 use crate::executor::Handle;
@@ -46,6 +48,12 @@ pub(crate) struct AsyncSource<E: Source> {
 }
 
 impl<E: Source> AsyncSource<E> {
+    #[cfg(target_os = "linux")]
+    pub fn fchown(&self, uid: uid_t, gid: gid_t) -> io::Result<()> {
+        syscall!(fchown(self.get_fd(), uid, gid))?;
+        Ok(())
+    }
+
     /// Wraps a `Source` object into an `AsyncSource`. When the `AsyncSource`
     /// object is created, it's fd will be registered into runtime's
     /// reactor.
