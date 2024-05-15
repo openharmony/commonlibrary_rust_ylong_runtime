@@ -139,7 +139,7 @@ impl Afd {
         iosb: *mut IO_STATUS_BLOCK,
         overlapped: *mut c_void,
     ) -> io::Result<bool> {
-        let afd_info = info as *mut _ as *mut c_void;
+        let afd_info = (info as *mut AfdPollInfo).cast::<c_void>();
         (*iosb).Anonymous.Status = STATUS_PENDING;
 
         let status = NtDeviceIoControlFile(
@@ -209,6 +209,7 @@ impl AfdGroup {
         let mut afd_group = self.afd_group.lock().unwrap();
 
         // When the last File has more than 32 Arc Points, creates a new File.
+        // If the vec len is not zero, then last always returns some
         if afd_group.len() == 0
             || Arc::strong_count(afd_group.last().unwrap()) > POLL_GROUP__MAX_GROUP_SIZE
         {

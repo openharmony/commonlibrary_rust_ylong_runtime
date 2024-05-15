@@ -273,6 +273,7 @@ impl File {
         }
 
         let mut buf = match file.state {
+            // after each take, buf will be set right back
             FileState::Idle(ref mut buf) => buf.take().unwrap(),
             _ => unreachable!(),
         };
@@ -349,6 +350,7 @@ impl AsyncSeek for File {
         loop {
             match inner.state {
                 FileState::Idle(ref mut buf) => {
+                    // after each take, buf will be set right back
                     let mut r_buf = buf.take().unwrap();
 
                     // move the cursor back since there's unread data in the buf
@@ -402,6 +404,7 @@ impl AsyncRead for File {
         loop {
             match inner.state {
                 FileState::Idle(ref mut file_buf) => {
+                    // after each take, buf will be set right back
                     let mut r_buf = file_buf.take().unwrap();
                     // There is still remaining data from the last read, append it to read buf
                     // directly
@@ -469,6 +472,7 @@ impl AsyncWrite for File {
         loop {
             match inner.state {
                 FileState::Idle(ref mut file_buf) => {
+                    // after each take, buf will be set right back
                     let mut w_buf = file_buf.take().unwrap();
 
                     let unread = w_buf.drop_unread();

@@ -58,11 +58,11 @@ impl TcpStream {
     }
 
     /// Clones the TcpStream.
-    pub fn try_clone(&self) -> Self {
-        TcpStream {
-            inner: self.inner.try_clone().unwrap(),
+    pub fn try_clone(&self) -> io::Result<Self> {
+        Ok(TcpStream {
+            inner: self.inner.try_clone()?,
             state: self.state.clone(),
-        }
+        })
     }
 
     /// Returns the socket address of the local half of this TCP connection.

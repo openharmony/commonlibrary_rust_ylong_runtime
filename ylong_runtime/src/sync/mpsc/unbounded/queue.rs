@@ -73,6 +73,8 @@ impl<T> Block<T> {
             match curr.try_insert(ptr) {
                 Ok(_) => return,
                 Err(next) => {
+                    // the sender and receiver is synced by the flag `has_value`,
+                    // therefore this next ptr is guaranteed to be non-null
                     curr = unsafe { next.as_ref().unwrap() };
                 }
             }
@@ -109,6 +111,7 @@ impl<T> Queue<T> {
         let block_ptr = Box::into_raw(block);
         Queue {
             head: RefCell::new(Head {
+                // block_ptr is non-null
                 block: NonNull::new(block_ptr).unwrap(),
                 index: 0,
             }),
@@ -120,11 +123,35 @@ impl<T> Queue<T> {
         }
     }
 
+    fn send_inner(
+        &self,
+        index: usize,
+        block: &Block<T>,
+        new_block: Option<Box<Block<T>>>,
+        value: T,
+    ) {
+        if index + 1 == CAPACITY {
+            // if the index is the last one, new block has been set above
+            let new_block_ptr = Box::into_raw(new_block.unwrap());
+            block.insert(new_block_ptr);
+            let next_block = block.next.load(Acquire);
+            self.tail.block.store(next_block, Release);
+            self.tail.index.fetch_add(1 << INDEX_SHIFT, Release);
+        }
+        // the index is bounded by Capacity
+        let node = block.data.get(index).unwrap();
+        unsafe {
+            node.value.as_ptr().write(MaybeUninit::new(value));
+        }
+        node.has_value.store(true, Release);
+        self.rx_waker.wake();
+    }
+
     pub(crate) fn send(&self, value: T) -> Result<(), SendError<T>> {
         let mut tail = self.tail.index.load(Acquire);
         let mut block_ptr = self.tail.block.load(Acquire);
-        let mut new_block = None;
         loop {
+            let mut new_block = None;
             if tail & CLOSED == CLOSED {
                 return Err(SendError(value));
             }
@@ -138,26 +165,13 @@ impl<T> Queue<T> {
             if index + 1 == CAPACITY && new_block.is_none() {
                 new_block = Some(Box::new(Block::<T>::new()));
             }
-            match self.tail.index.compare_exchange(
-                tail,
-                tail + (1 << INDEX_SHIFT),
-                AcqRel,
-                Acquire,
-            ) {
+            match self
+                .tail
+                .index
+                .compare_exchange(tail, tail + (1 << INDEX_SHIFT), AcqRel, Acquire)
+            {
                 Ok(_) => {
-                    if index + 1 == CAPACITY {
-                        let new_block_ptr = Box::into_raw(new_block.unwrap());
-                        block.insert(new_block_ptr);
-                        let next_block = block.next.load(Acquire);
-                        self.tail.block.store(next_block, Release);
-                        self.tail.index.fetch_add(1 << INDEX_SHIFT, Release);
-                    }
-                    let node = block.data.get(index).unwrap();
-                    unsafe {
-                        node.value.as_ptr().write(MaybeUninit::new(value));
-                    }
-                    node.has_value.store(true, Release);
-                    self.rx_waker.wake();
+                    self.send_inner(index, block, new_block, value);
                     return Ok(());
                 }
                 Err(_) => {
@@ -174,11 +188,14 @@ impl<T> Queue<T> {
         let block_ptr = head.block.as_ptr();
         let block = unsafe { &*block_ptr };
         let index = head_index % (CAPACITY + 1);
+        // index is guaranteed to not equal to capacity because of the wrapping_add by 2
+        // down below
         let node = block.data.get(index).unwrap();
         // Check whether the node is ready to read.
         if node.has_value.swap(false, Acquire) {
             let value = unsafe { node.value.as_ptr().read().assume_init() };
             if index + 1 == CAPACITY {
+                // next is initialized during block creation
                 head.block = NonNull::new(block.next.load(Acquire)).unwrap();
                 block.reclaim();
                 unsafe { (*self.tail.block.load(Acquire)).insert(block_ptr) };
@@ -252,6 +269,7 @@ impl<T> Drop for Queue<T> {
                     drop(Box::from_raw(block_ptr));
                     block_ptr = next_node_ptr;
                 } else {
+                    // index is bounded by capacity
                     let node = (*block_ptr).data.get_mut(index).unwrap();
                     node.value.get_mut().as_mut_ptr().drop_in_place();
                 }

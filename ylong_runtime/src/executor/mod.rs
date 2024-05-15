@@ -29,6 +29,8 @@ use crate::executor::current_thread::CurrentThreadSpawner;
 use crate::task::{JoinHandle, Task, TaskBuilder};
 mod driver_handle;
 pub(crate) use driver_handle::Handle;
+
+use crate::executor::worker::WorkerHandle;
 cfg_ffrt! {
     use crate::ffrt::spawner::spawn;
 }
@@ -105,7 +107,9 @@ pub(crate) fn global_default_async() -> &'static Runtime {
             }
 
             #[cfg(not(feature = "ffrt"))]
-            let runtime = match initialize_async_spawner(global_builder.as_ref().unwrap()) {
+            // we have just made sure the global builder is a some, so this unwrap_unchecked is safe
+            let runtime = match initialize_async_spawner(global_builder.as_ref().unwrap_unchecked())
+            {
                 Ok(s) => Runtime {
                     async_spawner: AsyncHandle::MultiThread(s),
                 },
@@ -133,7 +137,9 @@ pub(crate) fn global_default_blocking() -> &'static BlockPoolSpawner {
             if global_builder.is_none() {
                 *global_builder = Some(RuntimeBuilder::new_multi_thread());
             }
-            match initialize_blocking_spawner(&global_builder.as_ref().unwrap().common) {
+            // we have just made sure the global builder is a some, so this unwrap_unchecked
+            // is safe
+            match initialize_blocking_spawner(&global_builder.as_ref().unwrap_unchecked().common) {
                 Ok(bps) => GLOBAL_DEFAULT_BLOCKING = MaybeUninit::new(bps),
                 Err(e) => panic!("initialize blocking pool failed: {e:?}"),
             }
@@ -284,7 +290,7 @@ impl Runtime {
         };
 
         worker::CURRENT_HANDLE.with(|ctx| {
-            ctx.set(&cur_context as *const _ as *const ());
+            ctx.set((&cur_context as *const WorkerHandle).cast::<()>());
         });
 
         let ret = match &self.async_spawner {

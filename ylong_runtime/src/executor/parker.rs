@@ -26,7 +26,7 @@ pub(crate) struct Parker {
 
 struct Inner {
     state: AtomicUsize,
-    mutex: Mutex<bool>,
+    mutex: Mutex<()>,
     condvar: Condvar,
     driver: Arc<Mutex<Driver>>,
 }
@@ -41,7 +41,7 @@ impl Parker {
         Parker {
             inner: Arc::new(Inner {
                 state: AtomicUsize::new(IDLE),
-                mutex: Mutex::new(false),
+                mutex: Mutex::new(()),
                 condvar: Condvar::new(),
                 driver,
             }),
@@ -91,8 +91,8 @@ impl Inner {
 
         match park_flag {
             ParkFlag::NotPark => {}
-            ParkFlag::Park => self.park_on_condvar(),
-            ParkFlag::ParkTimeout(duration) => self.park_on_condvar_timeout(duration),
+            ParkFlag::Park => self.park_on_condvar_timeout(None),
+            ParkFlag::ParkTimeout(duration) => self.park_on_condvar_timeout(Some(duration)),
         }
     }
 
@@ -119,7 +119,8 @@ impl Inner {
         }
     }
 
-    fn park_on_condvar(&self) {
+    // if duration is none, than park permanently
+    fn park_on_condvar_timeout(&self, duration: Option<Duration>) {
         let mut l = self.mutex.lock().unwrap();
         match self
             .state
@@ -135,38 +136,14 @@ impl Inner {
         }
 
         loop {
-            l = self.condvar.wait(l).unwrap();
-
-            if self
-                .state
-                .compare_exchange(NOTIFIED, IDLE, SeqCst, SeqCst)
-                .is_ok()
-            {
-                // got a notification, finish parking
-                return;
+            let mut is_timed_out = false;
+            if let Some(duration) = duration {
+                let (lock, timeout_result) = self.condvar.wait_timeout(l, duration).unwrap();
+                is_timed_out = timeout_result.timed_out();
+                l = lock;
+            } else {
+                l = self.condvar.wait(l).unwrap();
             }
-            // got spurious wakeup, go back to park again
-        }
-    }
-
-    fn park_on_condvar_timeout(&self, duration: Duration) {
-        let mut l = self.mutex.lock().unwrap();
-        match self
-            .state
-            .compare_exchange(IDLE, PARKED_ON_CONDVAR, SeqCst, SeqCst)
-        {
-            Ok(_) => {}
-            Err(NOTIFIED) => {
-                // got a notification, exit parking
-                self.state.swap(IDLE, SeqCst);
-                return;
-            }
-            Err(actual) => panic!("inconsistent park state; actual = {actual}"),
-        }
-
-        loop {
-            let (lock, timeout_result) = self.condvar.wait_timeout(l, duration).unwrap();
-            l = lock;
 
             if self
                 .state
@@ -177,7 +154,7 @@ impl Inner {
                 return;
             }
 
-            if timeout_result.timed_out() {
+            if is_timed_out {
                 self.state.store(IDLE, SeqCst);
                 return;
             }

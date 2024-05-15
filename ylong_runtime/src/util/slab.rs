@@ -200,7 +200,7 @@ impl<T: Entry> Slab<T> {
             for slot_idx in 0..slots.slots.len() {
                 unsafe {
                     let slot = slots.slots.as_ptr().add(slot_idx);
-                    let value = slot as *const Value<T>;
+                    let value = slot.cast::<Value<T>>();
 
                     f(&(*value).value);
                 }
@@ -227,7 +227,7 @@ impl<T: Entry> Slab<T> {
                 .as_ptr()
                 .add(slot_idx);
 
-            let value = slot as *const Value<T>;
+            let value = slot.cast::<Value<T>>();
 
             Some(&(*value).value)
         }
@@ -439,7 +439,7 @@ impl<T> Slot<T> {
     fn gen_ref(&self, page: &Arc<Page<T>>) -> Ref<T> {
         std::mem::forget(page.clone());
         let slot = self as *const Slot<T>;
-        let value = slot as *const Value<T>;
+        let value = slot.cast::<Value<T>>();
 
         Ref { value }
     }

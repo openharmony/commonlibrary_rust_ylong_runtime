@@ -51,6 +51,7 @@ impl AsyncRead for Stdin {
         loop {
             match self.state {
                 State::Idle(ref mut buf_op) => {
+                    // before each take, BufInner is set to some
                     let mut buf_inner = buf_op.take().unwrap();
 
                     if !buf_inner.is_empty() {
@@ -60,9 +61,8 @@ impl AsyncRead for Stdin {
                     }
 
                     buf_inner.set_len(buf);
-
+                    // before each take, std is set to some
                     let mut std = self.std.take().unwrap();
-
                     let handle = spawn_blocking(move || {
                         let res = buf_inner.read_from(&mut std);
                         (res, buf_inner, std)

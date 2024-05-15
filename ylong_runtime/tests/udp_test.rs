@@ -361,7 +361,6 @@ fn sdv_send_to_try_peek_from() {
         receiver.readable().await.expect("Receiver isn't readable");
         let (number_of_bytes, _) = receiver
             .try_peek_from(&mut buf)
-            .await
             .expect("Didn't receive data");
         assert_eq!(number_of_bytes, 6);
     });

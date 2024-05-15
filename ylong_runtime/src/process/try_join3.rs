@@ -15,6 +15,16 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
+macro_rules! poll_return_if_err {
+    ($fut: expr, $is_pending: expr, $cx: expr) => {
+        match $fut.as_mut().poll($cx) {
+            Poll::Pending => $is_pending = true,
+            Poll::Ready(Err(e)) => return Poll::Ready(Err(e)),
+            Poll::Ready(_) => {}
+        }
+    };
+}
+
 pub(crate) async fn try_join3<F1, F2, F3, R1, R2, R3, E>(
     fut1: F1,
     fut2: F2,
@@ -33,34 +43,22 @@ where
         let mut is_pending = false;
 
         let mut fut1 = unsafe { Pin::new_unchecked(&mut fut1) };
-        if fut1.as_mut().poll(cx).is_pending() {
-            is_pending = true;
-        } else if fut1.as_mut().output().unwrap().is_err() {
-            return Poll::Ready(Err(fut1.take_output().unwrap().err().unwrap()));
-        }
+        poll_return_if_err!(fut1, is_pending, cx);
 
         let mut fut2 = unsafe { Pin::new_unchecked(&mut fut2) };
-        if fut2.as_mut().poll(cx).is_pending() {
-            is_pending = true;
-        } else if fut2.as_mut().output().unwrap().is_err() {
-            return Poll::Ready(Err(fut2.take_output().unwrap().err().unwrap()));
-        }
+        poll_return_if_err!(fut2, is_pending, cx);
 
         let mut fut3 = unsafe { Pin::new_unchecked(&mut fut3) };
-        if fut3.as_mut().poll(cx).is_pending() {
-            is_pending = true;
-        } else if fut3.as_mut().output().unwrap().is_err() {
-            return Poll::Ready(Err(fut3.take_output().unwrap().err().unwrap()));
-        }
+        poll_return_if_err!(fut3, is_pending, cx);
 
         if is_pending {
             Poll::Pending
         } else {
-            // All fut have ended in a Ready state and will only take_output() here.
+            // All fut should have a ready(Ok(res)) result here
             Poll::Ready(Ok((
-                fut1.take_output().unwrap().ok().unwrap(),
-                fut2.take_output().unwrap().ok().unwrap(),
-                fut3.take_output().unwrap().ok().unwrap(),
+                fut1.take_output().unwrap_or_else(|_| unreachable!()),
+                fut2.take_output().unwrap_or_else(|_| unreachable!()),
+                fut3.take_output().unwrap_or_else(|_| unreachable!()),
             )))
         }
     })
@@ -80,47 +78,34 @@ pub(crate) fn future_done<F: Future>(future: F) -> FutureDone<F> {
 impl<F: Future + Unpin> Unpin for FutureDone<F> {}
 
 impl<F: Future> FutureDone<F> {
-    pub(crate) fn output(self: Pin<&mut Self>) -> Option<&mut F::Output> {
-        // Safety: inner data never move.
-        unsafe {
-            match self.get_unchecked_mut() {
-                FutureDone::Ready(output) => Some(output),
-                _ => None,
-            }
-        }
-    }
-
-    pub(crate) fn take_output(self: Pin<&mut Self>) -> Option<F::Output> {
+    pub(crate) fn take_output(self: Pin<&mut Self>) -> F::Output {
         // Safety: inner data never move.
         unsafe {
             let inner = self.get_unchecked_mut();
-            match inner {
-                FutureDone::Ready(_) => {}
-                _ => return None,
-            }
             if let FutureDone::Ready(output) = std::mem::replace(inner, FutureDone::None) {
-                return Some(output);
+                return output;
             }
             unreachable!()
         }
     }
 }
 
-impl<F: Future> Future for FutureDone<F> {
-    type Output = ();
+impl<E, R, F: Future<Output = Result<R, E>>> Future for FutureDone<F> {
+    type Output = Result<(), E>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         // Safety: inner data never move.
         unsafe {
             match self.as_mut().get_unchecked_mut() {
                 FutureDone::Pending(fut) => match Pin::new_unchecked(fut).poll(cx) {
-                    Poll::Ready(res) => {
-                        self.set(FutureDone::Ready(res));
-                        Poll::Ready(())
+                    Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
+                    Poll::Ready(Ok(res)) => {
+                        self.set(FutureDone::Ready(Ok(res)));
+                        Poll::Ready(Ok(()))
                     }
                     Poll::Pending => Poll::Pending,
                 },
-                FutureDone::Ready(_) => Poll::Ready(()),
+                FutureDone::Ready(_) => Poll::Ready(Ok(())),
                 FutureDone::None => panic!("FutureDone output has gone"),
             }
         }
@@ -177,18 +162,17 @@ mod test {
     #[test]
     fn ut_future_done_test() {
         let handle = crate::spawn(async {
-            let fut = async { 1 };
+            let fut = async { Ok(1) };
             let mut fut = future_done(fut);
 
             crate::futures::poll_fn(move |cx| {
                 let mut fut = unsafe { Pin::new_unchecked(&mut fut) };
+
                 if fut.as_mut().poll(cx).is_pending() {
                     Poll::Pending
                 } else {
-                    let output = fut.as_mut().take_output();
-                    assert!(output.is_some());
-                    assert!(fut.as_mut().take_output().is_none());
-                    assert!(fut.output().is_none());
+                    let output: Result<i32, i32> = fut.as_mut().take_output();
+                    assert!(output.is_ok());
                     Poll::Ready(output.unwrap())
                 }
             })

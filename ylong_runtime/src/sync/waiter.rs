@@ -56,6 +56,7 @@ impl Waiter {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Waiter {
         Waiter {
+            // bounded by permit::max
             sem: SemaphoreInner::new(0).unwrap(),
         }
     }

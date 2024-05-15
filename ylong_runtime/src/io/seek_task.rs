@@ -42,6 +42,7 @@ where
     type Output = io::Result<u64>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        // before each take, the pos is set with some
         let pos = self.pos.take().unwrap();
         let ret = Pin::new(&mut self.seek).poll_seek(cx, pos);
         self.pos = Some(pos);

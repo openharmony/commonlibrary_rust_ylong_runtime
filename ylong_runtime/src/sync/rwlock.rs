@@ -78,6 +78,7 @@ impl<T: Sized> RwLock<T> {
     /// ```
     pub fn new(t: T) -> RwLock<T> {
         RwLock {
+            // bounded by permit::max
             read_sem: SemaphoreInner::new(0).unwrap(),
             write_sem: SemaphoreInner::new(0).unwrap(),
             write_mutex: SemaphoreInner::new(1).unwrap(),
@@ -137,20 +138,13 @@ impl<T: ?Sized> RwLock<T> {
         loop {
             if read_count < 0 {
                 return Err(LockError);
-            } else {
-                match self.read_count.compare_exchange(
-                    read_count,
-                    read_count + 1,
-                    AcqRel,
-                    Acquire,
-                ) {
-                    Ok(_) => {
-                        return Ok(RwLockReadGuard(self));
-                    }
-                    Err(curr) => {
-                        read_count = curr;
-                    }
-                }
+            }
+            match self
+                .read_count
+                .compare_exchange(read_count, read_count + 1, AcqRel, Acquire)
+            {
+                Ok(_) => return Ok(RwLockReadGuard(self)),
+                Err(curr) => read_count = curr,
             }
         }
     }

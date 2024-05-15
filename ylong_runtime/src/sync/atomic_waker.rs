@@ -47,17 +47,15 @@ impl AtomicWaker {
             Ok(IDLE) => {
                 self.waker.borrow_mut().replace(waker.clone());
 
-                match self
+                if self
                     .state
                     .compare_exchange(REGISTERING, IDLE, AcqRel, Acquire)
+                    .is_err()
                 {
-                    Ok(_) => {}
-                    // The state is REGISTERING | WAKING.
-                    Err(_) => {
-                        let waker = self.waker.borrow_mut().take().unwrap();
-                        self.state.store(IDLE, Release);
-                        waker.wake();
-                    }
+                    // atomic waker has been waked or registered, therefore waker must exist
+                    let waker = self.waker.borrow_mut().take().unwrap();
+                    self.state.store(IDLE, Release);
+                    waker.wake();
                 }
             }
             Err(WAKING) => {

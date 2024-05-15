@@ -126,6 +126,10 @@ impl Pty {
 
     /// Unsplit `SplitReadPty` and `SplitWritePty` into a `Pty`
     ///
+    /// # Panics
+    /// If there are more than one copy of SplitReadPty or SplitWritePty, this
+    /// method will panic
+    ///
     /// # Example
     ///
     /// ```no_run
@@ -141,7 +145,8 @@ impl Pty {
         if Arc::ptr_eq(&read_pty, &write_pty) {
             // drop SplitWritePty to ensure Arc::try_unwrap() successful.
             drop(write_pty);
-            Ok(Arc::try_unwrap(read_pty).unwrap())
+            Ok(Arc::try_unwrap(read_pty)
+                .expect("there are more than one copy of SplitRead or SplitWrite"))
         } else {
             Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
@@ -153,7 +158,7 @@ impl Pty {
 
 impl From<Pty> for OwnedFd {
     fn from(value: Pty) -> Self {
-        value.0.io_take().unwrap().into()
+        value.0.io_take().expect("io deregister failed").into()
     }
 }
 

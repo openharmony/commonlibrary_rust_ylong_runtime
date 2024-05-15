@@ -556,6 +556,7 @@ impl ReadDir {
         loop {
             match self.0 {
                 State::Available(ref mut dir) => {
+                    // before each take, the dir is set
                     let (mut std_dir, mut block) = dir.take().unwrap();
                     match block.pop_front() {
                         Some(Ok(entry)) => {

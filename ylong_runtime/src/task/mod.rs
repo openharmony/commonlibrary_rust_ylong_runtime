@@ -127,7 +127,7 @@ impl Task {
             task,
             virtual_table_type,
         ));
-        let non_ptr = NonNull::new(ptr as *mut Header);
+        let non_ptr = NonNull::new(ptr.cast::<Header>());
         let ptr = if let Some(ptr) = non_ptr {
             ptr
         } else {

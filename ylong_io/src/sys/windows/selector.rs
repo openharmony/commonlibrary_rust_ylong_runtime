@@ -129,9 +129,10 @@ impl SelectorInner {
 
     fn select_inner(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<usize> {
         // We can only poll once at the same time.
-        if self.polling.swap(true, Ordering::AcqRel) {
-            panic!("Can't be polling twice at same time!");
-        }
+        assert!(
+            !self.polling.swap(true, Ordering::AcqRel),
+            "Can't be polling twice at the same time"
+        );
 
         unsafe { self.update_sockets_events() }?;
 
@@ -164,7 +165,7 @@ impl SelectorInner {
                 continue;
             } else if iocp_event.token() % 2 == 1 {
                 // Non-AFD event, including pipe.
-                let callback = (*(iocp_event.overlapped() as *mut super::Overlapped)).callback;
+                let callback = (*(iocp_event.overlapped().cast::<super::Overlapped>())).callback;
 
                 let len = events.len();
                 callback(iocp_event.entry(), Some(events));
@@ -277,21 +278,7 @@ impl Drop for SelectorInner {
             match result {
                 Ok(iocp_events) => {
                     complete_num = iocp_events.iter().len();
-                    for iocp_event in iocp_events.iter() {
-                        if iocp_event.overlapped().is_null() {
-                            // User event
-                        } else if iocp_event.token() % 2 == 1 {
-                            // For pipe, dispatch the event so it can release resources
-                            let callback = unsafe {
-                                (*(iocp_event.overlapped() as *mut super::Overlapped)).callback
-                            };
-
-                            callback(iocp_event.entry(), None);
-                        } else {
-                            // Release memory of Arc reference
-                            let _ = from_overlapped(iocp_event.overlapped());
-                        }
-                    }
+                    release_events(iocp_events);
                 }
 
                 Err(_) => {
@@ -304,8 +291,24 @@ impl Drop for SelectorInner {
                 break;
             }
         }
-
         self.afd_group.release_unused_afd();
+    }
+}
+
+fn release_events(iocp_events: &mut [CompletionStatus]) {
+    for iocp_event in iocp_events.iter() {
+        if iocp_event.overlapped().is_null() {
+            // User event
+        } else if iocp_event.token() % 2 == 1 {
+            // For pipe, dispatch the event so it can release resources
+            let callback =
+                unsafe { (*(iocp_event.overlapped().cast::<super::Overlapped>())).callback };
+
+            callback(iocp_event.entry(), None);
+        } else {
+            // Release memory of Arc reference
+            let _ = from_overlapped(iocp_event.overlapped());
+        }
     }
 }
 
@@ -366,82 +369,86 @@ impl SockState {
         })
     }
 
+    fn update_while_idle(&mut self, self_arc: &Pin<Arc<Mutex<SockState>>>) -> io::Result<()> {
+        // Init AfdPollInfo
+        self.poll_info.exclusive = 0;
+        self.poll_info.number_of_handles = 1;
+        self.poll_info.timeout = i64::MAX;
+        self.poll_info.handles[0].handle = self.base_socket as HANDLE;
+        self.poll_info.handles[0].status = 0;
+        self.poll_info.handles[0].events = self.user_interests_flags | afd::POLL_LOCAL_CLOSE;
+
+        let overlapped_ptr = into_overlapped(self_arc.clone());
+
+        // System call to run current event.
+        let result = unsafe {
+            self.afd
+                .poll(&mut self.poll_info, &mut *self.iosb, overlapped_ptr)
+        };
+
+        if let Err(e) = result {
+            // if an error happened, there must be an os error
+            let code = e.raw_os_error().unwrap();
+            if code != ERROR_IO_PENDING as i32 {
+                drop(from_overlapped(overlapped_ptr.cast::<_>()));
+
+                return if code == ERROR_INVALID_HANDLE as i32 {
+                    // Socket closed; it'll be dropped.
+                    self.start_drop();
+                    Ok(())
+                } else {
+                    self.error = e.raw_os_error();
+                    Err(e)
+                };
+            }
+        };
+
+        // The poll request was successfully submitted.
+        self.poll_status = SockPollStatus::Pending;
+        self.polling_interests_flags = self.user_interests_flags;
+        Ok(())
+    }
+
+    fn update_while_pending(&mut self) -> io::Result<()> {
+        if (self.user_interests_flags & afd::ALL_EVENTS & !self.polling_interests_flags) == 0 {
+            // All the events the user is interested in are already
+            // being monitored by the pending poll
+            // operation. It might spuriously complete because of an
+            // event that we're no longer interested in; when that
+            // happens we'll submit a new poll
+            // operation with the updated event mask.
+        } else {
+            // A poll operation is already pending, but it's not monitoring for all the
+            // events that the user is interested in. Therefore, cancel the pending
+            // poll operation; when we receive it's completion package, a new poll
+            // operation will be submitted with the correct event mask.
+            if let Err(e) = self.cancel() {
+                self.error = e.raw_os_error();
+                return Err(e);
+            }
+        }
+        Ok(())
+    }
+
     /// Update SockState in Deque, poll for each Afd.
     fn update(&mut self, self_arc: &Pin<Arc<Mutex<SockState>>>) -> io::Result<()> {
         // delete_pending must false.
-        if self.delete_pending {
-            panic!("SockState update when delete_pending is true, {:#?}", self);
-        }
+        assert!(
+            !self.delete_pending,
+            "SockState update when delete_panding is true, {:#?}",
+            self
+        );
 
         // Make sure to reset previous error before a new update
         self.error = None;
 
         match self.poll_status {
             // Starts poll
-            SockPollStatus::Idle => {
-                // Init AfdPollInfo
-                self.poll_info.exclusive = 0;
-                self.poll_info.number_of_handles = 1;
-                self.poll_info.timeout = i64::MAX;
-                self.poll_info.handles[0].handle = self.base_socket as HANDLE;
-                self.poll_info.handles[0].status = 0;
-                self.poll_info.handles[0].events =
-                    self.user_interests_flags | afd::POLL_LOCAL_CLOSE;
-
-                let overlapped_ptr = into_overlapped(self_arc.clone());
-
-                // System call to run current event.
-                let result = unsafe {
-                    self.afd
-                        .poll(&mut self.poll_info, &mut *self.iosb, overlapped_ptr)
-                };
-
-                if let Err(e) = result {
-                    let code = e.raw_os_error().unwrap();
-                    if code != ERROR_IO_PENDING as i32 {
-                        drop(from_overlapped(overlapped_ptr as *mut _));
-
-                        return if code == ERROR_INVALID_HANDLE as i32 {
-                            // Socket closed; it'll be dropped.
-                            self.start_drop();
-                            Ok(())
-                        } else {
-                            self.error = e.raw_os_error();
-                            Err(e)
-                        };
-                    }
-                };
-
-                // The poll request was successfully submitted.
-                self.poll_status = SockPollStatus::Pending;
-                self.polling_interests_flags = self.user_interests_flags;
-            }
-            SockPollStatus::Pending => {
-                if (self.user_interests_flags & afd::ALL_EVENTS & !self.polling_interests_flags)
-                    == 0
-                {
-                    // All the events the user is interested in are already
-                    // being monitored by the pending poll
-                    // operation. It might spuriously complete because of an
-                    // event that we're no longer interested in; when that
-                    // happens we'll submit a new poll
-                    // operation with the updated event mask.
-                } else {
-                    // A poll operation is already pending, but it's not monitoring for all the
-                    // events that the user is interested in. Therefore, cancel the pending
-                    // poll operation; when we receive it's completion package, a new poll
-                    // operation will be submitted with the correct event mask.
-                    if let Err(e) = self.cancel() {
-                        self.error = e.raw_os_error();
-                        return Err(e);
-                    }
-                }
-            }
+            SockPollStatus::Idle => self.update_while_idle(self_arc),
+            SockPollStatus::Pending => self.update_while_pending(),
             // Do nothing
-            SockPollStatus::Cancelled => {}
+            SockPollStatus::Cancelled => Ok(()),
         }
-
-        Ok(())
     }
 
     /// Returns true if user_interests_flags is inconsistent with
@@ -560,6 +567,7 @@ fn get_base_socket(raw_socket: RawSocket) -> io::Result<RawSocket> {
         }
     }
 
+    // res is an error, then there must be an os error
     Err(io::Error::from_raw_os_error(res.unwrap_err()))
 }
 
@@ -572,7 +580,7 @@ fn base_socket_inner(raw_socket: RawSocket, control_code: u32) -> Result<RawSock
             control_code,
             null_mut(),
             0,
-            &mut base_socket as *mut _ as *mut c_void,
+            (&mut base_socket as *mut RawSocket).cast::<c_void>(),
             size_of::<RawSocket>() as u32,
             &mut bytes_returned,
             null_mut(),

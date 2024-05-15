@@ -120,7 +120,7 @@ impl CompletionStatus {
         CompletionStatus(OVERLAPPED_ENTRY {
             dwNumberOfBytesTransferred: bytes,
             lpCompletionKey: token,
-            lpOverlapped: overlapped as *mut _,
+            lpOverlapped: overlapped.cast::<_>(),
             Internal: 0,
         })
     }

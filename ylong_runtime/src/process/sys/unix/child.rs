@@ -83,6 +83,7 @@ impl Drop for Child {
         if let Ok(Some(_)) = self.try_wait() {
             return;
         }
+        // std is always Some before drop.
         let std = self.std.take().unwrap();
         crate::process::GlobalZombieChild::get_instance().push(std);
     }

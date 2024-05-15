@@ -164,40 +164,37 @@ impl<T> Slots<T> {
     /// assert!(!slots.contains(zero));
     /// ```
     pub fn remove(&mut self, key: usize) -> Result<T, SlotsError> {
-        if let Some(entry) = self.entries.get_mut(key) {
-            if let Some(val) = entry.data.take() {
-                let prev = entry.prev;
-                let next = entry.next;
-                // At the next insertion, update the next insertion position
-                entry.prev = NULL;
-                entry.next = self.next;
-                // If this node is the header node, update the header node; otherwise, update
-                // the `next` of the previous node.
-                match self.entries.get_mut(prev) {
-                    None => {
-                        self.head = next;
-                    }
-                    Some(slot) => {
-                        slot.next = next;
-                    }
-                }
-                // If this node is the tail node, update the tail node; otherwise, update the
-                // `prev` of the next node.
-                match self.entries.get_mut(next) {
-                    None => {
-                        self.tail = prev;
-                    }
-                    Some(slot) => {
-                        slot.prev = prev;
-                    }
-                }
-                // Update linked-list information.
-                self.len -= 1;
-                self.next = key;
-                return Ok(val);
+        let entry = self.entries.get_mut(key).ok_or(SlotsError)?;
+        let val = entry.data.take().ok_or(SlotsError)?;
+        let prev = entry.prev;
+        let next = entry.next;
+        // At the next insertion, update the next insertion position
+        entry.prev = NULL;
+        entry.next = self.next;
+        // If this node is the header node, update the header node; otherwise, update
+        // the `next` of the previous node.
+        match self.entries.get_mut(prev) {
+            None => {
+                self.head = next;
+            }
+            Some(slot) => {
+                slot.next = next;
             }
         }
-        Err(SlotsError)
+        // If this node is the tail node, update the tail node; otherwise, update the
+        // `prev` of the next node.
+        match self.entries.get_mut(next) {
+            None => {
+                self.tail = prev;
+            }
+            Some(slot) => {
+                slot.prev = prev;
+            }
+        }
+        // Update linked-list information.
+        self.len -= 1;
+        self.next = key;
+        Ok(val)
     }
 
     /// Check whether the container is empty.

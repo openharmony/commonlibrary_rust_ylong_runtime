@@ -189,7 +189,7 @@ cfg_not_ffrt!(
     impl Sleep {
         // Creates a Sleep structure based on the given deadline.
         fn new_timeout(deadline: Instant) -> Self {
-            let handle = Handle::get_handle().expect("sleep new out of worker ctx");
+            let handle = Handle::get_handle().unwrap_or_else(|e| panic!("sleep new out of worker ctx, error: {e}"));
 
             let start_time = handle.start_time();
             let deadline = cmp::max(deadline, start_time);
@@ -227,6 +227,7 @@ cfg_not_ffrt!(
             let driver = &this.inner.handle;
 
             if this.need_insert {
+                // the deadline is guaranteed to be later than the start time
                 let ms = this
                     .deadline
                     .checked_duration_since(driver.start_time())

@@ -147,9 +147,8 @@ impl<'a> ReadBuf<'a> {
     /// Panics if n is bigger than the remaining capacity of the buf.
     #[inline]
     pub fn initialize_unfilled_to(&mut self, n: usize) -> &mut [u8] {
-        if n > self.remaining() {
-            panic!("overflowed: try to initialize more bytes than the buffer's capacity")
-        }
+        let remaining = self.remaining();
+        assert!(n <= remaining, "overflowed: try to initialize more bytes than the buffer's capacity, n: {}, remaining: {}", n, remaining);
         let end = self.filled + n;
 
         if self.initialized < end {
@@ -184,9 +183,13 @@ impl<'a> ReadBuf<'a> {
     /// the buffer.
     #[inline]
     pub fn set_filled(&mut self, n: usize) {
-        if n > self.initialized {
-            panic!("buf's filled size becomes larger than the initialized size")
-        }
+        let initialized_len = self.initialized;
+        assert!(
+            n <= initialized_len,
+            "buf's filled size becomes larger than the initialized size, n: {}, initialized: {}",
+            n,
+            initialized_len
+        );
         self.filled = n;
     }
 
@@ -225,9 +228,14 @@ impl<'a> ReadBuf<'a> {
     /// size of the `ReadBuf`
     #[inline]
     pub fn append(&mut self, buf: &[u8]) {
-        if buf.len() > self.remaining() {
-            panic!("slice size is larger than the buf's remaining size");
-        }
+        let remaining = self.remaining();
+        assert!(
+            buf.len() <= remaining,
+            "slice size is larger than the buf's remaining size, buf len: {}, remaining: {}",
+            buf.len(),
+            remaining
+        );
+
         let end = self.filled + buf.len();
         unsafe {
             self.buf[self.filled..end]

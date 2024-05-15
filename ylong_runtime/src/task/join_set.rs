@@ -455,29 +455,29 @@ fn get_entry_waker_table<R>() -> &'static RawWakerVTable {
 // Converts a entry reference into a Waker
 fn entry_into_waker<R>(entry: &Arc<JoinEntry<R>>) -> Waker {
     let cpy = entry.clone();
-    let data = Arc::into_raw(cpy) as *const ();
+    let data = Arc::into_raw(cpy).cast::<()>();
     unsafe { Waker::from_raw(RawWaker::new(data, get_entry_waker_table::<R>())) }
 }
 
 unsafe fn clone_entry<R>(data: *const ()) -> RawWaker {
     // First increment the arc counter
-    let entry = Arc::from_raw(data as *const JoinEntry<R>);
+    let entry = Arc::from_raw(data.cast::<JoinEntry<R>>());
     mem::forget(entry.clone());
     // Construct the new waker
-    let data = Arc::into_raw(entry) as *const ();
+    let data = Arc::into_raw(entry).cast::<()>();
     RawWaker::new(data, get_entry_waker_table::<R>())
 }
 
 unsafe fn wake_entry<R>(data: *const ()) {
-    let entry = Arc::from_raw(data as *const JoinEntry<R>);
+    let entry = Arc::from_raw(data.cast::<JoinEntry<R>>());
     JoinEntry::wake_by_ref(&entry);
 }
 
 unsafe fn wake_entry_ref<R>(data: *const ()) {
-    let entry = ManuallyDrop::new(Arc::from_raw(data as *const JoinEntry<R>));
+    let entry = ManuallyDrop::new(Arc::from_raw(data.cast::<JoinEntry<R>>()));
     JoinEntry::wake_by_ref(&entry);
 }
 
 unsafe fn drop_entry<R>(data: *const ()) {
-    drop(Arc::from_raw(data as *const JoinEntry<R>))
+    drop(Arc::from_raw(data.cast::<JoinEntry<R>>()))
 }

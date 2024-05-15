@@ -25,7 +25,7 @@ use crate::sys::socket::socket_new;
 
 pub(crate) fn bind(path: &Path) -> io::Result<net::UnixListener> {
     let (socket_addr, addr_length) = socket_addr_trans_un(path)?;
-    let socket_addr = &socket_addr as *const libc::sockaddr_un as *const libc::sockaddr;
+    let socket_addr = (&socket_addr as *const libc::sockaddr_un).cast::<libc::sockaddr>();
 
     let socket = socket_new(AF_UNIX, libc::SOCK_STREAM)?;
     let net = unsafe { net::UnixListener::from_raw_fd(socket) };
@@ -39,7 +39,7 @@ pub(crate) fn bind(path: &Path) -> io::Result<net::UnixListener> {
 
 pub(crate) fn connect(path: &Path) -> io::Result<net::UnixStream> {
     let (sockaddr, addr_length) = socket_addr_trans_un(path)?;
-    let sockaddr = &sockaddr as *const libc::sockaddr_un as *const libc::sockaddr;
+    let sockaddr = (&sockaddr as *const libc::sockaddr_un).cast::<libc::sockaddr>();
 
     let socket = socket_new(AF_UNIX, libc::SOCK_STREAM)?;
     let net = unsafe { net::UnixStream::from_raw_fd(socket) };
@@ -57,7 +57,7 @@ pub(crate) fn unbound() -> io::Result<net::UnixDatagram> {
 
 pub(crate) fn data_gram_bind(path: &Path) -> io::Result<net::UnixDatagram> {
     let (socket_addr, addr_length) = socket_addr_trans_un(path)?;
-    let socket_addr = &socket_addr as *const libc::sockaddr_un as *const libc::sockaddr;
+    let socket_addr = (&socket_addr as *const libc::sockaddr_un).cast::<libc::sockaddr>();
 
     let socket = unbound()?;
     match syscall!(bind(socket.as_raw_fd(), socket_addr, addr_length)) {

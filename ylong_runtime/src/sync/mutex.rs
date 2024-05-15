@@ -66,6 +66,7 @@ impl<T: Sized> Mutex<T> {
     /// ```
     pub fn new(t: T) -> Mutex<T> {
         Mutex {
+            // bounded by permit::max
             sem: SemaphoreInner::new(1).unwrap(),
             data: UnsafeCell::new(t),
         }

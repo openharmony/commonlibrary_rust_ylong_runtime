@@ -54,7 +54,7 @@ impl TcpSocket {
             self.socket,
             SOL_SOCKET,
             SO_REUSEADDR,
-            &set_value as *const c_int as *const c_void,
+            (&set_value as *const c_int).cast::<c_void>(),
             size_of::<c_int>() as socklen_t
         )) {
             Err(err) => Err(err),
@@ -142,7 +142,7 @@ pub(crate) fn set_sock_linger(fd: Fd, duration: Option<Duration>) -> io::Result<
         fd as c_int,
         SOL_SOCKET,
         SO_LINGER,
-        &payload as *const linger as *const c_void,
+        (&payload as *const linger).cast::<c_void>(),
         mem::size_of::<linger>() as libc::socklen_t,
     ))
     .map(|_| ())
