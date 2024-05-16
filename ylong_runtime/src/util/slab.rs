@@ -153,6 +153,7 @@ impl<T: Entry> Slab<T> {
         let mut prev_len: usize = 0;
 
         for page in &mut slab.pages {
+            // we've just initialized the pages, so there is no other `Arc`
             let page = Arc::get_mut(page).unwrap();
             page.len = len;
             page.prev_len = prev_len;

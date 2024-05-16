@@ -51,6 +51,14 @@ impl LocalQueue {
             inner: Arc::new(InnerBuffer::new(LOCAL_QUEUE_CAP as u16)),
         }
     }
+
+    fn is_half_full(&self, rear: u16) -> bool {
+        let (steal_pos, _) = unwrap(self.inner.front.load(Acquire));
+        if rear.wrapping_sub(steal_pos) > LOCAL_QUEUE_CAP as u16 / 2 {
+            return true;
+        }
+        false
+    }
 }
 
 #[inline]
@@ -333,8 +341,7 @@ impl InnerBuffer {
     pub(crate) fn steal_into(&self, dst: &LocalQueue) -> Option<Task> {
         // it's a spmc queue, so the queue could read its own tail non-atomically
         let mut dst_rear = unsafe { non_atomic_load(&dst.inner.rear) };
-        let (des_steal_pos, _des_front_pos) = unwrap(dst.inner.front.load(Acquire));
-        if dst_rear.wrapping_sub(des_steal_pos) > LOCAL_QUEUE_CAP as u16 / 2 {
+        if dst.is_half_full(dst_rear) {
             return None;
         }
 
@@ -383,6 +390,7 @@ impl InnerBuffer {
 
             let task = unsafe { ptr::read(task_ptr).assume_init() };
             let ptr = dst.inner.buffer[des_idx].get();
+
             unsafe {
                 ptr::write((*ptr).as_mut_ptr(), task);
             }
