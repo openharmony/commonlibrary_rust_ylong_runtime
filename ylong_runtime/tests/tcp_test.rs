@@ -18,6 +18,38 @@ use ylong_runtime::net::{TcpListener, TcpStream};
 
 const ADDR: &str = "127.0.0.1:0";
 
+/// SDV test cases for `TcpStream`.
+///
+/// # Brief
+/// 1. Bind `TcpListener` and wait for `accept()` using an ipv6 address.
+/// 2. After accept, write `hello`.
+/// 2. `TcpStream` connect to listener and try to read buf.
+/// 4. Check if the result is correct.
+#[test]
+fn sdv_tcp_ipv6_connect() {
+    let handle = ylong_runtime::spawn(async move {
+        let listener = TcpListener::bind("[::1]:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        let handle = ylong_runtime::spawn(async move {
+            let mut stream = TcpStream::connect(addr).await;
+            while stream.is_err() {
+                stream = TcpStream::connect(addr).await;
+            }
+            let mut stream = stream.unwrap();
+            let mut buf = vec![0; 5];
+            let _ = stream.read(&mut buf).await;
+            assert_eq!(buf, b"hello");
+        });
+
+        let (mut stream, _) = listener.accept().await.unwrap();
+        stream.write(b"hello").await.unwrap();
+
+        handle.await.unwrap();
+    });
+    ylong_runtime::block_on(handle).unwrap();
+}
+
 /// SDV test cases for `TcpListener`.
 ///
 /// # Brief
@@ -378,7 +410,7 @@ fn sdv_tcp_split_owned_half() {
 ///    context
 /// 3. Drops the streams and it should not cause Panic
 #[test]
-#[cfg(not(feature = "ffrt"))]
+#[cfg(all(not(feature = "ffrt"), feature = "sync"))]
 fn sdv_tcp_drop_out_context() {
     let (tx, rx) = ylong_runtime::sync::oneshot::channel();
     let handle = ylong_runtime::spawn(async move {
@@ -448,7 +480,13 @@ fn sdv_tcp_cancel() {
     });
 
     let client = ylong_runtime::spawn(async {
-        let addr = rx.await.unwrap();
+        let addr = match rx.await {
+            Ok(addr) => addr,
+            Err(_) => {
+                sleep(Duration::from_secs(100000)).await;
+                return;
+            }
+        };
         let mut tcp = TcpStream::connect(addr).await;
         while tcp.is_err() {
             tcp = TcpStream::connect(addr).await;
@@ -502,4 +540,57 @@ fn sdv_tcp_cancel() {
 
     ylong_runtime::block_on(server).unwrap();
     ylong_runtime::block_on(client).unwrap();
+}
+
+/// SDV case for binding on the same port twice
+///
+/// # Breif
+/// 1. Create a Tcp connection
+/// 2. Close the client side before any data transmission
+/// 3. Check if the server side gets an UnexpectedEof error
+#[test]
+#[cfg(feature = "time")]
+fn sdv_tcp_unexpected_eof() {
+    use std::sync::Arc;
+
+    let val = Arc::new(std::sync::Mutex::new(0));
+    let val2 = val.clone();
+
+    let (tx, rx) = ylong_runtime::sync::oneshot::channel();
+    let handle = ylong_runtime::spawn(async move {
+        let tcp = TcpListener::bind(ADDR).await.unwrap();
+        let addr = tcp.local_addr().unwrap();
+        tx.send(addr).unwrap();
+        let (mut stream, _) = tcp.accept().await.unwrap();
+        let mut buf = [0; 10];
+        let ret = stream.read_exact(&mut buf).await.unwrap_err();
+        assert_eq!(ret.kind(), std::io::ErrorKind::UnexpectedEof);
+    });
+
+    let client = ylong_runtime::spawn(async move {
+        let addr = rx.await.unwrap();
+        let mut tcp = TcpStream::connect(addr).await;
+        while tcp.is_err() {
+            tcp = TcpStream::connect(addr).await;
+        }
+        let mut tcp = tcp.unwrap();
+        {
+            let mut guard = val2.lock().unwrap();
+            *guard = 1;
+        }
+        ylong_runtime::time::sleep(std::time::Duration::from_secs(10)).await;
+        let buf = [3; 10];
+        tcp.write_all(&buf).await.unwrap();
+    });
+
+    loop {
+        let guard = val.lock().unwrap();
+        if *guard != 0 {
+            break;
+        }
+        drop(guard);
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    client.cancel();
+    ylong_runtime::block_on(handle).unwrap();
 }

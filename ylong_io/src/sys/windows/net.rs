@@ -57,24 +57,6 @@ impl NetState {
         }
     }
 
-    /// Reregister the socket
-    pub fn reregister(
-        &mut self,
-        selector: &Selector,
-        token: Token,
-        interests: Interest,
-    ) -> io::Result<()> {
-        match self.inner.as_mut() {
-            Some(state) => selector
-                .reregister(state.state.clone(), token, interests)
-                .map(|_| {
-                    state.token = token;
-                    state.interests = interests;
-                }),
-            None => Err(io::ErrorKind::NotFound.into()),
-        }
-    }
-
     /// Deregister the socket
     pub fn deregister(&mut self) -> io::Result<()> {
         match self.inner.as_mut() {

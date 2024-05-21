@@ -46,14 +46,6 @@ impl Poll {
         source.register(&self.selector, token, interests)
     }
 
-    /// Re-registers the I/O source's fd in order to monitor its io events.
-    pub fn reregister<S>(&self, source: &mut S, token: Token, interests: Interest) -> io::Result<()>
-    where
-        S: Source + ?Sized,
-    {
-        source.reregister(&self.selector, token, interests)
-    }
-
     /// De-registers the I/O source's fd so the Poll will no longer monitor its
     /// io events.
     pub fn deregister<S>(&self, source: &mut S) -> io::Result<()>
@@ -72,5 +64,23 @@ impl Poll {
 impl std::fmt::Debug for Poll {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(fmt, "({:?})", self.selector)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    /// UT cases for debug info of poll
+    ///
+    /// # Brief
+    /// 1. Create a Poll
+    /// 2. Check its fmt debug info
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn ut_poll_debug_info() {
+        use crate::Poll;
+        let poll = Poll::new().unwrap();
+        let fmt = format!("{:?}", poll);
+        assert!(fmt.contains("epoll fd:"));
+        assert!(fmt.contains("Select id:"));
     }
 }

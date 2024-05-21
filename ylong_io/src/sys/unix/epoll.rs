@@ -12,7 +12,7 @@
 // limitations under the License.
 
 use std::io;
-use std::os::raw::{c_int, c_uint};
+use std::os::raw::c_int;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
@@ -75,7 +75,7 @@ impl Selector {
     /// Registers the fd with specific interested events
     pub fn register(&self, fd: i32, token: Token, interests: Interest) -> io::Result<()> {
         let mut sys_event = libc::epoll_event {
-            events: interests_to_io_event(interests),
+            events: interests.into_io_event(),
             u64: usize::from(token) as u64,
         };
 
@@ -88,7 +88,7 @@ impl Selector {
     /// Re-registers the fd with specific interested events
     pub fn reregister(&self, fd: i32, token: Token, interests: Interest) -> io::Result<()> {
         let mut sys_event = libc::epoll_event {
-            events: interests_to_io_event(interests),
+            events: interests.into_io_event(),
             u64: usize::from(token) as u64,
         };
 
@@ -110,21 +110,6 @@ impl Selector {
             Err(err) => Err(err),
         }
     }
-}
-
-fn interests_to_io_event(interests: Interest) -> c_uint {
-    let mut io_event = libc::EPOLLET as u32;
-
-    if interests.is_readable() {
-        io_event |= libc::EPOLLIN as u32;
-        io_event |= libc::EPOLLRDHUP as u32;
-    }
-
-    if interests.is_writable() {
-        io_event |= libc::EPOLLOUT as u32;
-    }
-
-    io_event as c_uint
 }
 
 impl Drop for Selector {
@@ -176,5 +161,40 @@ impl EventTrait for Event {
 
     fn is_error(&self) -> bool {
         (self.events as libc::c_int & libc::EPOLLERR) != 0
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::sys::socket;
+    use crate::{Event, EventTrait, Interest, Selector, Token};
+
+    /// UT cases for `Selector::reregister`.
+    ///
+    /// # Brief
+    /// 1. Create a Selector
+    /// 2. Reregister the selector
+    #[test]
+    fn ut_epoll_reregister() {
+        let selector = Selector::new().unwrap();
+        let sock = socket::socket_new(libc::AF_UNIX, libc::SOCK_STREAM).unwrap();
+        let ret = selector.register(sock, Token::from_usize(0), Interest::READABLE);
+        assert!(ret.is_ok());
+        let ret = selector.reregister(sock, Token::from_usize(0), Interest::WRITABLE);
+        assert!(ret.is_ok());
+    }
+
+    /// UT case for `Event::is_error`
+    ///
+    /// # Brief
+    /// 1. Create an event from libc::EPOLLERR
+    /// 2. Check if it's an error
+    #[test]
+    fn ut_event_is_err() {
+        let event = Event {
+            events: libc::EPOLLERR as u32,
+            u64: 0,
+        };
+        assert!(event.is_error());
     }
 }

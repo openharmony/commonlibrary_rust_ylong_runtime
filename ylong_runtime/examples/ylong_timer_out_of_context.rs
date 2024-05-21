@@ -11,8 +11,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// cfg gn_test is used to isolate the test compiling on OHOS
-#![allow(unexpected_cfgs)]
-#![cfg(gn_test)]
+//! This example simulates the scenario of calling a timer related api outside
+//! the runtime's context
 
-mod signal;
+use std::time::Duration;
+
+fn main() {
+    // this will cause panic because the runtime cannot register the timer on the
+    // main thread
+    ylong_runtime::time::sleep(Duration::from_secs(1));
+}

@@ -11,8 +11,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// cfg gn_test is used to isolate the test compiling on OHOS
-#![allow(unexpected_cfgs)]
-#![cfg(gn_test)]
+//! A test for FD overflow
 
-mod signal;
+use ylong_runtime::net::TcpListener;
+
+fn main() {
+    let handle = ylong_runtime::spawn(async move {
+        let mut vec = vec![];
+        loop {
+            let tcp = TcpListener::bind("127.0.0.1:0").await;
+            match tcp {
+                Err(e) => {
+                    println!("err: {}", e.kind());
+                    return;
+                }
+                Ok(listener) => vec.push(listener),
+            }
+        }
+    });
+    ylong_runtime::block_on(handle).unwrap();
+}

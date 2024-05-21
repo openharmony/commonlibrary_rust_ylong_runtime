@@ -25,14 +25,11 @@ pub(crate) mod driver;
 pub(crate) mod ready;
 pub(crate) mod schedule_io;
 
-cfg_net! {
-    pub use sys::{TcpListener, TcpStream};
-    pub use sys::{UdpSocket, ConnectedUdpSocket};
-    pub use sys::{SplitReadHalf, SplitWriteHalf, BorrowReadHalf, BorrowWriteHalf};
-    #[cfg(unix)]
-    pub use sys::{UnixListener, UnixStream, UnixDatagram};
-    pub use sys::ToSocketAddrs;
-}
-
 #[cfg(not(feature = "ffrt"))]
 pub(crate) use driver::IoDriver;
+pub use sys::{
+    BorrowReadHalf, BorrowWriteHalf, ConnectedUdpSocket, SplitReadHalf, SplitWriteHalf,
+    TcpListener, TcpStream, ToSocketAddrs, UdpSocket,
+};
+#[cfg(unix)]
+pub use sys::{UnixDatagram, UnixListener, UnixStream};

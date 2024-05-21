@@ -152,15 +152,6 @@ impl Source for TcpListener {
             .register(selector, token, interests, self.as_raw_socket())
     }
 
-    fn reregister(
-        &mut self,
-        selector: &Selector,
-        token: Token,
-        interests: Interest,
-    ) -> io::Result<()> {
-        self.state.reregister(selector, token, interests)
-    }
-
     fn deregister(&mut self, _selector: &Selector) -> io::Result<()> {
         self.state.deregister()
     }

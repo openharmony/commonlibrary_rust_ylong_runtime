@@ -69,3 +69,46 @@ impl ops::BitOr for Interest {
         self.add(other)
     }
 }
+
+#[cfg(test)]
+mod test {
+    /// UT cases for `into_io_event`.
+    ///
+    /// # Brief
+    /// 1. Create different kinds of Interest
+    /// 2. Turn the Interest into IO Event
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn ut_interest_to_io_event() {
+        use std::num::NonZeroU8;
+
+        use libc::c_int;
+
+        use crate::Interest;
+
+        #[allow(clippy::init_numbered_fields)]
+        let interest = Interest {
+            0: NonZeroU8::new(4).unwrap(),
+        };
+        let event = interest.into_io_event();
+        assert_eq!(event as c_int, libc::EPOLLET);
+
+        let interest = Interest::READABLE;
+        let event = interest.into_io_event();
+        assert_eq!(
+            event as c_int,
+            libc::EPOLLET | libc::EPOLLIN | libc::EPOLLRDHUP
+        );
+
+        let interest = Interest::WRITABLE;
+        let event = interest.into_io_event();
+        assert_eq!(event as c_int, libc::EPOLLET | libc::EPOLLOUT);
+
+        let interest = Interest::READABLE | Interest::WRITABLE;
+        let event = interest.into_io_event();
+        assert_eq!(
+            event as c_int,
+            libc::EPOLLET | libc::EPOLLIN | libc::EPOLLRDHUP | libc::EPOLLOUT
+        );
+    }
+}

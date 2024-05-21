@@ -11,8 +11,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// cfg gn_test is used to isolate the test compiling on OHOS
-#![allow(unexpected_cfgs)]
-#![cfg(gn_test)]
+//! This example simulates the situation of spawn failure due to insufficient
+//! memory
 
-mod signal;
+use std::time::Duration;
+
+fn main() {
+    // loop until the program gets killed automatically
+    loop {
+        let _handle = ylong_runtime::spawn(async move {
+            let buf = vec![0; 2000000];
+            ylong_runtime::time::sleep(Duration::from_secs(100)).await;
+            assert_eq!(buf, [0; 2000000]);
+        });
+    }
+}

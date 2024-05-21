@@ -123,6 +123,7 @@ cfg_time! {
 }
 
 #[cfg(test)]
+#[cfg(feature = "time")]
 mod test {
     use crate::sync::error::{RecvError, RecvTimeoutError, TryRecvError};
 

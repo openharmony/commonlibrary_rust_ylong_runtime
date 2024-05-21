@@ -407,25 +407,13 @@ impl<T> Slots<T> {
         // Get the first address of the current `page`
         let base = &self.slots[0] as *const _ as usize;
 
-        // The case where the first address is 0 and `page` is unallocated
-        // if base == 0 {
-        //     logerr!("`page` unallocated");
-        // }
-
         // Get the current `slot` address
         let slot = slot as usize;
         // Get `Vec` internal element size
         let width = mem::size_of::<Slot<T>>();
 
-        // if slot < base {
-        //     logerr!("wrong address");
-        // }
-
         // Get the current `idx`
         (slot - base) / width
-        // if idx >= self.slots.len() as usize {
-        //     logerr!("idx out of range");
-        // }
     }
 }
 

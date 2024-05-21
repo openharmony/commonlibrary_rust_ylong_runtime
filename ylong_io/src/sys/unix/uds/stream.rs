@@ -227,15 +227,6 @@ impl Source for UnixStream {
         selector.register(self.inner.as_raw_fd(), token, interests)
     }
 
-    fn reregister(
-        &mut self,
-        selector: &Selector,
-        token: Token,
-        interests: Interest,
-    ) -> io::Result<()> {
-        selector.reregister(self.inner.as_raw_fd(), token, interests)
-    }
-
     fn deregister(&mut self, selector: &Selector) -> io::Result<()> {
         selector.deregister(self.inner.as_raw_fd())
     }
@@ -254,5 +245,43 @@ impl IntoRawFd for UnixStream {
 impl FromRawFd for UnixStream {
     unsafe fn from_raw_fd(fd: RawFd) -> UnixStream {
         UnixStream::from_std(FromRawFd::from_raw_fd(fd))
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::net::Shutdown;
+    use std::os::fd::{FromRawFd, IntoRawFd};
+
+    use crate::UnixStream;
+
+    /// UT for `UnixStream::pair`
+    ///
+    /// # Brief
+    /// 1. Create a pair of UnixStream
+    /// 2. Check if the peer address is correct
+    /// 3. Check if the local address is correct
+    /// 4. Shutdown both UnixStream
+    #[test]
+    fn ut_uds_stream_pair() {
+        let (sender, receiver) = UnixStream::pair().unwrap();
+        let sender2 = sender.try_clone().unwrap();
+
+        let addr = sender2.local_addr().unwrap();
+        let fmt = format!("{addr:?}");
+        assert_eq!(&fmt, "(unnamed)");
+
+        let addr = receiver.peer_addr().unwrap();
+        let fmt = format!("{addr:?}");
+        assert_eq!(&fmt, "(unnamed)");
+
+        let fd = receiver.into_raw_fd();
+        let receiver2 = unsafe { UnixStream::from_raw_fd(fd) };
+        let addr = receiver2.local_addr().unwrap();
+        let fmt = format!("{addr:?}");
+        assert_eq!(&fmt, "(unnamed)");
+
+        receiver2.shutdown(Shutdown::Both).unwrap();
+        sender.shutdown(Shutdown::Both).unwrap()
     }
 }

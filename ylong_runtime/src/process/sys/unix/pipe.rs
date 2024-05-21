@@ -73,15 +73,6 @@ impl Source for Pipe {
         SourceFd(&self.as_raw_fd()).register(selector, token, interests)
     }
 
-    fn reregister(
-        &mut self,
-        selector: &Selector,
-        token: Token,
-        interests: Interest,
-    ) -> io::Result<()> {
-        SourceFd(&self.as_raw_fd()).reregister(selector, token, interests)
-    }
-
     fn deregister(&mut self, selector: &Selector) -> io::Result<()> {
         SourceFd(&self.as_raw_fd()).deregister(selector)
     }

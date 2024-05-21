@@ -12,7 +12,6 @@
 // limitations under the License.
 
 #![warn(missing_docs)]
-#![cfg_attr(doc_cfg, feature(doc_cfg))]
 
 //! # ylong_runtime
 //! A runtime for writing IO-bounded and CPU-bounded applications.

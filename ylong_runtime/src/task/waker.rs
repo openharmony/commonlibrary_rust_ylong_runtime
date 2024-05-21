@@ -66,8 +66,6 @@ where
     RawWaker::new(ptr, raw_waker_ref)
 }
 
-/// Warps std::task::{RawWaker, RawWakerVTable, Waker} info, implements task
-/// notify and schedule
 pub(crate) struct WakerRefHeader<'a> {
     waker: ManuallyDrop<Waker>,
     _field: PhantomData<&'a Header>,

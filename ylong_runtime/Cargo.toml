@@ -168,3 +168,23 @@ required-features = ["time", "multi_instance_runtime"]
 name = "ylong_runtime_timer_memory"
 path = "examples/ylong_runtime_timer_memory.rs"
 required-features = ["time", "multi_instance_runtime"]
+
+[[example]]
+name = "ylong_timer_latency"
+path = "examples/ylong_timer_latency.rs"
+required-features = ["time"]
+
+[[example]]
+name = "ylong_runtime_tcp_fd_limit"
+path = "examples/ylong_runtime_tcp_fd_limit.rs"
+required-features = ["net"]
+
+[[example]]
+name = "ylong_runtime_spawn_fail"
+path = "examples/ylong_runtime_spawn_fail.rs"
+required-features = ["time"]
+
+[[example]]
+name = "ylong_timer_out_of_context"
+path = "examples/ylong_timer_out_of_context.rs"
+required-features = ["time"]

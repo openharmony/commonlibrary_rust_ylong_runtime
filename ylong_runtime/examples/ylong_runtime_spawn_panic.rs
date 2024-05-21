@@ -11,8 +11,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// cfg gn_test is used to isolate the test compiling on OHOS
-#![allow(unexpected_cfgs)]
-#![cfg(gn_test)]
+//! Spawn a task which will panic, the runtime should catch the panic
 
-mod signal;
+fn main() {
+    let handle = ylong_runtime::spawn(async move {
+        panic!("panic");
+    });
+    let err = ylong_runtime::block_on(handle).unwrap_err();
+    assert_eq!(err.kind(), ylong_runtime::error::ErrorKind::Panic);
+    println!("process exit normally");
+}
