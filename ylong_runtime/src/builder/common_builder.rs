@@ -14,7 +14,6 @@
 cfg_not_ffrt! {
     use std::time::Duration;
     use crate::builder::CallbackHook;
-    use crate::executor::blocking_pool::BLOCKING_MAX_THEAD_NUM;
     use crate::builder::ScheduleAlgo;
     const BLOCKING_PERMANENT_THREAD_NUM: u8 = 0;
 }
@@ -79,7 +78,7 @@ impl CommonBuilder {
             worker_name: None,
             is_affinity: false,
             blocking_permanent_thread_num: BLOCKING_PERMANENT_THREAD_NUM,
-            max_blocking_pool_size: Some(BLOCKING_MAX_THEAD_NUM),
+            max_blocking_pool_size: None,
             schedule_algo: ScheduleAlgo::FifoBound,
             stack_size: None,
             after_start: None,
@@ -139,12 +138,7 @@ macro_rules! impl_common {
                 mut self,
                 blocking_permanent_thread_num: u8,
             ) -> Self {
-                if blocking_permanent_thread_num > self.common.max_blocking_pool_size.unwrap() {
-                    self.common.blocking_permanent_thread_num =
-                        self.common.max_blocking_pool_size.unwrap();
-                } else {
-                    self.common.blocking_permanent_thread_num = blocking_permanent_thread_num;
-                }
+                self.common.blocking_permanent_thread_num = blocking_permanent_thread_num;
                 self
             }
 

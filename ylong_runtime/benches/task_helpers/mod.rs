@@ -12,7 +12,10 @@
 // limitations under the License.
 
 #![allow(dead_code)]
+
+use std::env;
 use std::hint::black_box;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use tokio::sync::RwLock;
@@ -31,6 +34,10 @@ pub const READ_FILE: &str = "/dev/zero";
 pub const WRITE_FILE: &str = "/dev/null";
 pub static mut READ_BUFFER: [u8; BUFFER_SIZE] = [0_u8; BUFFER_SIZE];
 pub static mut WRITE_BUFFER: [u8; BUFFER_SIZE] = [0_u8; BUFFER_SIZE];
+
+pub const KB: usize = 1024;
+pub const DIR_PATH: &str = "resources";
+pub const FILE_NAME: &str = "test";
 
 pub const YIELD_NUM: usize = 1_000;
 
@@ -118,4 +125,21 @@ pub async fn tokio_rwlock_write_task(lock: Arc<RwLock<()>>) {
 
 pub async fn tokio_rwlock_task(lock: Arc<RwLock<()>>) {
     let _read = lock.read().await;
+}
+
+pub fn get_writer_buffer(size: usize) -> Vec<u8> {
+    let mut buffer = vec![0; size * KB];
+    for (i, tar) in buffer.iter_mut().enumerate() {
+        *tar = (i % 256) as u8;
+    }
+    buffer
+}
+
+pub fn get_file_dir(size: usize) -> PathBuf {
+    let current_dir = env::current_dir().unwrap();
+    let file_path = current_dir
+        .join(DIR_PATH.to_string())
+        .join(format!("{}_{}.txt", FILE_NAME, size));
+    let _ = std::fs::create_dir_all(file_path.parent().unwrap());
+    file_path
 }

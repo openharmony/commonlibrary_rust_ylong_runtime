@@ -221,8 +221,8 @@ impl<T: ?Sized> RwLock<T> {
     /// assert_eq!(lock.into_inner(), 0);
     /// ```
     pub fn into_inner(self) -> T
-    where
-        T: Sized,
+        where
+            T: Sized,
     {
         self.data.into_inner()
     }
@@ -341,7 +341,7 @@ mod tests {
 
     /// UT test cases for Rwlock::new()
     ///
-    /// # Brief  
+    /// # Brief
     /// 1. Create a concurrent read/write lock with structure and value as input
     ///    parameters
     /// 2. Verify the contents of the read/write lock
@@ -362,7 +362,7 @@ mod tests {
 
     /// UT test cases for Rwlock::read()
     ///
-    /// # Brief  
+    /// # Brief
     /// 1. Creating a concurrent read/write lock
     /// 2. Calling the read() function
     /// 3. Verify the value of the read() function dereference
@@ -392,7 +392,7 @@ mod tests {
             let mut loopmun = lock2.write().await;
             *loopmun += 1;
         }))
-        .unwrap();
+            .unwrap();
         block_on(async {
             let a = lock.read().await;
             assert_eq!(*a, 101);
@@ -401,7 +401,7 @@ mod tests {
 
     /// UT test cases for Rwlock::try_read()
     ///
-    /// # Brief  
+    /// # Brief
     /// 1. Creating a concurrent read/write lock
     /// 2. Call try_read()
     /// 3. Verify the value of the return value dereference
@@ -414,7 +414,7 @@ mod tests {
 
     /// UT test cases for Rwlock::try_read()
     ///
-    /// # Brief  
+    /// # Brief
     /// 1. Creating a concurrent read/write lock
     /// 2. Create a thread to call the write method to hold the lock, and then
     ///    sleep to hold the lock for a long time
@@ -435,7 +435,7 @@ mod tests {
 
     /// UT test cases for Rwlock::write()
     ///
-    /// # Brief  
+    /// # Brief
     /// 1. Creating a concurrent read/write lock
     /// 2. Create a call to the write interface to modify the value inside the
     ///    concurrent read/write lock
