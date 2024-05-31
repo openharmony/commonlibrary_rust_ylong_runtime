@@ -562,6 +562,37 @@ impl TcpStream {
     pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
         self.source.shutdown(how)
     }
+
+    /// Sets the owner for this source's fd
+    ///
+    /// # Error
+    /// This method calls libc::fchown, libc::fchown returns the following
+    /// errors [`libc::EBADF`]: The fd argument is not an open file descriptor.
+    /// [`libc::EPERM`]: The effective user ID does not match the owner of the file or the process does not have appropriate privilege and _POSIX_CHOWN_RESTRICTED indicates that such privilege is required.
+    /// [`libc::EROFS`]:The file referred to by fildes resides on a read-only file system.
+    /// [`libc::EINVAL`]: The owner or group ID is not a value supported by the implementation.
+    /// [`libc::EIO`]: A physical I/O error has occurred.
+    /// [`libc::EINTR`]: The fchown() function was interrupted by a signal which was caught.
+    ///
+    /// # Example
+    /// ```no_run
+    /// use std::io;
+    ///
+    /// use ylong_runtime::net::TcpStream;
+    ///
+    /// async fn io_func() -> io::Result<()> {
+    ///     let addr = "127.0.0.1:1234";
+    ///     let stream = TcpStream::connect(addr)
+    ///         .await
+    ///         .expect("Couldn't connect to the server...");
+    ///     stream.fchown(0, 0)?;
+    ///     Ok(())
+    /// }
+    /// ```
+    #[cfg(target_os = "linux")]
+    pub fn fchown(&self, uid: uid_t, gid: gid_t) -> io::Result<()> {
+        self.source.fchown(uid, gid)
+    }
 }
 
 impl AsyncRead for TcpStream {
@@ -617,6 +648,9 @@ impl AsRawSocket for TcpStream {
 
 #[cfg(unix)]
 use std::os::fd::{AsRawFd, RawFd};
+
+#[cfg(target_os = "linux")]
+use libc::{gid_t, uid_t};
 
 #[cfg(unix)]
 use ylong_io::Source;
