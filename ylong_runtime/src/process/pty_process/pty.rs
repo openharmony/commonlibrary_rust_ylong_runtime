@@ -158,6 +158,7 @@ impl Pty {
 
 impl From<Pty> for OwnedFd {
     fn from(value: Pty) -> Self {
+        // io must be some until deregister
         value.0.io_take().expect("io deregister failed").into()
     }
 }

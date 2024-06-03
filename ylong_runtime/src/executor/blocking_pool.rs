@@ -319,19 +319,15 @@ impl<'a> Inner {
                 if is_waked_up {
                     break;
                 }
-            } else {
-                match self.wait_temporary(shared, worker_id) {
-                    (WaitState::ExitWait, guard) => {
-                        shared = guard;
-                        break;
-                    }
-                    (WaitState::Continue, guard) => {
-                        shared = guard;
-                    }
-                    (WaitState::Release, guard) => {
-                        return (true, guard);
-                    }
+                continue;
+            }
+            match self.wait_temporary(shared, worker_id) {
+                (WaitState::ExitWait, guard) => {
+                    shared = guard;
+                    break;
                 }
+                (WaitState::Continue, guard) => shared = guard,
+                (WaitState::Release, guard) => return (true, guard),
             }
         }
         (false, shared)

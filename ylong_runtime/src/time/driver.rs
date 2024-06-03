@@ -77,7 +77,10 @@ impl TimeDriver {
 
         if *waker_idx == waker_list.len() {
             for waker in waker_list.iter_mut() {
-                waker.take().unwrap().wake();
+                waker
+                    .take()
+                    .expect("waker taken from the clock is none")
+                    .wake();
             }
             *waker_idx = 0;
         }
