@@ -299,6 +299,23 @@ fn sdv_tcp_split_borrow_half() {
     ylong_runtime::block_on(handle).unwrap();
 }
 
+/// SDV case for binding on the same port twice
+///
+/// # Breif
+/// 1. Create a new TcpListener
+/// 2. Create another TcpListener that binds to the same port
+/// 3. Check if the return is an error
+#[test]
+fn sdv_tcp_address_in_use() {
+    ylong_runtime::block_on(async move {
+        let tcp = TcpListener::bind(ADDR).await.unwrap();
+        let addr = tcp.local_addr().unwrap();
+
+        let tcp2 = TcpListener::bind(addr).await;
+        assert!(tcp2.is_err());
+    });
+}
+
 /// SDV test cases for `TcpStream` of into_split().
 ///
 /// # Brief
@@ -418,7 +435,7 @@ fn sdv_tcp_cancel() {
     let server = ylong_runtime::spawn(async {
         let tcp = TcpListener::bind(ADDR).await.unwrap();
         let addr = tcp.local_addr().unwrap();
-        tx.send(addr).unwrap();
+        let _ = tx.send(addr);
         let (mut stream, _) = tcp.accept().await.unwrap();
         sleep(Duration::from_secs(10000)).await;
 
@@ -446,8 +463,8 @@ fn sdv_tcp_cancel() {
         assert_eq!(buf, [2; 100]);
     });
 
-    server.cancel();
     client.cancel();
+    server.cancel();
     let ret = ylong_runtime::block_on(server);
     assert!(ret.is_err());
     let ret = ylong_runtime::block_on(client);

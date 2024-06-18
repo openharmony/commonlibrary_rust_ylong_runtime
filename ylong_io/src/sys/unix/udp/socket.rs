@@ -13,7 +13,7 @@
 
 use std::net::SocketAddr;
 use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
-use std::{io, mem, net};
+use std::{io, net};
 
 use libc::{c_int, AF_INET, AF_INET6, SOCK_DGRAM};
 
@@ -42,21 +42,14 @@ impl UdpSock {
     }
 
     pub(crate) fn bind(self, addr: SocketAddr) -> io::Result<UdpSocket> {
+        let udp_socket = UdpSocket {
+            inner: unsafe { net::UdpSocket::from_raw_fd(self.socket) },
+        };
         let (raw_addr, addr_length) = socket_addr_trans(&addr);
         match syscall!(bind(self.socket, raw_addr.as_ptr(), addr_length)) {
             Err(err) if err.raw_os_error() != Some(libc::EINPROGRESS) => Err(err),
-            _ => {
-                let udp_socket = Ok(UdpSocket {
-                    inner: unsafe { net::UdpSocket::from_raw_fd(self.socket) },
-                });
-                mem::forget(self);
-                udp_socket
-            }
+            _ => Ok(udp_socket),
         }
-    }
-
-    pub(crate) fn close(&self) {
-        let _ = unsafe { net::UdpSocket::from_raw_fd(self.socket) };
     }
 }
 
@@ -69,11 +62,5 @@ impl AsRawFd for UdpSock {
 impl FromRawFd for UdpSock {
     unsafe fn from_raw_fd(fd: RawFd) -> UdpSock {
         UdpSock { socket: fd }
-    }
-}
-
-impl Drop for UdpSock {
-    fn drop(&mut self) {
-        self.close();
     }
 }

@@ -12,9 +12,9 @@
 // limitations under the License.
 
 use std::net::SocketAddr;
-use std::os::windows::io::{FromRawSocket, RawSocket};
+use std::os::windows::io::FromRawSocket;
 use std::os::windows::raw;
-use std::{io, mem, net};
+use std::{io, net};
 
 use crate::sys::winapi::{
     bind as win_bind, closesocket, ioctlsocket, socket, ADDRESS_FAMILY, AF_INET, AF_INET6, FIONBIO,
@@ -66,19 +66,6 @@ impl UdpSock {
             PartialEq::eq,
             SOCKET_ERROR
         )?;
-        // must
-        mem::forget(self);
         Ok(socket)
-    }
-
-    /// Closes Socket
-    pub(crate) fn close(&self) {
-        let _ = unsafe { net::UdpSocket::from_raw_socket(self.socket as RawSocket) };
-    }
-}
-
-impl Drop for UdpSock {
-    fn drop(&mut self) {
-        self.close();
     }
 }
