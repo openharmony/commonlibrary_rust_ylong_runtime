@@ -23,7 +23,7 @@ use libc::{
 };
 
 use super::super::socket_addr::socket_addr_trans;
-use super::{TcpListener, TcpStream};
+use super::TcpStream;
 use crate::source::Fd;
 use crate::sys::unix::socket::socket_new;
 
@@ -70,34 +70,20 @@ impl TcpSocket {
         }
     }
 
-    pub(crate) fn listen(self, max_connect: c_int) -> io::Result<TcpListener> {
+    pub(crate) fn listen(self, max_connect: c_int) -> io::Result<()> {
         syscall!(listen(self.socket, max_connect))?;
-
-        let tcp_listener = Ok(TcpListener {
-            inner: unsafe { net::TcpListener::from_raw_fd(self.socket) },
-        });
-
-        mem::forget(self);
-
-        tcp_listener
+        Ok(())
     }
 
     pub(crate) fn connect(self, addr: SocketAddr) -> io::Result<TcpStream> {
+        let stream = TcpStream {
+            inner: unsafe { net::TcpStream::from_raw_fd(self.socket) },
+        };
         let (raw_addr, addr_length) = socket_addr_trans(&addr);
         match syscall!(connect(self.socket, raw_addr.as_ptr(), addr_length)) {
             Err(err) if err.raw_os_error() != Some(libc::EINPROGRESS) => Err(err),
-            _ => {
-                let tcp_stream = Ok(TcpStream {
-                    inner: unsafe { net::TcpStream::from_raw_fd(self.socket) },
-                });
-                mem::forget(self);
-                tcp_stream
-            }
+            _ => Ok(stream),
         }
-    }
-
-    pub(crate) fn close(&self) {
-        let _ = unsafe { net::TcpStream::from_raw_fd(self.socket) };
     }
 }
 
@@ -110,12 +96,6 @@ impl AsRawFd for TcpSocket {
 impl FromRawFd for TcpSocket {
     unsafe fn from_raw_fd(fd: RawFd) -> TcpSocket {
         TcpSocket { socket: fd }
-    }
-}
-
-impl Drop for TcpSocket {
-    fn drop(&mut self) {
-        self.close();
     }
 }
 

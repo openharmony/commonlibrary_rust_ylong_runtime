@@ -36,9 +36,13 @@ impl TcpListener {
     /// The socket will be set to `SO_REUSEADDR`.
     pub fn bind(addr: SocketAddr) -> io::Result<TcpListener> {
         let socket = TcpSocket::new_socket(addr)?;
+        let listener = TcpListener {
+            inner: unsafe { net::TcpListener::from_raw_fd(socket.as_raw_fd()) },
+        };
         socket.set_reuse(true)?;
         socket.bind(addr)?;
-        socket.listen(1024)
+        socket.listen(1024)?;
+        Ok(listener)
     }
 
     /// Accepts connections and returns the `TcpStream` and the remote peer

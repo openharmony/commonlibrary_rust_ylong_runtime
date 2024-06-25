@@ -221,8 +221,8 @@ impl<T: ?Sized> RwLock<T> {
     /// assert_eq!(lock.into_inner(), 0);
     /// ```
     pub fn into_inner(self) -> T
-        where
-            T: Sized,
+    where
+        T: Sized,
     {
         self.data.into_inner()
     }
@@ -392,7 +392,7 @@ mod tests {
             let mut loopmun = lock2.write().await;
             *loopmun += 1;
         }))
-            .unwrap();
+        .unwrap();
         block_on(async {
             let a = lock.read().await;
             assert_eq!(*a, 101);

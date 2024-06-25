@@ -15,7 +15,7 @@ use std::io;
 
 use libc::c_int;
 
-pub(crate) fn socket_new(domain: c_int, socket_type: c_int) -> io::Result<i32> {
+pub(crate) fn socket_new(domain: c_int, socket_type: c_int) -> io::Result<c_int> {
     #[cfg(target_os = "linux")]
     let socket_type = socket_type | libc::SOCK_NONBLOCK | libc::SOCK_CLOEXEC;
     let socket = syscall!(socket(domain, socket_type, 0))?;

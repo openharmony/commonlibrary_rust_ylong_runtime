@@ -15,7 +15,7 @@ use std::mem::MaybeUninit;
 use std::net::SocketAddr;
 use std::os::windows::io::{AsRawSocket, FromRawSocket, RawSocket};
 use std::time::Duration;
-use std::{io, mem, net};
+use std::{io, mem};
 
 use libc::{c_int, getsockopt};
 
@@ -85,7 +85,6 @@ impl TcpSocket {
             PartialEq::eq,
             SOCKET_ERROR
         )?;
-        mem::forget(self);
         Ok(())
     }
 
@@ -102,16 +101,8 @@ impl TcpSocket {
 
         match res {
             Err(e) if e.kind() != io::ErrorKind::WouldBlock => Err(e),
-            _ => {
-                mem::forget(self);
-                Ok(())
-            }
+            _ => Ok(()),
         }
-    }
-
-    /// Closes Socket
-    pub(crate) fn close(&self) {
-        let _ = unsafe { net::TcpStream::from_raw_socket(self.socket as RawSocket) };
     }
 }
 
@@ -126,12 +117,6 @@ impl FromRawSocket for TcpSocket {
         TcpSocket {
             socket: sock as SOCKET,
         }
-    }
-}
-
-impl Drop for TcpSocket {
-    fn drop(&mut self) {
-        self.close();
     }
 }
 
