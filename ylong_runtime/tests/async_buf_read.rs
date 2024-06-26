@@ -208,6 +208,7 @@ fn sdv_buf_reader_seek() {
         let mut file = File::create("buf_reader_seek_file").await.unwrap();
         let buf = "lorem-ipsum-dolor".as_bytes();
         let res = file.write(buf).await.unwrap();
+        file.sync_all().await.unwrap();
         assert_eq!(res, 17);
     });
     ylong_runtime::block_on(handle).unwrap();
