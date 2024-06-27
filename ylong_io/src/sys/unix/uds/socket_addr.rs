@@ -102,3 +102,25 @@ impl fmt::Debug for SocketAddr {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use crate::SocketAddr;
+
+    /// UT for uds sockaddr debug info
+    ///
+    /// # Brief
+    /// 1. Create an UDS socket address
+    /// 2. Check if the debug info is correct
+    #[test]
+    fn ut_uds_socket_addr_debug_info() {
+        let sock_addr = libc::sockaddr_un {
+            sun_family: 1,
+            sun_path: [2; 108],
+        };
+
+        let addr = SocketAddr::from_parts(sock_addr, 10);
+        let fmt = format!("{addr:?}");
+        assert!(fmt.contains("\"\\u{2}\\u{2}\\u{2}\\u{2}\\u{2}\\u{2}\\u{2}\" (pathname)"));
+    }
+}

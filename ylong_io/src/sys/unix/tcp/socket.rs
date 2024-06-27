@@ -148,3 +148,24 @@ fn into_linger(duration: Option<Duration>) -> linger {
         },
     }
 }
+
+#[cfg(test)]
+mod test {
+    use std::ffi::c_int;
+    use std::os::fd::{AsRawFd, FromRawFd};
+
+    use crate::sys::unix::tcp::socket::into_linger;
+    use crate::sys::unix::tcp::TcpSocket;
+
+    /// UT for `into_linger`
+    ///
+    /// # Brief
+    /// 1. Call `into_linger` with parameter None
+    /// 2. Check if the returned linger is correct
+    #[test]
+    fn ut_into_linger_none() {
+        let linger = into_linger(None);
+        assert_eq!(linger.l_linger, 0);
+        assert_eq!(linger.l_linger, 0);
+    }
+}

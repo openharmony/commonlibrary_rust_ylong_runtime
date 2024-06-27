@@ -13,25 +13,20 @@
 
 use std::fmt::{Debug, Formatter};
 use std::io;
+use std::io::{Read, Write};
+use std::mem::MaybeUninit;
 use std::ops::Deref;
 use std::sync::Arc;
+use std::task::{Context, Poll};
 
 #[cfg(target_os = "linux")]
 use libc::{gid_t, uid_t};
 use ylong_io::{Interest, Source};
 
 use crate::executor::Handle;
-use crate::io::poll_ready;
-use crate::net::ScheduleIO;
+use crate::io::{poll_ready, ReadBuf};
+use crate::net::{ReadyEvent, ScheduleIO};
 use crate::util::slab::Ref;
-
-cfg_net!(
-    use std::task::{Context, Poll};
-    use std::mem::MaybeUninit;
-    use crate::io::ReadBuf;
-    use crate::net::ReadyEvent;
-    use std::io::{Read, Write};
-);
 
 /// Wrapper that turns a sync `Source` io into an async one. This struct
 /// interacts with the reactor of the runtime.

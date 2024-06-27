@@ -45,7 +45,6 @@ const DRIVER_TICK_INIT: u8 = 0;
 // | reserved | generation | address |
 // |----------|------------|---------|
 // |   1 bit  |   7 bits   | 24 bits |
-// const RESERVED: Mask = Mask::new(1, 31);
 const GENERATION: Mask = Mask::new(7, 24);
 const ADDRESS: Mask = Mask::new(24, 0);
 

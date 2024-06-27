@@ -763,15 +763,6 @@ impl Source for UdpSocket {
         selector.register(self.get_fd(), token, interests)
     }
 
-    fn reregister(
-        &mut self,
-        selector: &Selector,
-        token: Token,
-        interests: Interest,
-    ) -> io::Result<()> {
-        selector.reregister(self.get_fd(), token, interests)
-    }
-
     fn deregister(&mut self, selector: &Selector) -> io::Result<()> {
         selector.deregister(self.get_fd())
     }
@@ -789,15 +780,6 @@ impl Source for ConnectedUdpSocket {
         interests: Interest,
     ) -> io::Result<()> {
         selector.register(self.get_fd(), token, interests)
-    }
-
-    fn reregister(
-        &mut self,
-        selector: &Selector,
-        token: Token,
-        interests: Interest,
-    ) -> io::Result<()> {
-        selector.reregister(self.get_fd(), token, interests)
     }
 
     fn deregister(&mut self, selector: &Selector) -> io::Result<()> {

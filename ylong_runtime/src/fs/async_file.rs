@@ -568,6 +568,7 @@ impl FileInner {
 
 #[cfg(test)]
 mod test {
+    use std::io;
     use std::io::SeekFrom;
 
     use crate::fs::async_file::DEFAULT_BUF_LIMIT;
@@ -753,5 +754,27 @@ mod test {
         });
         crate::block_on(handle).unwrap();
         std::fs::remove_file(file_path).unwrap();
+    }
+
+    use std::fmt::{Debug, Formatter};
+
+    impl Debug for File {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            self.file.fmt(f)
+        }
+    }
+
+    /// UT for opening an non-existed file
+    ///
+    /// # Brief
+    /// 1. Open a file that does not exist
+    /// 2. Check if the returned error is NotFound
+    #[test]
+    fn ut_fs_open_fail() {
+        let handle = crate::spawn(async move {
+            let file = File::open("file_not_exist").await;
+            assert_eq!(file.unwrap_err().kind(), io::ErrorKind::NotFound);
+        });
+        crate::block_on(handle).unwrap();
     }
 }

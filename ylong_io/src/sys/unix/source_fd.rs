@@ -30,20 +30,30 @@ impl<'a> Source for SourceFd<'a> {
         selector.register(self.get_fd(), token, interests)
     }
 
-    fn reregister(
-        &mut self,
-        selector: &Selector,
-        token: Token,
-        interests: Interest,
-    ) -> io::Result<()> {
-        selector.reregister(self.get_fd(), token, interests)
-    }
-
     fn deregister(&mut self, selector: &Selector) -> io::Result<()> {
         selector.deregister(self.get_fd())
     }
 
     fn get_fd(&self) -> Fd {
         *self.0
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::sys::{socket, SourceFd};
+
+    /// UT cases for debug info of SourceFd.
+    ///
+    /// # Brief
+    /// 1. Create a SourceFd
+    /// 2. Reregister the SourceFd
+    #[test]
+    fn ut_source_fd_debug_info() {
+        let sock = socket::socket_new(libc::AF_UNIX, libc::SOCK_STREAM).unwrap();
+        let source_fd = SourceFd(&sock);
+
+        let fmt = format!("{:?}", source_fd);
+        assert!(fmt.contains("SourceFd("));
     }
 }

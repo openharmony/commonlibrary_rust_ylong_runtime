@@ -11,8 +11,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// cfg gn_test is used to isolate the test compiling on OHOS
-#![allow(unexpected_cfgs)]
-#![cfg(gn_test)]
+//! This example simulates the scenario where a worker thread gets its stack
+//! overflowed
 
-mod signal;
+fn main() {
+    ylong_runtime::builder::RuntimeBuilder::new_multi_thread()
+        .worker_stack_size(1)
+        .build_global()
+        .unwrap();
+
+    let handle = ylong_runtime::spawn(async move {
+        let a = [0; 20000];
+        assert_eq!(a, [0; 20000]);
+    });
+
+    ylong_runtime::block_on(handle).unwrap();
+}

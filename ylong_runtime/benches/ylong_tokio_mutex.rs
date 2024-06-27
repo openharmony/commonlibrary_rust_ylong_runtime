@@ -38,8 +38,10 @@ macro_rules! tokio_mutex_task {
                 for _ in 0..$num {
                     let mutex1 = mutex.clone();
                     handlers.push(runtime.spawn(async move {
-                        let mut lock = mutex1.lock().await;
-                        *lock += 1;
+                        for _ in 0..1000 {
+                            let mut lock = mutex1.lock().await;
+                            *lock += 1;
+                        }
                     }));
                 }
 
@@ -48,7 +50,7 @@ macro_rules! tokio_mutex_task {
                 }
                 let _res = runtime.block_on(async {
                     let n = mutex.lock().await;
-                    assert_eq!(*n, $num);
+                    assert_eq!(*n, $num * 1000);
                 });
             }));
         }
@@ -66,8 +68,10 @@ macro_rules! ylong_mutex_task {
                 for _ in 0..$num {
                     let mutex1 = mutex.clone();
                     handlers.push(ylong_runtime::spawn(async move {
-                        let mut lock = mutex1.lock().await;
-                        *lock += 1;
+                        for _ in 0..1000 {
+                            let mut lock = mutex1.lock().await;
+                            *lock += 1;
+                        }
                     }));
                 }
 
@@ -76,7 +80,7 @@ macro_rules! ylong_mutex_task {
                 }
                 let _res = ylong_runtime::block_on(async {
                     let n = mutex.lock().await;
-                    assert_eq!(*n, $num);
+                    assert_eq!(*n, $num * 1000);
                 });
             }));
         }

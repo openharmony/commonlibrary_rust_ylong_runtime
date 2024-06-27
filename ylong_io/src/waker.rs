@@ -32,3 +32,24 @@ impl Waker {
         self.inner.wake()
     }
 }
+
+#[cfg(test)]
+mod test {
+    /// UT cases for debug info of waker
+    ///
+    /// # Brief
+    /// 1. Create a Waker
+    /// 2. Check its fmt debug info
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn ut_waker_debug_info() {
+        use crate::{Poll, Token, Waker};
+
+        let poll = Poll::new().unwrap();
+        let waker = Waker::new(&poll, Token::from_usize(0)).unwrap();
+        let fmt = format!("{:?}", waker);
+        assert!(fmt.contains("fd:"));
+        assert!(fmt.contains("read:"));
+        assert!(fmt.contains("write:"));
+    }
+}

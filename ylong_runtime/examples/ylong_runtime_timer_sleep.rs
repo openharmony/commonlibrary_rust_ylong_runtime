@@ -11,7 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Sleep usage in ylong_runtime.
+//! A test for sleep latency in ylong_runtime.
 
 use std::time::{Duration, Instant};
 

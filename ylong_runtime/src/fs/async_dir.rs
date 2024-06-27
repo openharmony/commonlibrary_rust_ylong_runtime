@@ -728,6 +728,8 @@ impl DirEntry {
 
 #[cfg(test)]
 mod test {
+    use std::io;
+
     use crate::fs::{
         canonicalize, copy, create_dir, hard_link, metadata, read, read_dir, read_link,
         read_to_string, remove_dir_all, remove_file, rename, set_permissions, symlink_metadata,
@@ -750,6 +752,20 @@ mod test {
 
             assert!(res.is_ok());
         });
+    }
+
+    /// UT test for creating
+    ///
+    /// # Brief
+    ///
+    /// 1. Create a new directory whose parent doesn't exist.
+    /// 2. Check if the returned error is NotFound.
+    #[test]
+    fn ut_fs_create_dir_fail() {
+        crate::block_on(async {
+            let ret = create_dir("non-existed_parent/non_existed_child").await;
+            assert_eq!(ret.unwrap_err().kind(), io::ErrorKind::NotFound);
+        })
     }
 
     /// UT test for `rename`

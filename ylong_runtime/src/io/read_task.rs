@@ -92,6 +92,7 @@ impl<'a, R: ?Sized> ReadToEndTask<'a, R> {
         }
     }
 }
+const PROBE_SIZE: usize = 32;
 
 fn poll_read_to_end<R: AsyncRead + Unpin>(
     buf: &mut Vec<u8>,
@@ -100,9 +101,10 @@ fn poll_read_to_end<R: AsyncRead + Unpin>(
     cx: &mut Context<'_>,
 ) -> Poll<io::Result<usize>> {
     loop {
-        // Allocate 32 bytes every time, if the remaining capacity is larger than 32
+        // Allocate spaces to read, if the remaining capacity is larger than 32
         // bytes, this will do nothing.
-        buf.reserve(32);
+        buf.try_reserve(PROBE_SIZE)
+            .map_err(|_| io::ErrorKind::OutOfMemory)?;
         let len = buf.len();
         let mut read_buf = ReadBuf::uninit(unsafe {
             from_raw_parts_mut(buf.as_mut_ptr().cast::<MaybeUninit<u8>>(), buf.capacity())
@@ -113,9 +115,7 @@ fn poll_read_to_end<R: AsyncRead + Unpin>(
         let poll = Pin::new(&mut reader).poll_read(cx, &mut read_buf);
         let new_len = read_buf.filled_len();
         match poll {
-            Poll::Pending => {
-                return Poll::Pending;
-            }
+            Poll::Pending => return Poll::Pending,
             Poll::Ready(Ok(())) if (new_len - len) == 0 => {
                 return Poll::Ready(Ok(mem::replace(read_len, 0)))
             }

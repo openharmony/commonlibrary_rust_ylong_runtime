@@ -172,15 +172,6 @@ impl Source for UnixListener {
         selector.register(self.inner.as_raw_fd(), token, interests)
     }
 
-    fn reregister(
-        &mut self,
-        selector: &Selector,
-        token: Token,
-        interests: Interest,
-    ) -> io::Result<()> {
-        selector.reregister(self.inner.as_raw_fd(), token, interests)
-    }
-
     fn deregister(&mut self, selector: &Selector) -> io::Result<()> {
         selector.deregister(self.inner.as_raw_fd())
     }

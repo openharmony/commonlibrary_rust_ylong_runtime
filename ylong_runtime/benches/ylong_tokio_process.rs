@@ -72,7 +72,7 @@ macro_rules! ylong_process_task {
 }
 
 #[cfg(test)]
-mod uds_bench {
+mod process_bench {
     extern crate test;
 
     use std::hint::black_box;

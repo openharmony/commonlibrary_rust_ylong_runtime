@@ -67,15 +67,6 @@ impl Selector {
         SelectorInner::register(&self.inner, socket, token, interests)
     }
 
-    pub(crate) fn reregister(
-        &self,
-        sock_state: Pin<Arc<Mutex<SockState>>>,
-        token: Token,
-        interests: Interest,
-    ) -> io::Result<()> {
-        self.inner.reregister(sock_state, token, interests)
-    }
-
     pub(crate) fn clone_cp(&self) -> Arc<CompletionPort> {
         self.inner.completion_port.clone()
     }

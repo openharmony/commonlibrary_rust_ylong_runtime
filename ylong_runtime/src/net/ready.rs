@@ -213,303 +213,310 @@ cfg_ffrt! {
     }
 }
 
-// @title  ready from_event function ut test
-// @design conditions of use override
-// @precon none
-// @brief  1. Create an event
-//         2. Call from_event
-//         3. Verify the returned results
-// @expect 1. Event readable to get readable Ready instances
-//         2. Event writable, call writable Ready instances
-//         3. Event Read Close, Call Read Close Ready Instance
-//         4. Event Write Close, Call Write Close Ready Instance
-// @auto  Yes
-#[test]
-#[cfg(feature = "tcp")]
-fn ut_ready_from_event() {
-    ut_ready_from_event_01();
-    ut_ready_from_event_02();
-    ut_ready_from_event_03();
-    ut_ready_from_event_04();
+#[cfg(test)]
+mod test {
+    use ylong_io::Interest;
 
-    // Readable
-    fn ut_ready_from_event_01() {
-        let mut event = libc::epoll_event {
-            events: 0b00,
-            u64: 0,
-        };
-        event.events |= libc::EPOLLIN as u32;
-        let ready = Ready::from_event(&event);
-        assert_eq!(ready.0, 0b01);
+    use crate::net::{Ready, ReadyEvent};
+
+    // @title  ready from_event function ut test
+    // @design conditions of use override
+    // @precon none
+    // @brief  1. Create an event
+    //         2. Call from_event
+    //         3. Verify the returned results
+    // @expect 1. Event readable to get readable Ready instances
+    //         2. Event writable, call writable Ready instances
+    //         3. Event Read Close, Call Read Close Ready Instance
+    //         4. Event Write Close, Call Write Close Ready Instance
+    // @auto  Yes
+    #[test]
+    #[cfg(all(not(feature = "ffrt"), target_os = "linux"))]
+    fn ut_ready_from_event() {
+        ut_ready_from_event_01();
+        ut_ready_from_event_02();
+        ut_ready_from_event_03();
+        ut_ready_from_event_04();
+
+        // Readable
+        fn ut_ready_from_event_01() {
+            let mut event = libc::epoll_event {
+                events: 0b00,
+                u64: 0,
+            };
+            event.events |= libc::EPOLLIN as u32;
+            let ready = Ready::from_event(&event);
+            assert_eq!(ready.0, 0b01);
+        }
+
+        // Writable
+        fn ut_ready_from_event_02() {
+            let mut event = libc::epoll_event {
+                events: 0b00,
+                u64: 0,
+            };
+            event.events |= libc::EPOLLOUT as u32;
+            let ready = Ready::from_event(&event);
+            assert_eq!(ready.0, 0b10);
+        }
+
+        // Read off
+        fn ut_ready_from_event_03() {
+            let mut event = libc::epoll_event {
+                events: 0b00,
+                u64: 0,
+            };
+            event.events |= (libc::EPOLLIN | libc::EPOLLRDHUP) as u32;
+            let ready = Ready::from_event(&event);
+            assert_eq!(ready.0, 0b101);
+        }
+
+        // Write Off
+        fn ut_ready_from_event_04() {
+            let mut event = libc::epoll_event {
+                events: 0x00,
+                u64: 0,
+            };
+            event.events |= (libc::EPOLLOUT | libc::EPOLLERR) as u32;
+            let ready = Ready::from_event(&event);
+            assert_eq!(ready.0, 0b1010);
+        }
     }
 
-    // Writable
-    fn ut_ready_from_event_02() {
-        let mut event = libc::epoll_event {
-            events: 0b00,
-            u64: 0,
-        };
-        event.events |= libc::EPOLLOUT as u32;
-        let ready = Ready::from_event(&event);
-        assert_eq!(ready.0, 0b10);
+    /// UT test cases for ready from_usize function
+    ///
+    /// # Brief
+    /// 1. Enter a usize, call from_usize
+    /// 2. Verify the returned results
+    #[test]
+    fn ut_ready_from_usize() {
+        let ready = Ready::from_usize(0x01);
+        assert_eq!(ready.0, 0x01);
     }
 
-    // Read off
-    fn ut_ready_from_event_03() {
-        let mut event = libc::epoll_event {
-            events: 0b00,
-            u64: 0,
-        };
-        event.events |= (libc::EPOLLIN | libc::EPOLLRDHUP) as u32;
-        let ready = Ready::from_event(&event);
-        assert_eq!(ready.0, 0b101);
+    /// UT test cases for ready is_empty function
+    ///
+    /// # Brief
+    /// 1. Create a Ready
+    /// 2. Call is_empty
+    /// 3. Verify the returned results
+    #[test]
+    fn ut_ready_is_empty() {
+        let ready = Ready::from_usize(0x00);
+        assert!(ready.is_empty());
+
+        let ready = Ready::from_usize(0x01);
+        assert!(!ready.is_empty());
     }
 
-    // Write Off
-    fn ut_ready_from_event_04() {
-        let mut event = libc::epoll_event {
-            events: 0x00,
-            u64: 0,
-        };
-        event.events |= (libc::EPOLLOUT | libc::EPOLLERR) as u32;
-        let ready = Ready::from_event(&event);
+    /// UT test cases for ready is_readable function
+    ///
+    /// # Brief
+    /// 1. Create a Ready
+    /// 2. Call is_readable
+    /// 3. Verify the returned results
+    #[test]
+    fn ut_ready_is_readable() {
+        let ready = Ready::from_usize(0x01);
+        assert!(ready.is_readable());
+
+        let ready = Ready::from_usize(0x02);
+        assert!(!ready.is_readable());
+    }
+
+    /// UT test cases for ready is_writable function
+    ///
+    /// # Brief
+    /// 1. Create a Ready
+    /// 2. Call is_writable
+    /// 3. Verify the returned results
+    #[test]
+    fn ut_ready_is_writable() {
+        let ready = Ready::from_usize(0x02);
+        assert!(ready.is_writable());
+
+        let ready = Ready::from_usize(0x01);
+        assert!(!ready.is_writable());
+    }
+
+    /// UT test cases for ready is_read_closed function
+    ///
+    /// # Brief
+    /// 1. Create a Ready
+    /// 2. Call is_read_closed
+    /// 3. Verify the returned results
+    #[test]
+    fn ut_ready_is_read_closed() {
+        let ready = Ready::from_usize(0x04);
+        assert!(ready.is_read_closed());
+
+        let ready = Ready::from_usize(0x01);
+        assert!(!ready.is_read_closed());
+    }
+
+    /// UT test cases for ready is_write_closed function
+    ///
+    /// # Brief
+    /// 1. Create a Ready
+    /// 2. Call is_write_closed
+    /// 3. Verify the returned results
+    #[test]
+    fn ut_ready_is_write_closed() {
+        let ready = Ready::from_usize(0x08);
+        assert!(ready.is_write_closed());
+
+        let ready = Ready::from_usize(0x01);
+        assert!(!ready.is_write_closed());
+    }
+
+    /// UT test cases for ready as_usize function
+    ///
+    /// # Brief
+    /// 1. Create a Ready
+    /// 2. Call as_usize
+    /// 3. Verify the returned results
+    #[test]
+    fn ut_ready_as_usize() {
+        let ready = Ready::from_usize(0x08);
+        assert_eq!(ready.as_usize(), 0x08);
+    }
+
+    /// UT test cases for ready from_interest function
+    ///
+    /// # Brief
+    /// 1. Create a Interest instances
+    /// 2. Call from_interest
+    /// 3. Verify the returned results
+    #[test]
+    fn ut_ready_from_interest() {
+        let interest = Interest::READABLE;
+        let ready = Ready::from_interest(interest);
+        assert_eq!(ready.as_usize(), 0b101);
+
+        let interest = Interest::WRITABLE;
+        let ready = Ready::from_interest(interest);
+        assert_eq!(ready.as_usize(), 0b1010);
+    }
+
+    /// UT test cases for ready intersection function
+    ///
+    /// # Brief
+    /// 1. Create a Interest instances and a Ready instances
+    /// 2. Call intersection
+    /// 3. Verify the returned results
+    #[test]
+    fn ut_ready_intersection() {
+        let interest = Interest::READABLE;
+        let ready = Ready::from_usize(0b1111);
+        let res = ready.intersection(interest);
+        assert_eq!(res.0, 0b0101);
+    }
+
+    /// UT test cases for ready satisfies function
+    ///
+    /// # Brief
+    /// 1. Create a Interest instances, and a Ready instances
+    /// 2. Call satisfies
+    /// 3. Verify the returned results
+    #[test]
+    fn ut_ready_satisfies() {
+        let interest = Interest::READABLE;
+        let ready = Ready::from_usize(0b1111);
+        assert!(ready.satisfies(interest));
+
+        let ready = Ready::from_usize(0b0000);
+        assert!(!ready.satisfies(interest));
+    }
+
+    /// UT test cases for ready bitor function
+    ///
+    /// # Brief
+    /// 1. Create two Ready instances
+    /// 2. Call bitor or use | logical operators
+    /// 3. Verify the returned results
+    #[test]
+    fn ut_ready_bitor() {
+        let ready1 = Ready::from_usize(0b1010);
+        let ready2 = Ready::from_usize(0b0101);
+        let ready3 = ready1 | ready2;
+        assert_eq!(ready3.0, 0b1111);
+    }
+
+    /// UT test cases for ready bitor_assign function
+    ///
+    /// # Brief
+    /// 1. Create two Ready instances
+    /// 2. Call bitor_assign or use |= logical operators
+    /// 3. Verify the returned results
+    #[test]
+    fn ut_ready_bitor_assign() {
+        let mut ready1 = Ready::from_usize(0b1010);
+        let ready2 = Ready::from_usize(0b0101);
+        ready1 |= ready2;
+        assert_eq!(ready1.0, 0b1111);
+    }
+
+    /// UT test cases for ready bitand function
+    ///
+    /// # Brief
+    /// 1. Create two Ready instances
+    /// 2. Call bitand or use & logical operators
+    /// 3. Verify the returned results
+    #[test]
+    fn ut_ready_bitand() {
+        let ready1 = Ready::from_usize(0b1010);
+        let ready2 = Ready::from_usize(0b0101);
+        let ready = ready1 & ready2;
+        assert_eq!(ready.0, 0b0000);
+    }
+
+    /// UT test cases for ready bitsub function
+    ///
+    /// # Brief
+    /// 1. Create two Ready instances
+    /// 2. Call bitsub or use - logical operators
+    /// 3. Verify the returned results
+    #[test]
+    fn ut_ready_bitsub() {
+        let ready1 = Ready::from_usize(0b1111);
+        let ready2 = Ready::from_usize(0b0101);
+        let ready = ready1 - ready2;
         assert_eq!(ready.0, 0b1010);
     }
-}
 
-/// UT test cases for ready from_usize function
-///
-/// # Brief  
-/// 1. Enter a usize, call from_usize
-/// 2. Verify the returned results
-#[test]
-fn ut_ready_from_usize() {
-    let ready = Ready::from_usize(0x01);
-    assert_eq!(ready.0, 0x01);
-}
+    /// UT test cases for ready_event new function
+    ///
+    /// # Brief
+    /// 1. Call new
+    /// 2. Verify the returned results
+    #[test]
+    fn ut_ready_event_new() {
+        let ready_event = ReadyEvent::new(1u8, Ready::from_usize(0b0101));
+        assert_eq!(ready_event.tick, 1u8);
+        assert_eq!(ready_event.ready.0, 0b0101);
+    }
 
-/// UT test cases for ready is_empty function
-///
-/// # Brief
-/// 1. Create a Ready
-/// 2. Call is_empty
-/// 3. Verify the returned results
-#[test]
-fn ut_ready_is_empty() {
-    let ready = Ready::from_usize(0x00);
-    assert!(ready.is_empty());
+    /// UT test cases for ready_event get_tick function
+    ///
+    /// # Brief
+    /// 1. Create a ready_event
+    /// 2. Call get_tick
+    /// 3. Verify the returned results
+    #[test]
+    fn ut_ready_event_get_tick() {
+        let ready_event = ReadyEvent::new(1u8, Ready::from_usize(0b0101));
+        assert_eq!(ready_event.get_tick(), 1u8);
+    }
 
-    let ready = Ready::from_usize(0x01);
-    assert!(!ready.is_empty());
-}
-
-/// UT test cases for ready is_readable function
-///
-/// # Brief  
-/// 1. Create a Ready
-/// 2. Call is_readable
-/// 3. Verify the returned results
-#[test]
-fn ut_ready_is_readable() {
-    let ready = Ready::from_usize(0x01);
-    assert!(ready.is_readable());
-
-    let ready = Ready::from_usize(0x02);
-    assert!(!ready.is_readable());
-}
-
-/// UT test cases for ready is_writable function
-///
-/// # Brief  
-/// 1. Create a Ready
-/// 2. Call is_writable
-/// 3. Verify the returned results
-#[test]
-fn ut_ready_is_writable() {
-    let ready = Ready::from_usize(0x02);
-    assert!(ready.is_writable());
-
-    let ready = Ready::from_usize(0x01);
-    assert!(!ready.is_writable());
-}
-
-/// UT test cases for ready is_read_closed function
-///
-/// # Brief  
-/// 1. Create a Ready
-/// 2. Call is_read_closed
-/// 3. Verify the returned results
-#[test]
-fn ut_ready_is_read_closed() {
-    let ready = Ready::from_usize(0x04);
-    assert!(ready.is_read_closed());
-
-    let ready = Ready::from_usize(0x01);
-    assert!(!ready.is_read_closed());
-}
-
-/// UT test cases for ready is_write_closed function
-///
-/// # Brief  
-/// 1. Create a Ready
-/// 2. Call is_write_closed
-/// 3. Verify the returned results
-#[test]
-fn ut_ready_is_write_closed() {
-    let ready = Ready::from_usize(0x08);
-    assert!(ready.is_write_closed());
-
-    let ready = Ready::from_usize(0x01);
-    assert!(!ready.is_write_closed());
-}
-
-/// UT test cases for ready as_usize function
-///
-/// # Brief  
-/// 1. Create a Ready
-/// 2. Call as_usize
-/// 3. Verify the returned results
-#[test]
-fn ut_ready_as_usize() {
-    let ready = Ready::from_usize(0x08);
-    assert_eq!(ready.as_usize(), 0x08);
-}
-
-/// UT test cases for ready from_interest function
-///
-/// # Brief  
-/// 1. Create a Interest instances
-/// 2. Call from_interest
-/// 3. Verify the returned results
-#[test]
-fn ut_ready_from_interest() {
-    let interest = Interest::READABLE;
-    let ready = Ready::from_interest(interest);
-    assert_eq!(ready.as_usize(), 0b101);
-
-    let interest = Interest::WRITABLE;
-    let ready = Ready::from_interest(interest);
-    assert_eq!(ready.as_usize(), 0b1010);
-}
-
-/// UT test cases for ready intersection function
-///
-/// # Brief  
-/// 1. Create a Interest instances and a Ready instances
-/// 2. Call intersection
-/// 3. Verify the returned results
-#[test]
-fn ut_ready_intersection() {
-    let interest = Interest::READABLE;
-    let ready = Ready::from_usize(0b1111);
-    let res = ready.intersection(interest);
-    assert_eq!(res.0, 0b0101);
-}
-
-/// UT test cases for ready satisfies function
-///
-/// # Brief  
-/// 1. Create a Interest instances, and a Ready instances
-/// 2. Call satisfies
-/// 3. Verify the returned results
-#[test]
-fn ut_ready_satisfies() {
-    let interest = Interest::READABLE;
-    let ready = Ready::from_usize(0b1111);
-    assert!(ready.satisfies(interest));
-
-    let ready = Ready::from_usize(0b0000);
-    assert!(!ready.satisfies(interest));
-}
-
-/// UT test cases for ready bitor function
-///
-/// # Brief
-/// 1. Create two Ready instances
-/// 2. Call bitor or use | logical operators
-/// 3. Verify the returned results
-#[test]
-fn ut_ready_bitor() {
-    let ready1 = Ready::from_usize(0b1010);
-    let ready2 = Ready::from_usize(0b0101);
-    let ready3 = ready1 | ready2;
-    assert_eq!(ready3.0, 0b1111);
-}
-
-/// UT test cases for ready bitor_assign function
-///
-/// # Brief  
-/// 1. Create two Ready instances
-/// 2. Call bitor_assign or use |= logical operators
-/// 3. Verify the returned results
-#[test]
-fn ut_ready_bitor_assign() {
-    let mut ready1 = Ready::from_usize(0b1010);
-    let ready2 = Ready::from_usize(0b0101);
-    ready1 |= ready2;
-    assert_eq!(ready1.0, 0b1111);
-}
-
-/// UT test cases for ready bitand function
-///
-/// # Brief  
-/// 1. Create two Ready instances
-/// 2. Call bitand or use & logical operators
-/// 3. Verify the returned results
-#[test]
-fn ut_ready_bitand() {
-    let ready1 = Ready::from_usize(0b1010);
-    let ready2 = Ready::from_usize(0b0101);
-    let ready = ready1 & ready2;
-    assert_eq!(ready.0, 0b0000);
-}
-
-/// UT test cases for ready bitsub function
-///
-/// # Brief  
-/// 1. Create two Ready instances
-/// 2. Call bitsub or use - logical operators
-/// 3. Verify the returned results
-#[test]
-fn ut_ready_bitsub() {
-    let ready1 = Ready::from_usize(0b1111);
-    let ready2 = Ready::from_usize(0b0101);
-    let ready = ready1 - ready2;
-    assert_eq!(ready.0, 0b1010);
-}
-
-/// UT test cases for ready_event new function
-///
-/// # Brief  
-/// 1. Call new
-/// 2. Verify the returned results
-#[test]
-fn ut_ready_event_new() {
-    let ready_event = ReadyEvent::new(1u8, Ready::from_usize(0b0101));
-    assert_eq!(ready_event.tick, 1u8);
-    assert_eq!(ready_event.ready.0, 0b0101);
-}
-
-/// UT test cases for ready_event get_tick function
-///
-/// # Brief  
-/// 1. Create a ready_event
-/// 2. Call get_tick
-/// 3. Verify the returned results
-#[test]
-fn ut_ready_event_get_tick() {
-    let ready_event = ReadyEvent::new(1u8, Ready::from_usize(0b0101));
-    assert_eq!(ready_event.get_tick(), 1u8);
-}
-
-/// UT test cases for ready_event get_ready function
-///
-/// # Brief  
-/// 1. Create a ready_event
-/// 2. Call get_ready
-/// 3. Verify the returned results
-#[test]
-fn ut_ready_event_get_ready() {
-    let ready_event = ReadyEvent::new(1u8, Ready::from_usize(0b0101));
-    assert_eq!(ready_event.get_ready().0, 0b0101);
+    /// UT test cases for ready_event get_ready function
+    ///
+    /// # Brief
+    /// 1. Create a ready_event
+    /// 2. Call get_ready
+    /// 3. Verify the returned results
+    #[test]
+    fn ut_ready_event_get_ready() {
+        let ready_event = ReadyEvent::new(1u8, Ready::from_usize(0b0101));
+        assert_eq!(ready_event.get_ready().0, 0b0101);
+    }
 }

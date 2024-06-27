@@ -15,7 +15,6 @@ macro_rules! cfg_net {
     ($($item:item)*) => {
         $(
             #[cfg(feature = "net")]
-            #[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
             $item
         )*
     }
@@ -25,7 +24,6 @@ macro_rules! cfg_time {
     ($($item:item)*) => {
         $(
             #[cfg(feature = "time")]
-            #[cfg_attr(doc_cfg, doc(cfg(feature = "time")))]
             $item
         )*
     }
@@ -35,7 +33,6 @@ macro_rules! cfg_ffrt {
     ($($item:item)*) => {
         $(
             #[cfg(feature = "ffrt")]
-            #[cfg_attr(doc_cfg, doc(cfg(feature = "ffrt")))]
             $item
         )*
     }
@@ -45,7 +42,6 @@ macro_rules! cfg_signal {
     ($($item:item)*) => {
         $(
             #[cfg(feature = "signal")]
-            #[cfg_attr(doc_cfg, doc(cfg(feature = "signal")))]
             $item
         )*
     }
@@ -56,7 +52,6 @@ macro_rules! cfg_process {
     ($($item:item)*) => {
         $(
             #[cfg(feature = "process")]
-            #[cfg_attr(doc_cfg, doc(cfg(feature = "process")))]
             $item
         )*
     }
@@ -66,7 +61,6 @@ macro_rules! cfg_sync {
     ($($item:item)*) => {
         $(
             #[cfg(feature = "sync")]
-            #[cfg_attr(doc_cfg, doc(cfg(feature = "sync")))]
             $item
         )*
     }
@@ -76,7 +70,6 @@ macro_rules! cfg_macros {
     ($($item:item)*) => {
         $(
             #[cfg(feature = "macros")]
-            #[cfg_attr(doc_cfg, doc(cfg(feature = "macros")))]
             $item
         )*
     }
@@ -86,7 +79,6 @@ macro_rules! cfg_fs {
     ($($item:item)*) => {
         $(
             #[cfg(feature = "fs")]
-            #[cfg_attr(doc_cfg, doc(cfg(feature = "fs")))]
             $item
         )*
     }
@@ -120,7 +112,7 @@ macro_rules! cfg_metrics {
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", any(feature = "net", feature = "process")))]
 macro_rules! syscall {
     ($fn: ident ( $($arg: expr),* $(,)* ) ) => {{
         let res = unsafe { libc::$fn($($arg, )*) };

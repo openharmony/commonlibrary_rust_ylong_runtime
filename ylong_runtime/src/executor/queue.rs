@@ -597,10 +597,6 @@ pub(crate) mod test {
         type Output = usize;
         fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
             if self.total > self.value {
-                // unsafe {
-                // Pin::get_unchecked_mut(self).value += 1;
-
-                //}
                 self.get_mut().value += 1;
                 cx.waker().wake_by_ref();
                 Poll::Pending

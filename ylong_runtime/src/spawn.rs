@@ -69,6 +69,7 @@ where
 
 /// Gets global default executor, spawns async tasks by the task builder, and
 /// returns.
+#[inline]
 pub(crate) fn spawn_async<T, R>(builder: &TaskBuilder, task: T) -> JoinHandle<R>
 where
     T: Future<Output = R>,

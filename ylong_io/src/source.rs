@@ -35,15 +35,6 @@ pub trait Source {
         interests: Interest,
     ) -> io::Result<()>;
 
-    /// Reregisters the connection into [`crate::Poll`], this can change
-    /// [`Interest`].
-    fn reregister(
-        &mut self,
-        selector: &Selector,
-        token: Token,
-        interests: Interest,
-    ) -> io::Result<()>;
-
     /// Deregisters the connection from [`crate::Poll`].
     fn deregister(&mut self, selector: &Selector) -> io::Result<()>;
 

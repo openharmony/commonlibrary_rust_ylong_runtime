@@ -38,7 +38,7 @@ fn main() -> io::Result<()> {
             loop {
                 let start = Instant::now();
                 match stream.read(&mut recv_buf).await {
-                    Ok(n) if n == 0 => break,
+                    Ok(0) => break,
                     Ok(n) => {
                         println!("Receive len: {n}.");
                     }
@@ -48,7 +48,7 @@ fn main() -> io::Result<()> {
                     }
                 }
                 match stream.write(&recv_buf).await {
-                    Ok(n) if n == 0 => {
+                    Ok(0) => {
                         println!("Server now break");
                         break;
                     }
