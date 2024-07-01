@@ -355,6 +355,7 @@ fn sdv_async_fs_open_options() {
 
         let arg = "hello world";
         file.write_all(arg.as_bytes()).await.unwrap();
+        file.sync_all().await.unwrap();
 
         let res = file.seek(SeekFrom::Start(pos)).await.unwrap();
         assert_eq!(res, 0);

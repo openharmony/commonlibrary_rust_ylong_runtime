@@ -358,6 +358,7 @@ impl File {
     /// let mut buf = vec![0; 1024 * 1024 * 16];
     /// // write the buffer in chunks up to 2MB each
     /// let _ = file.write_all(&mut buf).await;
+    /// let _ = file.sync_all().await;
     ///
     /// let mut file = File::open("foo.txt").await.unwrap();
     /// file.set_buffer_size_limit(1024 * 1024 * 2);
@@ -750,6 +751,8 @@ mod test {
 
             let buf = [2; 20000];
             let ret = file.write_all(&buf).await;
+            assert!(ret.is_ok());
+            let ret = file.sync_all().await;
             assert!(ret.is_ok());
         });
         crate::block_on(handle).unwrap();
