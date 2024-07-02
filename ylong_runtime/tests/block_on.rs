@@ -57,15 +57,6 @@ fn sdv_single1_block_on() {
 }
 
 #[test]
-fn sdv_nest_block_on() {
-    let runtime = RuntimeBuilder::new_multi_thread().build().unwrap();
-    let res = runtime.block_on(async { runtime.block_on(async { 1 + 2 }) });
-    assert_eq!(res, 3);
-    let res = ylong_runtime::block_on(async { ylong_runtime::block_on(async { 1 + 2 }) });
-    assert_eq!(res, 3);
-}
-
-#[test]
 fn sdv_block_on_nest_spawn() {
     let runtime = RuntimeBuilder::new_multi_thread().build().unwrap();
     let res = runtime.block_on(async {

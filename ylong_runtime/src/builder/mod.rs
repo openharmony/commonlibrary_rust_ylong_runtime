@@ -262,7 +262,7 @@ mod current_thread_test {
         }
 
         let runtime = RuntimeBuilder::new_current_thread().build().unwrap();
-        let handle = runtime.spawn(async move {
+        let handle = runtime.spawn_blocking(|| {
             let runtime = RuntimeBuilder::new_current_thread().build().unwrap();
             let handle = runtime.spawn(async move { 1_usize });
             let result = runtime.block_on(handle).unwrap();

@@ -75,7 +75,7 @@ pub fn timer(period: Duration) -> Timer {
 /// ylong_runtime::block_on(handle).unwrap();
 /// ```
 pub fn timer_at(start: Instant, period: Duration) -> Timer {
-    let start = sleep_until(start);
+    let start = Box::pin(sleep_until(start));
     Timer { start, period }
 }
 
@@ -129,7 +129,7 @@ where
 
 /// Struct of Timer
 pub struct Timer {
-    start: Sleep,
+    start: Pin<Box<Sleep>>,
     period: Duration,
 }
 
@@ -150,14 +150,14 @@ impl Timer {
             None => deadline + TEN_YEARS,
         };
 
-        self.start.reset(next);
+        self.start.as_mut().reset(next);
 
         Poll::Ready(next)
     }
 
     /// Resets Timer from now on.
     pub fn reset(&mut self) {
-        self.start.reset(Instant::now() + self.period);
+        self.start.as_mut().reset(Instant::now() + self.period);
     }
 
     /// Gets period
