@@ -13,6 +13,7 @@
 
 use std::convert::TryInto;
 use std::future::Future;
+use std::marker::PhantomPinned;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
@@ -71,6 +72,8 @@ pub struct Sleep {
     deadline: Instant,
 
     inner: SleepInner,
+
+    _phantom: PhantomPinned,
 }
 
 cfg_ffrt!(
@@ -201,15 +204,17 @@ cfg_not_ffrt!(
                 inner: SleepInner {
                     timer,
                     handle,
-                }
+                },
+                _phantom: PhantomPinned,
             }
         }
 
         // Resets the deadline of the Sleep
-        pub(crate) fn reset(&mut self, new_deadline: Instant) {
-            self.need_insert = true;
-            self.deadline = new_deadline;
-            self.inner.timer.set_result(false);
+        pub(crate) fn reset(self: Pin<&mut Self>, new_deadline: Instant) {
+            let this = unsafe { self.get_unchecked_mut() };
+            this.need_insert = true;
+            this.deadline = new_deadline;
+            this.inner.timer.set_result(false);
         }
 
         // Cancels the Sleep
@@ -223,7 +228,7 @@ cfg_not_ffrt!(
         type Output = ();
 
         fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-            let this = self.get_mut();
+            let this = unsafe { self.get_unchecked_mut() };
             let driver = &this.inner.handle;
 
             if this.need_insert {
@@ -272,9 +277,11 @@ impl Drop for Sleep {
 
 #[cfg(test)]
 mod test {
-    use std::time::Duration;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+    use std::time::{Duration, Instant};
 
-    use crate::time::sleep;
+    use crate::time::{sleep, sleep_until};
     use crate::{block_on, spawn};
 
     /// UT test cases for new_sleep
@@ -283,24 +290,61 @@ mod test {
     /// 1. Uses sleep to create a Sleep Struct.
     /// 2. Uses block_on to test different sleep duration.
     #[test]
-    fn new_timer_sleep() {
+    fn ut_new_timer_sleep() {
+        let val = Arc::new(AtomicUsize::new(0));
+        let val_cpy = val.clone();
         block_on(async move {
             sleep(Duration::new(0, 20_000_000)).await;
             sleep(Duration::new(0, 20_000_000)).await;
             sleep(Duration::new(0, 20_000_000)).await;
+            val_cpy.fetch_add(1, Ordering::Relaxed);
         });
 
-        let handle_one = spawn(async {
+        assert_eq!(val.load(Ordering::Relaxed), 1);
+        let val_cpy2 = val.clone();
+        let val_cpy3 = val.clone();
+        let val_cpy4 = val.clone();
+        let handle_one = spawn(async move {
             sleep(Duration::new(0, 20_000_000)).await;
+            val_cpy2.fetch_add(1, Ordering::Relaxed);
         });
-        let handle_two = spawn(async {
+        let handle_two = spawn(async move {
             sleep(Duration::new(0, 20_000_000)).await;
+            val_cpy3.fetch_add(1, Ordering::Relaxed);
         });
-        let handle_three = spawn(async {
+        let handle_three = spawn(async move {
             sleep(Duration::new(0, 20_000_000)).await;
+            val_cpy4.fetch_add(1, Ordering::Relaxed);
         });
         block_on(handle_one).unwrap();
         block_on(handle_two).unwrap();
         block_on(handle_three).unwrap();
+        assert_eq!(val.load(Ordering::Relaxed), 4);
+    }
+
+    /// UT test cases for sleep zero second or sleep until a past instant
+    ///
+    /// # Brief
+    /// 1. Call sleep with a duration of zero, check if the val is successfully
+    ///    added.
+    /// 2. Call sleep with a past instant, check if the val is successfully
+    ///    added.
+    #[test]
+    fn ut_timer_sleep_zero() {
+        let mut val = 0;
+        let past = Instant::now().checked_sub(Duration::from_secs(1)).unwrap();
+        let mut val = block_on(async move {
+            sleep(Duration::new(0, 0)).await;
+            val += 1;
+            val
+        });
+        assert_eq!(val, 1);
+
+        let val = block_on(async move {
+            sleep_until(past).await;
+            val += 1;
+            val
+        });
+        assert_eq!(val, 2);
     }
 }

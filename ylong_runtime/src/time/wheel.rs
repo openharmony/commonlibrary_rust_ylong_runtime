@@ -230,9 +230,7 @@ impl Wheel {
         // Unsafe access to clock_entry is only unsafe when Sleep Drop,
         // `Sleep` here does not go into `Ready`.
         unsafe { clock_entry.as_mut().set_level(level) };
-
         self.levels[level].insert(clock_entry);
-
         Ok(expiration)
     }
 
@@ -241,12 +239,6 @@ impl Wheel {
         // `Sleep` here does not go into `Ready`.
         let level = unsafe { clock_entry.as_ref().level() };
         self.levels[level].cancel(clock_entry);
-
-        // Caller has unique access to the linked list and the node is not in any other
-        // linked list.
-        unsafe {
-            self.trigger.remove(clock_entry);
-        }
     }
 
     // Return where the next expiration is located, and its deadline.
@@ -366,8 +358,9 @@ impl Level {
 
         let slot = ((duration >> (self.level * LEVELS_NUM)) % SLOTS_NUM as u64) as usize;
 
-        // Caller has unique access to the linked list and the node is not in any other
-        // linked list.
+        // Caller has unique access to the linked list.
+        // The clock entry is guaranteed to be inside the wheel, so we need to unset the
+        // occupied bit.
         unsafe {
             self.slots[slot].remove(clock_entry);
         }

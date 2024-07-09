@@ -247,8 +247,11 @@ impl Runtime {
     ///
     /// Any code after the `block_on` will be executed once the future is done.
     ///
-    /// Don't use this method on an asynchronous environment, since it will
-    /// block the worker thread and may cause deadlock.
+    /// # Panics
+    /// 1. This function panics if it gets called in a runtime asynchronous
+    ///    context. To be specific, this function cannot be called inside
+    ///    `ylong_runtime::block_on` or `ylong_runtime::spawn`.
+    /// 2. This function panics if the provided Future panics.
     ///
     /// # Examples
     ///
@@ -283,6 +286,16 @@ impl Runtime {
     where
         T: Future<Output = R>,
     {
+        worker::CURRENT_HANDLE.with(|ctx| {
+            if !ctx.get().is_null() {
+                panic!(
+                    "Cannot block_on an asynchronous function in a runtime context. \
+                    This happens because a block_on call tries to block the current \
+                    thread which is being used to drive asynchronous tasks."
+                );
+            }
+        });
+
         // Registers handle to the current thread when block_on().
         // so that async_source can get the handle and register it.
         let cur_context = worker::WorkerHandle {
@@ -347,3 +360,36 @@ cfg_metrics!(
         Metrics::new(global_default_async())
     }
 );
+
+#[cfg(test)]
+mod test {
+
+    /// UT test cases for block_on inside a spawn
+    ///
+    /// # Brief
+    /// 1. Call block_on inside a spawn
+    /// 2. Check if the test panics
+    #[should_panic]
+    #[test]
+    fn ut_block_on_panic_in_spawn() {
+        let handle = crate::spawn(async move {
+            let ret = crate::block_on(async move { 1 });
+            assert_eq!(ret, 1);
+        });
+        crate::block_on(handle).unwrap();
+    }
+
+    /// UT test cases for new_timer_timeout
+    ///
+    /// # Brief
+    /// 1. Call block inside another block_on
+    /// 2. Check if the test panics
+    #[should_panic]
+    #[test]
+    fn ut_block_on_panic_in_block_on() {
+        crate::block_on(async move {
+            let ret = crate::block_on(async move { 1 });
+            assert_eq!(ret, 1);
+        });
+    }
+}

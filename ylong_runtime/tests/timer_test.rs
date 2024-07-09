@@ -13,9 +13,12 @@
 
 #![cfg(all(feature = "time", feature = "sync"))]
 
+use std::future::Future;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
 
-use ylong_runtime::time::{sleep, sleep_until};
+use ylong_runtime::time::{sleep, sleep_until, Sleep};
 
 async fn download() {
     const TOTAL_SIZE: usize = 10 * 1024;
@@ -85,4 +88,51 @@ fn sdv_block_on_timeout() {
             async move { timeout(Duration::from_secs(2), async move { 1 }).await },
         );
     assert_eq!(ret, Ok(1))
+}
+
+struct TimeFuture {
+    sleep: Option<Pin<Box<Sleep>>>,
+    count: u32,
+}
+
+impl Future for TimeFuture {
+    type Output = u32;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.get_mut();
+        if this.count < 5 {
+            this.sleep = Some(Box::pin(sleep(Duration::from_millis(50))));
+        }
+        if let Some(mut sleep) = this.sleep.take() {
+            if Pin::new(&mut sleep).poll(cx).is_pending() {
+                this.count += 1;
+                this.sleep = Some(sleep);
+                return Poll::Pending;
+            }
+        }
+        Poll::Ready(0)
+    }
+}
+
+/// SDV case for polling a sleep
+///
+/// # Brief
+/// 1. Create a future that would create a new sleep during every call to its
+///    `poll`
+/// 2. Spawn and block_on the future, check if the returned value is correct
+#[test]
+fn sdv_sleep_poll() {
+    let handle = ylong_runtime::spawn(async move {
+        for _ in 0..2 {
+            let future = TimeFuture {
+                sleep: None,
+                count: 0,
+            };
+            let ret = future.await;
+            assert_eq!(ret, 0);
+        }
+        1
+    });
+    let ret = ylong_runtime::block_on(handle).unwrap();
+    assert_eq!(ret, 1);
 }
