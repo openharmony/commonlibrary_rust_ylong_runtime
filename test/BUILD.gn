@@ -70,13 +70,19 @@ ohos_rust_systemtest("rust_ylong_signal_test_sdv") {
 
 group("unittest") {
   testonly = true
-  deps = [ ":rust_ylong_runtime_test_ut" ]
+  deps = []
+  if (!use_clang_coverage) {
+    deps += [ ":rust_ylong_runtime_test_ut" ]
+  }
 }
 
 group("sdvtest") {
   testonly = true
-  deps = [
-    ":rust_ylong_runtime_test_sdv",
-    ":rust_ylong_signal_test_sdv",
-  ]
+  deps = []
+  if (!use_clang_coverage) {
+    deps += [
+      ":rust_ylong_runtime_test_sdv",
+      ":rust_ylong_signal_test_sdv",
+    ]
+  }
 }
