@@ -493,21 +493,15 @@ mod test {
     /// otherwise the next bind operation will fail.
     #[test]
     fn ut_uds_datagram_read_write_test() {
-        const PATH: &str = "/tmp/uds_datagram_test_path1";
-        let _ = std::fs::remove_file(PATH);
-
         let handle2 = crate::spawn(async {
-            let socket = UnixDatagram::bind(PATH).unwrap();
+            let (server, client) = UnixDatagram::pair().unwrap();
 
-            let handle = crate::spawn(async {
-                let socket = UnixDatagram::unbound().unwrap();
-                socket.connect(PATH).unwrap();
-
-                socket.send(b"hello world").await.expect("send failed");
+            let handle = crate::spawn(async move {
+                client.send(b"hello world").await.expect("send failed");
             });
 
             let mut buf = vec![0; 11];
-            socket.recv(buf.as_mut_slice()).await.expect("recv failed");
+            server.recv(buf.as_mut_slice()).await.expect("recv failed");
             assert_eq!(
                 std::str::from_utf8(&buf).unwrap(),
                 "hello world".to_string()
@@ -516,7 +510,6 @@ mod test {
             handle.await.unwrap();
         });
         crate::block_on(handle2).unwrap();
-        let _ = std::fs::remove_file(PATH);
     }
 
     /// Uds UnixDatagram try_xxx() test case.

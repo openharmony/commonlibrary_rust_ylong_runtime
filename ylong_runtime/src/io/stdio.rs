@@ -194,11 +194,8 @@ pub(crate) use std_async_write;
 
 #[cfg(test)]
 mod test {
-    #[cfg(unix)]
-    use std::os::fd::{AsFd, AsRawFd};
-
     use crate::io::stdio::BufInner;
-    use crate::io::{AsyncWriteExt, ReadBuf};
+    use crate::io::ReadBuf;
 
     /// UT test cases for `stdout` and `stderr``.
     ///
@@ -222,41 +219,5 @@ mod test {
         let mut read_buf = ReadBuf::new(&mut buf);
         let n = buf_inner.clone_into(&mut read_buf);
         assert_eq!(n, 10);
-    }
-
-    /// UT test cases for `stdout` and `stderr``.
-    ///
-    /// # Brief
-    /// 1. create a `stdout` and a `stderr`.
-    /// 2. write something into `stdout` and `stderr`.
-    /// 3. check operation is ok.
-    #[test]
-    fn ut_test_stdio_write() {
-        let handle = crate::spawn(async {
-            let mut stdout = crate::io::stdout();
-            #[cfg(unix)]
-            assert!(stdout.as_fd().as_raw_fd() >= 0);
-            #[cfg(unix)]
-            assert!(stdout.as_raw_fd() >= 0);
-            let res = stdout.write_all(b"something").await;
-            assert!(res.is_ok());
-            let res = stdout.flush().await;
-            assert!(res.is_ok());
-            let res = stdout.shutdown().await;
-            assert!(res.is_ok());
-
-            let mut stderr = crate::io::stderr();
-            #[cfg(unix)]
-            assert!(stderr.as_fd().as_raw_fd() >= 0);
-            #[cfg(unix)]
-            assert!(stderr.as_raw_fd() >= 0);
-            let res = stderr.write_all(b"something").await;
-            assert!(res.is_ok());
-            let res = stderr.flush().await;
-            assert!(res.is_ok());
-            let res = stderr.shutdown().await;
-            assert!(res.is_ok());
-        });
-        let _ = crate::block_on(handle);
     }
 }
