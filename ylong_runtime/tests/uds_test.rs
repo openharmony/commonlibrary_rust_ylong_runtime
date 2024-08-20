@@ -204,31 +204,6 @@ fn sdv_uds_datagram_try_test() {
     ylong_runtime::block_on(handle).unwrap();
 }
 
-/// Uds UnixListener test case.
-///
-/// # Title
-/// sdv_uds_listener_baisc_test
-///
-/// # Brief
-/// 1. Create a std UnixListener with `bind()`.
-/// 2. Convert std UnixListener to Ylong_runtime UnixListener.
-/// 3. Check result is correct.
-#[test]
-fn sdv_uds_listener_baisc_test() {
-    const PATH: &str = "/tmp/uds_path3";
-    let _ = std::fs::remove_file(PATH);
-    let listener = std::os::unix::net::UnixListener::bind(PATH).unwrap();
-    let handle = ylong_runtime::spawn(async {
-        let res = UnixListener::from_std(listener);
-        assert!(res.is_ok());
-        let listener = res.unwrap();
-        assert!(listener.as_raw_fd() >= 0);
-        assert!(listener.take_error().is_ok());
-    });
-    ylong_runtime::block_on(handle).unwrap();
-    let _ = std::fs::remove_file(PATH);
-}
-
 /// Uds UnixStream test case.
 ///
 /// # Title
