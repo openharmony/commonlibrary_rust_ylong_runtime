@@ -18,7 +18,7 @@
 use std::os::fd::{AsFd, AsRawFd};
 
 use ylong_runtime::io::{AsyncReadExt, AsyncWriteExt};
-use ylong_runtime::net::{UnixListener, UnixStream};
+use ylong_runtime::net::{UnixDatagram, UnixListener, UnixStream};
 
 /// Uds UnixListener test case.
 ///
@@ -88,4 +88,105 @@ fn sdv_uds_listener_read_write_test() {
     });
 
     let _ = std::fs::remove_file(PATH);
+}
+
+/// uds UnixListener/UnixStream test case.
+///
+/// # Title
+/// sdv_uds_stream_test
+///
+/// # Brief
+/// 1. Creates a server and a client.
+/// 2. Sends and writes message to each other.
+///
+/// # Note
+/// Each execution will leave a file under PATH which must be deleted,
+/// otherwise the next bind operation will fail.
+#[test]
+fn sdv_uds_stream_test() {
+    const PATH: &str = "/tmp/uds_path1";
+    let _ = std::fs::remove_file(PATH);
+
+    async fn server() {
+        let mut read_buf = [0_u8; 12];
+        let listener = UnixListener::bind(PATH).unwrap();
+        let (mut stream, _) = listener.accept().await.unwrap();
+        let n = stream.write(b"hello client").await.unwrap();
+        assert_eq!(n, "hello client".len());
+        let n = stream.read(&mut read_buf).await.unwrap();
+        assert_eq!(n, "hello server".len());
+        assert_eq!(
+            std::str::from_utf8(&read_buf).unwrap(),
+            "hello server".to_string()
+        );
+    }
+
+    async fn client() {
+        let mut read_buf = [0_u8; 12];
+        loop {
+            if let Ok(mut stream) = UnixStream::connect(PATH).await {
+                let n = stream.read(&mut read_buf).await.unwrap();
+                assert_eq!(n, "hello server".len());
+                assert_eq!(
+                    std::str::from_utf8(&read_buf).unwrap(),
+                    "hello client".to_string()
+                );
+
+                let n = stream.write(b"hello server").await.unwrap();
+                assert_eq!(n, "hello client".len());
+                break;
+            }
+        }
+    }
+
+    let handle = ylong_runtime::spawn(client());
+    ylong_runtime::block_on(server());
+    ylong_runtime::block_on(handle).unwrap();
+
+    std::fs::remove_file(PATH).unwrap();
+}
+
+/// uds UnixDatagram test case.
+///
+/// # Title
+/// sdv_uds_datagram_test
+///
+/// # Brief
+/// 1. Creates a server and a client.
+/// 2. Client Sends message and server recv it.
+///
+/// # Note
+/// Each execution will leave a file under PATH which must be deleted,
+/// otherwise the next bind operation will fail.
+#[test]
+fn sdv_uds_datagram_test() {
+    const PATH: &str = "/tmp/uds_path2";
+    let _ = std::fs::remove_file(PATH);
+
+    async fn server() {
+        let socket = UnixDatagram::bind(PATH).unwrap();
+
+        let mut buf = vec![0; 11];
+        socket.recv(buf.as_mut_slice()).await.expect("recv failed");
+        assert_eq!(
+            std::str::from_utf8(&buf).unwrap(),
+            "hello world".to_string()
+        );
+    }
+
+    async fn client() {
+        let socket = UnixDatagram::unbound().unwrap();
+        loop {
+            if socket.connect(PATH).is_ok() {
+                socket.send(b"hello world").await.expect("send failed");
+                break;
+            };
+        }
+    }
+
+    let handle = ylong_runtime::spawn(client());
+    ylong_runtime::block_on(server());
+    ylong_runtime::block_on(handle).unwrap();
+
+    std::fs::remove_file(PATH).unwrap();
 }
