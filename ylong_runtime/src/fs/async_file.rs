@@ -11,7 +11,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::fmt::{Debug, Formatter};
 use std::fs::{File as SyncFile, Metadata, Permissions};
 use std::future::Future;
 use std::io;
@@ -97,12 +96,6 @@ impl FileState {
 }
 
 const DEFAULT_BUF_LIMIT: usize = 2 * 1024 * 1024;
-
-impl Debug for File {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("YlongFile").field(&self.file).finish()
-    }
-}
 
 impl File {
     /// Creates a new [`File`] struct.
@@ -217,7 +210,9 @@ impl File {
     /// ```
     pub async fn sync_all(&self) -> io::Result<()> {
         let mut file = self.inner.lock().await;
-        file.flush().await;
+        if let Err(e) = poll_fn(|cx| Pin::new(&mut *file).poll_flush(cx)).await {
+            file.write_err = Some(e.kind());
+        }
         let file = self.file.clone();
         async_op(move || file.sync_all()).await
     }
@@ -245,7 +240,9 @@ impl File {
     /// ```
     pub async fn sync_data(&self) -> io::Result<()> {
         let mut file = self.inner.lock().await;
-        file.flush().await;
+        if let Err(e) = poll_fn(|cx| Pin::new(&mut *file).poll_flush(cx)).await {
+            file.write_err = Some(e.kind());
+        }
         let file = self.file.clone();
         async_op(move || file.sync_data()).await
     }
@@ -277,7 +274,9 @@ impl File {
     /// ```
     pub async fn set_len(&self, size: u64) -> io::Result<()> {
         let mut file = self.inner.lock().await;
-        file.flush().await;
+        if let Err(e) = poll_fn(|cx| Pin::new(&mut *file).poll_flush(cx)).await {
+            file.write_err = Some(e.kind());
+        }
 
         let mut buf = match file.state {
             // after each take, buf will be set right back
@@ -370,102 +369,6 @@ impl File {
     /// ```
     pub fn set_buffer_size_limit(&mut self, buf_size_limit: usize) {
         self.buf_size_limit = buf_size_limit;
-    }
-
-    /// Takes the ownership of the `File` and turns it into a [`std::fs::File`].
-    /// Before the transition, any in-flight operations will be completed.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use ylong_runtime::fs::File;
-    ///
-    /// # async fn file_into_std() -> std::io::Result<()> {
-    /// let file = File::open("foo.txt").await?;
-    /// let std = file.into_std().await;
-    /// # Ok(())
-    /// # }
-    pub async fn into_std(mut self) -> SyncFile {
-        let file = self.inner.get_mut();
-        file.flush().await;
-        Arc::try_unwrap(self.file).expect("into_std Arc::try_unwrap failed")
-    }
-
-    /// Turns the `File` into [`std::fs::File`] immediately without awaiting any
-    /// in-flight operation to complete.
-    ///
-    /// # Errors
-    /// This method wil return an error containing the file if some operation
-    /// is still in-flight
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use ylong_runtime::fs::File;
-    ///
-    /// # async fn file_try_into_std() -> std::io::Result<()> {
-    /// let file = File::open("foo.txt").await?;
-    /// let std = file.try_into_std().unwrap();
-    /// # Ok(())
-    /// # }
-    pub fn try_into_std(mut self) -> Result<SyncFile, Self> {
-        match Arc::try_unwrap(self.file) {
-            Ok(file) => Ok(file),
-            Err(arc_file) => {
-                self.file = arc_file;
-                Err(self)
-            }
-        }
-    }
-}
-
-impl From<SyncFile> for File {
-    fn from(file: SyncFile) -> Self {
-        Self::new(file)
-    }
-}
-
-cfg_unix! {
-    use std::os::unix::io::{AsFd, AsRawFd, FromRawFd, BorrowedFd, RawFd};
-
-    impl AsRawFd for File {
-        fn as_raw_fd(&self) -> RawFd {
-            self.file.as_raw_fd()
-        }
-    }
-
-    impl AsFd for File {
-        fn as_fd(&self) -> BorrowedFd<'_> {
-            unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
-        }
-    }
-
-    impl FromRawFd for File {
-        unsafe fn from_raw_fd(fd: RawFd) -> Self {
-            SyncFile::from_raw_fd(fd).into()
-        }
-    }
-}
-
-cfg_windows! {
-    use std::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle, AsHandle, BorrowedHandle};
-
-    impl AsRawHandle for File {
-        fn as_raw_handle(&self) -> RawHandle {
-            self.file.as_raw_handle()
-        }
-    }
-
-    impl AsHandle for File {
-        fn as_handle(&self) -> BorrowedHandle<'_> {
-            unsafe { BorrowedHandle::borrow_raw(self.as_raw_handle()) }
-        }
-    }
-
-    impl FromRawHandle for File {
-        unsafe fn from_raw_handle(handle: RawHandle) -> Self {
-            SyncFile::from_raw_handle(handle).into()
-        }
     }
 }
 
@@ -644,12 +547,6 @@ impl AsyncWrite for File {
 }
 
 impl FileInner {
-    async fn flush(&mut self) {
-        if let Err(e) = poll_fn(|cx| self.poll_flush(cx)).await {
-            self.write_err = Some(e.kind());
-        }
-    }
-
     fn poll_flush(&mut self, cx: &mut Context) -> Poll<io::Result<()>> {
         if let Some(e) = self.write_err {
             return Poll::Ready(Err(e.into()));
@@ -676,7 +573,7 @@ mod test {
     use std::io::SeekFrom;
 
     use crate::fs::async_file::DEFAULT_BUF_LIMIT;
-    use crate::fs::{remove_file, File, OpenOptions};
+    use crate::fs::{remove_file, File};
     use crate::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 
     /// UT test for `set_len`
@@ -862,6 +759,14 @@ mod test {
         std::fs::remove_file(file_path).unwrap();
     }
 
+    use std::fmt::{Debug, Formatter};
+
+    impl Debug for File {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            self.file.fmt(f)
+        }
+    }
+
     /// UT for opening an non-existed file
     ///
     /// # Brief
@@ -874,107 +779,5 @@ mod test {
             assert_eq!(file.unwrap_err().kind(), io::ErrorKind::NotFound);
         });
         crate::block_on(handle).unwrap();
-    }
-
-    /// UT for `into_std`
-    ///
-    /// # Brief
-    /// 1. Creates an async File
-    /// 2. Turns the async File into a std File
-    /// 3. Check if the std file functions correctly
-    #[test]
-    fn ut_file_into_std() {
-        use std::io::{Read, Seek};
-
-        let file_path = "file17.txt";
-        let handle = crate::spawn(async move {
-            let mut file = OpenOptions::new()
-                .read(true)
-                .write(true)
-                .create(true)
-                .open(file_path)
-                .await
-                .unwrap();
-
-            let res = file.write_all(b"hello").await;
-            assert!(res.is_ok());
-
-            let mut std = file.into_std().await;
-            let ret = std.seek(SeekFrom::Start(0)).unwrap();
-            assert_eq!(ret, 0);
-            let mut buf = [0; 5];
-            let ret = std.read_exact(&mut buf);
-            assert!(ret.is_ok());
-            assert_eq!(&buf, b"hello");
-        });
-        crate::block_on(handle).unwrap();
-        std::fs::remove_file(file_path).unwrap();
-    }
-
-    /// UT for `try_into_std`
-    ///
-    /// # Brief
-    /// 1. Creates an async File
-    /// 2. Uses the async file to write without flushing
-    /// 3. Tries to turn the async file into a std file
-    /// 4. Check if the attempt fails
-    /// 5. Flushes the file
-    /// 6. Tries to turn the async file into a std file
-    /// 7. Check if the attempt succeeds
-    #[test]
-    fn ut_file_try_into_std() {
-        let file_path = "file18.txt";
-        let handle = crate::spawn(async move {
-            let mut file = File::create(file_path).await.unwrap();
-            let res = file.write_all(b"hello").await;
-            assert!(res.is_ok());
-
-            let std = file.try_into_std();
-            assert!(std.is_err());
-
-            let mut file = std.unwrap_err();
-            let ret = file.flush().await;
-            assert!(ret.is_ok());
-
-            let std = file.try_into_std();
-            assert!(std.is_ok());
-        });
-        crate::block_on(handle).unwrap();
-        std::fs::remove_file(file_path).unwrap();
-    }
-
-    /// UT for `as_raw_fd`
-    ///
-    /// # Brief
-    /// 1. Creates an async File and turns it into a std file
-    /// 2. Gets the raw fd from the std file
-    /// 3. Turns the std file back to an async file
-    /// 4. Check if the fds are equal
-    /// 5. Creates a new async file from the raw fd
-    /// 6. Check if the fd of the new async file is correct
-    #[test]
-    #[cfg(unix)]
-    fn ut_file_as_raw_fd() {
-        use std::os::fd::{AsFd, AsRawFd};
-        use std::os::unix::io::FromRawFd;
-
-        let file_path = "file19.txt";
-        let handle = crate::spawn(async move {
-            let file = File::create(file_path).await.unwrap();
-            let std = file.into_std().await;
-            let fd = std.as_raw_fd();
-            let file = File::from(std);
-            let fd2 = file.as_raw_fd();
-            assert_eq!(fd, fd2);
-            let fd3 = file.as_fd().as_raw_fd();
-            assert_eq!(fd, fd3);
-
-            let file2 = unsafe { File::from_raw_fd(fd) };
-            let fd4 = file2.as_raw_fd();
-            assert_eq!(fd, fd4);
-        });
-
-        crate::block_on(handle).unwrap();
-        std::fs::remove_file(file_path).unwrap();
     }
 }
