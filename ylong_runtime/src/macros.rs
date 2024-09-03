@@ -112,24 +112,6 @@ macro_rules! cfg_metrics {
     }
 }
 
-macro_rules! cfg_unix {
-    ($($item:item)*) => {
-        $(
-            #[cfg(unix)]
-            $item
-        )*
-    }
-}
-
-macro_rules! cfg_windows {
-    ($($item:item)*) => {
-        $(
-            #[cfg(windows)]
-            $item
-        )*
-    }
-}
-
 #[cfg(all(target_os = "linux", any(feature = "net", feature = "process")))]
 macro_rules! syscall {
     ($fn: ident ( $($arg: expr),* $(,)* ) ) => {{
