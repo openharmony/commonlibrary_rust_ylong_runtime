@@ -23,7 +23,7 @@ use std::task::{Context, Poll};
 
 use crate::futures::poll_fn;
 use crate::sync::error::{RecvError, SendError};
-use crate::sync::wake_list::WakerList;
+use crate::sync::wake_list::{ListItem, WakerList};
 
 /// The least significant bit that marks the version of channel.
 const VERSION_SHIFT: usize = 1;
@@ -359,8 +359,11 @@ impl<T> Receiver<T> {
             Some(Err(e)) => return Ready(Err(e)),
             None => {}
         }
-
-        self.channel.waker_list.insert(cx.waker().clone());
+        let wake = cx.waker().clone();
+        self.channel.waker_list.insert(ListItem {
+            wake,
+            wait_permit: Arc::new(AtomicUsize::new(1)),
+        });
 
         match self.try_notified() {
             Some(Ok(())) => Ready(Ok(())),

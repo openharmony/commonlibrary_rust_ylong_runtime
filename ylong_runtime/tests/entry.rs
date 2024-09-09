@@ -42,3 +42,4 @@ mod tcp_test;
 mod timer_test;
 mod udp_test;
 mod uds_test;
+mod cancel_safe;
