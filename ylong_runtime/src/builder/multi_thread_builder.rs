@@ -15,7 +15,6 @@ use std::io;
 use std::sync::Mutex;
 
 cfg_ffrt!(
-    // use ylong_ffrt::{ffrt_set_cpu_worker_max_num, ffrt_set_worker_stack_size, Qos};
     use ylong_ffrt::{ffrt_set_worker_stack_size, Qos};
     use std::collections::HashMap;
     use libc::{c_uint, c_ulong};
@@ -69,10 +68,6 @@ impl MultiThreadBuilder {
 
         #[cfg(feature = "ffrt")]
         unsafe {
-            for (qos, worker_num) in self.thread_num_by_qos.iter() {
-                // ffrt_set_cpu_worker_max_num(*qos, *worker_num as c_uint);
-            }
-
             for (qos, stack_size) in self.common.stack_size_by_qos.iter() {
                 ffrt_set_worker_stack_size(*qos, *stack_size as c_ulong);
             }
