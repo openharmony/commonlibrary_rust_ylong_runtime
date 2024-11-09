@@ -13,10 +13,6 @@
 
 import("//build/ohos.gni")
 
-config("libruntime_nostack_protect_config") {
-  rustflags = [ "-Zstack-protector=none" ]
-}
-
 ohos_rust_shared_library("ylong_runtime") {
   part_name = "ylong_runtime"
   subsystem_name = "commonlibrary"
@@ -35,9 +31,6 @@ ohos_rust_shared_library("ylong_runtime") {
   ]
 
   sources = [ "src/lib.rs" ]
-
-  configs = [ ":libruntime_nostack_protect_config" ]
-
   deps = [
     "../ylong_io:ylong_io",
     "../ylong_runtime_macros:ylong_runtime_macros(${host_toolchain})",
