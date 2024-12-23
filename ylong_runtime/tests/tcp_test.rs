@@ -13,6 +13,8 @@
 
 #![cfg(feature = "net")]
 
+use std::net::Shutdown;
+
 use ylong_runtime::io::{AsyncReadExt, AsyncWriteExt};
 use ylong_runtime::net::{TcpListener, TcpStream};
 
@@ -593,4 +595,43 @@ fn sdv_tcp_unexpected_eof() {
     }
     client.cancel();
     ylong_runtime::block_on(handle).unwrap();
+}
+
+/// SDV case for IO operation failed
+///
+/// # Breif
+/// 1. Create a Tcp connection
+/// 2. Close the client side before any data transmission
+/// 3. Check if the server side gets an UnexpectedEof error
+#[test]
+#[cfg(feature = "time")]
+fn sdv_tcp_server_client_close() {
+    let (tx, rx) = ylong_runtime::sync::oneshot::channel();
+    let mut handles = Vec::new();
+    handles.push(ylong_runtime::spawn(async move {
+        let tcp = TcpListener::bind(ADDR).await.unwrap();
+        let addr = tcp.local_addr().unwrap();
+        tx.send(addr).unwrap();
+        let (mut stream, _) = tcp.accept().await.unwrap();
+        let buf1 = [2; 10];
+        stream.write_all(&buf1).await.unwrap();
+        stream.shutdown(Shutdown::Both).unwrap();
+    }));
+    handles.push(ylong_runtime::spawn(async move {
+        let addr = rx.await.unwrap();
+        let mut tcp = TcpStream::connect(addr).await;
+        while tcp.is_err() {
+            tcp = TcpStream::connect(addr).await;
+        }
+        let mut tcp = tcp.unwrap();
+        let mut buf2 = [0; 10];
+        tcp.read_exact(&mut buf2).await.unwrap();
+        assert_eq!(buf2, [2; 10]);
+        tcp.shutdown(Shutdown::Both).unwrap();
+        let result = tcp.read_exact(&mut buf2).await.unwrap_err();
+        assert_eq!(result.kind(), std::io::ErrorKind::UnexpectedEof);
+    }));
+    for handle in handles {
+        ylong_runtime::block_on(handle).unwrap();
+    }
 }
