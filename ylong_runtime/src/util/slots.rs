@@ -232,6 +232,21 @@ impl<T> Slots<T> {
             len: 0,
         }
     }
+    pub(crate) fn get_by_index(&mut self, key: usize) -> Option<& T> {
+        if let Some(entry) = self.entries.get_mut(key) {
+            let val = entry.data.as_ref();
+            return val;
+        }
+        None
+    }
+    pub(crate) fn get_first(&mut self) -> Option<& T> {
+        let curr = self.head;
+        if let Some(entry) = self.entries.get_mut(curr) {
+            let val = entry.data.as_ref();
+            return val;
+        }
+        None
+    }
 }
 
 impl<T> Default for Slots<T> {

@@ -17,13 +17,14 @@ use std::mem::MaybeUninit;
 use std::pin::Pin;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
+use std::sync::Arc;
 use std::task::Poll::{Pending, Ready};
 use std::task::{Context, Poll};
 
 use crate::sync::atomic_waker::AtomicWaker;
 use crate::sync::error::{RecvError, SendError, TryRecvError, TrySendError};
 use crate::sync::mpsc::Container;
-use crate::sync::wake_list::WakerList;
+use crate::sync::wake_list::{ListItem, WakerList};
 
 /// The offset of the index.
 const INDEX_SHIFT: usize = 1;
@@ -236,8 +237,11 @@ impl<T> Future for Position<'_, T> {
             SendPosition::Closed => return Ready(SendPosition::Closed),
             SendPosition::Full => {}
         }
-
-        self.array.waiters.insert(cx.waker().clone());
+        let wake = cx.waker().clone();
+        self.array.waiters.insert(ListItem {
+            wake,
+            wait_permit: Arc::new(AtomicUsize::new(1)),
+        });
 
         let tail = self.array.tail.load(Acquire);
         let index = (tail >> INDEX_SHIFT) % self.array.capacity;

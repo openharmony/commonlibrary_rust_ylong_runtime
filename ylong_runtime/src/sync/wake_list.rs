@@ -12,9 +12,12 @@
 // limitations under the License.
 
 use std::cell::UnsafeCell;
+use std::cmp;
 use std::hint::spin_loop;
 use std::ops::{Deref, DerefMut};
+use std::sync::atomic::Ordering::{AcqRel, Acquire};
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use std::task::Waker;
 
 use crate::util::slots::{Slots, SlotsError};
@@ -25,7 +28,14 @@ const LOCKED: usize = 1 << 0;
 const NOTIFIABLE: usize = 1 << 1;
 
 pub(crate) struct Inner {
-    wake_list: Slots<Waker>,
+    wake_list: Slots<ListItem>,
+}
+
+pub(crate) struct ListItem {
+    // Task waker
+    pub(crate) wake: Waker,
+    // The status of task to get semaphores
+    pub(crate) wait_permit: Arc<AtomicUsize>,
 }
 
 /// Lists of Wakers
@@ -52,14 +62,15 @@ impl WakerList {
     }
 
     /// Pushes a waker into the list and return its index in the list.
-    pub fn insert(&self, waker: Waker) -> usize {
+    pub fn insert(&self, waker: ListItem) -> usize {
         let mut list = self.lock();
 
         list.wake_list.push_back(waker)
     }
 
     /// Removes the waker corresponding to the key.
-    pub fn remove(&self, key: usize) -> Result<Waker, SlotsError> {
+    #[allow(dead_code)]
+    pub fn remove(&self, key: usize) -> Result<ListItem, SlotsError> {
         let mut inner = self.lock();
         inner.wake_list.remove(key)
     }
@@ -101,15 +112,41 @@ impl WakerList {
     }
 }
 
+impl ListItem {
+    fn get_wait_permit(&self) -> usize {
+        self.wait_permit.load(Acquire)
+    }
+    fn change_permit(&self, curr: usize, next: usize) -> Result<usize, usize> {
+        self.wait_permit.
+            compare_exchange(curr, next, AcqRel, Acquire)
+    }
+
+    fn change_status(&self, acquired_permit: usize) -> bool {
+        let mut curr = self.get_wait_permit();
+        loop {
+            let assign = cmp::min(curr, acquired_permit);
+            let next = curr - assign;
+            match self.change_permit(curr, next) {
+                Ok(_) => return next == 0,
+                Err(actual) => curr = actual,
+            }
+        }
+    }
+}
+
 impl Inner {
     /// Wakes up one or more members in the WakerList, and return the result.
     #[inline]
     fn notify(&mut self, notify_type: Notify) -> bool {
         let mut is_wake = false;
-        while let Some(waker) = self.wake_list.pop_front() {
-            waker.wake();
-            is_wake = true;
-
+        while let Some(list_item) = self.wake_list.get_first() {
+            let res= list_item.change_status(1);
+            if res {
+                // If entering this branch, 'wake_list.pop_front()' must be 'Some(_)'
+                let pop = self.wake_list.pop_front().expect("The list first is NULL");
+                pop.wake.wake();
+                is_wake = true;
+            }
             if notify_type == Notify::One {
                 return is_wake;
             }
@@ -134,6 +171,21 @@ impl Inner {
 /// The guard holding the WakerList.
 pub(crate) struct Lock<'a> {
     waker_set: &'a WakerList,
+}
+
+impl Lock<'_> {
+    pub(crate) fn remove_permit(&mut self, key: usize, wait_permit: usize) -> bool {
+        if let Some(list_item) = self.wake_list.get_by_index(key) {
+            let inner_wait_permit = list_item.get_wait_permit();
+            if inner_wait_permit == wait_permit {
+                let _ = self.wake_list.remove(key);
+            }
+        }
+        if wait_permit == 0 {
+            return !self.notify_one();
+        }
+        false
+    }
 }
 
 impl Drop for Lock<'_> {

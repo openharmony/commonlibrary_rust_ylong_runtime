@@ -17,10 +17,11 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
+use std::sync::Arc;
 use std::task::Poll::{Pending, Ready};
 use std::task::{Context, Poll};
 
-use crate::sync::wake_list::WakerList;
+use crate::sync::wake_list::{ListItem, WakerList};
 
 /// Maximum capacity of `Semaphore`.
 const MAX_PERMITS: usize = usize::MAX >> 1;
@@ -38,6 +39,8 @@ pub(crate) struct Permit<'a> {
     semaphore: &'a SemaphoreInner,
     waker_index: Option<usize>,
     enqueue: bool,
+    // Sharing state in a multi-threaded environment
+    wait_permit: Arc<AtomicUsize>,
 }
 
 /// Error returned by `Semaphore`.
@@ -181,6 +184,7 @@ impl SemaphoreInner {
         cx: &mut Context<'_>,
         waker_index: &mut Option<usize>,
         enqueue: &mut bool,
+        wait_permit: Arc<AtomicUsize>,
     ) -> Poll<Result<(), SemaphoreError>> {
         let mut curr = self.permits.load(Acquire);
         if curr & CLOSED == CLOSED {
@@ -199,7 +203,11 @@ impl SemaphoreInner {
                     return res;
                 }
             } else if !(*enqueue) {
-                *waker_index = Some(self.waker_list.insert(cx.waker().clone()));
+                let wake = cx.waker().clone();
+                *waker_index = Some(self.waker_list.insert(ListItem {
+                    wake,
+                    wait_permit: wait_permit.clone(),
+                }));
                 *enqueue = true;
                 curr = self.permits.load(Acquire);
             } else {
@@ -218,11 +226,12 @@ impl Debug for SemaphoreInner {
 }
 
 impl<'a> Permit<'a> {
-    fn new(semaphore: &'a SemaphoreInner) -> Permit {
+    fn new(semaphore: &'a SemaphoreInner) -> Permit<'a> {
         Permit {
             semaphore,
             waker_index: None,
             enqueue: false,
+            wait_permit: Arc::new(AtomicUsize::new(1)),
         }
     }
 }
@@ -231,20 +240,35 @@ impl Future for Permit<'_> {
     type Output = Result<(), SemaphoreError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let (semaphore, waker_index, enqueue) = unsafe {
+        let (semaphore, waker_index, enqueue, wait_permit) = unsafe {
             let me = self.get_unchecked_mut();
-            (me.semaphore, &mut me.waker_index, &mut me.enqueue)
+            (
+                me.semaphore,
+                &mut me.waker_index,
+                &mut me.enqueue,
+                me.wait_permit.clone(),
+            )
         };
 
-        semaphore.poll_acquire(cx, waker_index, enqueue)
+        semaphore.poll_acquire(cx, waker_index, enqueue, wait_permit)
     }
 }
 
 impl Drop for Permit<'_> {
     fn drop(&mut self) {
         if self.enqueue {
-            // if `enqueue` is true, `waker_index` must be `Some(_)`.
-            let _ = self.semaphore.waker_list.remove(self.waker_index.unwrap());
+            let mut list = self.semaphore.waker_list.lock();
+            let wait_permit = self.wait_permit.load(Acquire);
+            // if 'enqueue' is true, 'waker_index' must be 'Some(_)'
+            let index = self.waker_index.unwrap();
+            let res = list.remove_permit(index, wait_permit);
+            if res {
+                let prev = self.semaphore.permits.fetch_add(1 << PERMIT_SHIFT, Release);
+                assert!(
+                    (prev >> PERMIT_SHIFT) < MAX_PERMITS,
+                    "the number of permits will overflow the capacity after addition"
+                );
+            }
         }
     }
 }
