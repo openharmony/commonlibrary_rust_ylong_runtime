@@ -45,6 +45,15 @@
         },
         {
           "name": "//commonlibrary/rust/ylong_runtime/ylong_runtime:ylong_runtime_static"
+        },
+        {
+          "name": "//commonlibrary/rust/ylong_runtime/ylong_runtime_macros:ylong_runtime_macros"
+        },
+        {
+          "name": "//commonlibrary/rust/ylong_runtime/ylong_signal:ylong_signal"
+        },
+        {
+          "name": "//commonlibrary/rust/ylong_runtime/ylong_io:ylong_io"
         }
       ],
       "test": [
