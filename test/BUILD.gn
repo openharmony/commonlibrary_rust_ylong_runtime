@@ -31,7 +31,9 @@ ohos_rust_unittest("rust_ylong_runtime_test_ut") {
     "../ylong_io:ylong_io",
     "../ylong_runtime_macros:ylong_runtime_macros(${host_toolchain})",
     "../ylong_signal:ylong_signal",
-    "//third_party/rust/crates/libc:lib",
+  ]
+  external_deps = [
+    "rust_libc:lib",
   ]
 }
 
@@ -52,7 +54,9 @@ ohos_rust_systemtest("rust_ylong_runtime_test_sdv") {
   sources = [ "../ylong_runtime/tests/entry.rs" ]
   deps = [
     "../ylong_runtime:ylong_runtime",
-    "//third_party/rust/crates/libc:lib",
+  ]
+  external_deps = [
+    "rust_libc:lib",
   ]
 }
 
@@ -64,7 +68,9 @@ ohos_rust_systemtest("rust_ylong_signal_test_sdv") {
   sources = [ "../ylong_signal/tests/entry.rs" ]
   deps = [
     "../ylong_signal:ylong_signal",
-    "//third_party/rust/crates/libc:lib",
+  ]
+  external_deps = [
+    "rust_libc:lib",
   ]
 }
 

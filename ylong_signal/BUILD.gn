@@ -21,5 +21,7 @@ ohos_rust_static_library("ylong_signal") {
   edition = "2021"
 
   sources = [ "src/lib.rs" ]
-  deps = [ "//third_party/rust/crates/libc:lib" ]
+  external_deps = [
+    "rust_libc:lib",
+  ]
 }

@@ -26,7 +26,8 @@
     "ram": "~200KB",
     "deps": {
       "components": [
-        "ffrt"
+        "ffrt",
+        "rust_libc"
       ],
       "third_party": []
     },
