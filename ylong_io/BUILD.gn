@@ -26,5 +26,7 @@ ohos_rust_static_library("ylong_io") {
   ]
 
   sources = [ "src/lib.rs" ]
-  deps = [ "//third_party/rust/crates/libc:lib" ]
+  external_deps = [
+    "rust_libc:lib",
+  ]
 }
