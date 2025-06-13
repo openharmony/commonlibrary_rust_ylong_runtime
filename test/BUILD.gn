@@ -32,9 +32,13 @@ ohos_rust_unittest("rust_ylong_runtime_test_ut") {
     "../ylong_runtime_macros:ylong_runtime_macros(${host_toolchain})",
     "../ylong_signal:ylong_signal",
   ]
-  external_deps = [
-    "rust_libc:lib",
-  ]
+
+  if (defined(global_parts_info) &&
+      !defined(global_parts_info.third_party_rust_libc)) {
+    deps += [ "//third_party/rust/crates/libc:lib" ]
+  } else {
+    external_deps += [ "rust_libc:lib" ]
+  }
 }
 
 ohos_rust_systemtest("rust_ylong_runtime_test_sdv") {
@@ -55,9 +59,13 @@ ohos_rust_systemtest("rust_ylong_runtime_test_sdv") {
   deps = [
     "../ylong_runtime:ylong_runtime",
   ]
-  external_deps = [
-    "rust_libc:lib",
-  ]
+
+  if (defined(global_parts_info) &&
+      !defined(global_parts_info.third_party_rust_libc)) {
+    deps += [ "//third_party/rust/crates/libc:lib" ]
+  } else {
+    external_deps += [ "rust_libc:lib" ]
+  }
 }
 
 ohos_rust_systemtest("rust_ylong_signal_test_sdv") {
@@ -69,9 +77,13 @@ ohos_rust_systemtest("rust_ylong_signal_test_sdv") {
   deps = [
     "../ylong_signal:ylong_signal",
   ]
-  external_deps = [
-    "rust_libc:lib",
-  ]
+
+  if (defined(global_parts_info) &&
+      !defined(global_parts_info.third_party_rust_libc)) {
+    deps += [ "//third_party/rust/crates/libc:lib" ]
+  } else {
+    external_deps += [ "rust_libc:lib" ]
+  }
 }
 
 group("unittest") {

@@ -37,9 +37,12 @@ ohos_rust_shared_library("ylong_runtime") {
     "../ylong_signal:ylong_signal",
   ]
 
-  external_deps = [
-    "rust_libc:lib",
-  ]
+  if (defined(global_parts_info) &&
+      !defined(global_parts_info.third_party_rust_libc)) {
+    deps += [ "//third_party/rust/crates/libc:lib" ]
+  } else {
+    external_deps += [ "rust_libc:lib" ]
+  }
 }
 
 ohos_rust_static_library("ylong_runtime_static") {
@@ -66,7 +69,10 @@ ohos_rust_static_library("ylong_runtime_static") {
     "../ylong_signal:ylong_signal",
   ]
 
-  external_deps = [
-    "rust_libc:lib",
-  ]
+  if (defined(global_parts_info) &&
+      !defined(global_parts_info.third_party_rust_libc)) {
+    deps += [ "//third_party/rust/crates/libc:lib" ]
+  } else {
+    external_deps += [ "rust_libc:lib" ]
+  }
 }
