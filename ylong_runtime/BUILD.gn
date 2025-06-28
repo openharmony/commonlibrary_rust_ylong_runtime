@@ -24,8 +24,6 @@ ohos_rust_shared_library("ylong_runtime") {
     "fs",
     "macros",
     "net",
-    "process",
-    "signal",
     "sync",
     "time",
   ]
@@ -34,7 +32,6 @@ ohos_rust_shared_library("ylong_runtime") {
   deps = [
     "../ylong_io:ylong_io",
     "../ylong_runtime_macros:ylong_runtime_macros(${host_toolchain})",
-    "../ylong_signal:ylong_signal",
   ]
 
   if (defined(global_parts_info) &&
@@ -56,8 +53,6 @@ ohos_rust_static_library("ylong_runtime_static") {
     "fs",
     "macros",
     "net",
-    "process",
-    "signal",
     "sync",
     "time",
   ]
@@ -66,7 +61,6 @@ ohos_rust_static_library("ylong_runtime_static") {
   deps = [
     "../ylong_io:ylong_io",
     "../ylong_runtime_macros:ylong_runtime_macros(${host_toolchain})",
-    "../ylong_signal:ylong_signal",
   ]
 
   if (defined(global_parts_info) &&

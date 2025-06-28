@@ -28,7 +28,9 @@ mod join_set;
 mod mpsc_test;
 mod mutex;
 mod par_iter;
+#[cfg(feature = "process")]
 mod process;
+#[cfg(feature = "process")]
 mod pty_process;
 mod select;
 mod semaphore_test;
