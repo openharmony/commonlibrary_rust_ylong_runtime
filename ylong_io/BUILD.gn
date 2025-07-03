@@ -27,12 +27,5 @@ ohos_rust_static_library("ylong_io") {
 
   sources = [ "src/lib.rs" ]
 
-  deps = []
-
-  if (defined(global_parts_info) &&
-      !defined(global_parts_info.third_party_rust_libc)) {
-    deps += [ "//third_party/rust/crates/libc:lib" ]
-  } else {
-    external_deps += [ "rust_libc:lib" ]
-  }
+  external_deps = [ "rust_libc:lib" ]
 }
