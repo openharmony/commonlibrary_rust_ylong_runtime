@@ -31,12 +31,7 @@ ohos_rust_unittest("rust_ylong_runtime_test_ut") {
     "../ylong_signal:ylong_signal",
   ]
 
-  if (defined(global_parts_info) &&
-      !defined(global_parts_info.third_party_rust_libc)) {
-    deps += [ "//third_party/rust/crates/libc:lib" ]
-  } else {
-    external_deps += [ "rust_libc:lib" ]
-  }
+  external_deps = [ "rust_libc:lib" ]
 }
 
 ohos_rust_systemtest("rust_ylong_runtime_test_sdv") {
@@ -52,16 +47,9 @@ ohos_rust_systemtest("rust_ylong_runtime_test_sdv") {
   ]
 
   sources = [ "../ylong_runtime/tests/entry.rs" ]
-  deps = [
-    "../ylong_runtime:ylong_runtime",
-  ]
+  deps = [ "../ylong_runtime:ylong_runtime" ]
 
-  if (defined(global_parts_info) &&
-      !defined(global_parts_info.third_party_rust_libc)) {
-    deps += [ "//third_party/rust/crates/libc:lib" ]
-  } else {
-    external_deps += [ "rust_libc:lib" ]
-  }
+  external_deps = [ "rust_libc:lib" ]
 }
 
 ohos_rust_systemtest("rust_ylong_signal_test_sdv") {
@@ -70,16 +58,9 @@ ohos_rust_systemtest("rust_ylong_signal_test_sdv") {
   rustflags = [ "--cfg=gn_test" ]
 
   sources = [ "../ylong_signal/tests/entry.rs" ]
-  deps = [
-    "../ylong_signal:ylong_signal",
-  ]
+  deps = [ "../ylong_signal:ylong_signal" ]
 
-  if (defined(global_parts_info) &&
-      !defined(global_parts_info.third_party_rust_libc)) {
-    deps += [ "//third_party/rust/crates/libc:lib" ]
-  } else {
-    external_deps += [ "rust_libc:lib" ]
-  }
+  external_deps = [ "rust_libc:lib" ]
 }
 
 group("unittest") {
