@@ -35,6 +35,10 @@ ohos_rust_shared_library("ylong_runtime") {
   ]
 
   external_deps = [ "rust_libc:lib" ]
+
+  innerapi_tags = [
+    "chipsetsdk"
+  ]
 }
 
 ohos_rust_static_library("ylong_runtime_static") {
