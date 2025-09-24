@@ -16,6 +16,8 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::{io, mem, option, vec};
+#[cfg(target_os = "linux")]
+use libc::{gid_t, uid_t};
 
 use crate::spawn_blocking;
 use crate::task::JoinHandle;
@@ -30,6 +32,33 @@ where
 
     for addr in addrs {
         match f(addr) {
+            Ok(res) => return Ok(res),
+            Err(e) => last_e = Some(e),
+        }
+    }
+
+    Err(last_e.unwrap_or(io::Error::new(
+        io::ErrorKind::InvalidInput,
+        "addr could not resolve to any address",
+    )))
+}
+
+#[cfg(target_os = "linux")]
+pub(crate) async fn each_addr_with_owner<A: ToSocketAddrs, F, T>(
+    uid: uid_t,
+    gid: gid_t,
+    addr: A,
+    mut f: F,
+) -> io::Result<T>
+where
+    F: FnMut(SocketAddr, uid_t, gid_t) -> io::Result<T>,
+{
+    let addrs = addr.to_socket_addrs().await?;
+
+    let mut last_e = None;
+
+    for addr in addrs {
+        match f(addr, uid, gid) {
             Ok(res) => return Ok(res),
             Err(e) => last_e = Some(e),
         }
