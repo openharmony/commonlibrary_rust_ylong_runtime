@@ -14,6 +14,11 @@
 #![cfg(feature = "net")]
 
 use std::net::Shutdown;
+#[cfg(target_os = "linux")]
+use std::os::unix::io::AsRawFd;
+
+#[cfg(target_os = "linux")]
+use libc::{gid_t, uid_t};
 
 use ylong_runtime::io::{AsyncReadExt, AsyncWriteExt};
 use ylong_runtime::net::{TcpListener, TcpStream};
@@ -125,6 +130,74 @@ fn sdv_tcp_stream_basic() {
                 stream = TcpStream::connect(addr).await;
             }
             let stream = stream.unwrap();
+
+            assert_eq!(stream.peer_addr().unwrap(), addr);
+            assert_eq!(
+                stream.local_addr().unwrap().ip(),
+                std::net::Ipv4Addr::new(127, 0, 0, 1)
+            );
+            stream.set_ttl(101).unwrap();
+            assert_eq!(stream.ttl().unwrap(), 101);
+            stream.set_nodelay(true).unwrap();
+            assert!(stream.nodelay().unwrap());
+            assert!(stream.linger().unwrap().is_none());
+            stream
+                .set_linger(Some(std::time::Duration::from_secs(1)))
+                .unwrap();
+            assert_eq!(
+                stream.linger().unwrap(),
+                Some(std::time::Duration::from_secs(1))
+            );
+            assert!(stream.take_error().unwrap().is_none());
+        });
+
+        listener.accept().await.unwrap();
+
+        handle.await.unwrap();
+    });
+    ylong_runtime::block_on(handle).unwrap();
+}
+
+#[cfg(target_os = "linux")]
+fn verify_socket_ownership(stream: &TcpStream, expected_uid: uid_t, expected_gid: gid_t) -> std::io::Result<bool> {
+    let fd = stream.as_raw_fd();
+    let mut stat = std::mem::MaybeUninit::<libc::stat>::uninit();
+
+    unsafe {
+        if libc::fstat(fd, stat.as_mut_ptr()) != 0 {
+            return Err(std::io::Error::last_os_error());
+        }
+
+        let stat = stat.assume_init();
+        Ok(stat.st_uid == expected_uid && stat.st_gid == expected_gid)
+    }
+}
+
+/// SDV test cases for `TcpStream`.
+///
+/// # Brief
+/// 1. Bind `TcpListener` and wait for `accept()`.
+/// 2. `TcpStream` connect to listener.
+/// 3. Check uid/gid and call peer_addr(), local_addr(), set_ttl(), ttl(), set_nodelay(),
+///    nodelay(), take_error().
+/// 4. Check result is correct.
+#[test]
+#[cfg(target_os = "linux")]
+fn sdv_tcp_stream_with_owner_basic() {
+    let handle = ylong_runtime::spawn(async move {
+        let uid = unsafe { libc::getuid() };
+        let gid = unsafe { libc::getgid() };
+        let listener = TcpListener::bind(ADDR).await.unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        let handle = ylong_runtime::spawn(async move {
+            let mut stream = TcpStream::connect_with_owner(addr, uid, gid).await;
+            while stream.is_err() {
+                stream = TcpStream::connect_with_owner(addr, uid, gid).await;
+            }
+            let stream = stream.unwrap();
+            let res = verify_socket_ownership(&stream, uid, gid).unwrap();
+            assert!(res);
 
             assert_eq!(stream.peer_addr().unwrap(), addr);
             assert_eq!(
