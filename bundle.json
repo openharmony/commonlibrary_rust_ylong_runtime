@@ -3,8 +3,8 @@
   "version": "4.0",
   "description": "Rust runtime implementation",
   "publishAs": "code-segment",
-  "homePage": "https://gitee.com/openharmony",
-  "repository": "https://gitee.com/openharmony/commonlibrary_rust_ylong_runtime",
+  "homePage": "https://gitcode.com/openharmony",
+  "repository": "https://gitcode.com/openharmony/commonlibrary_rust_ylong_runtime",
   "license": "Apache License 2.0",
   "language": "Rust",
   "segment": {
