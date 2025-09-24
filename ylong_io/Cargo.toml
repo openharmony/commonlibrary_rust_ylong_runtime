@@ -4,7 +4,7 @@ version = "1.0.0"
 edition = "2021"
 description = "Event Driven IO"
 license = "Apache-2.0"
-repository = "https://gitee.com/openharmony/commonlibrary_rust_ylong_runtime"
+repository = "https://gitcode.com/openharmony/commonlibrary_rust_ylong_runtime"
 keywords = ["ylong", "io", "epoll"]
 
 [features]
