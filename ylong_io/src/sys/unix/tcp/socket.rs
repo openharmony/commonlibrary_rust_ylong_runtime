@@ -18,12 +18,13 @@ use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 use std::time::Duration;
 
 use libc::{
-    c_int, c_void, linger, socklen_t, AF_INET, AF_INET6, SOCK_STREAM, SOL_SOCKET, SO_LINGER,
-    SO_REUSEADDR,
+    c_int, c_void, gid_t, linger, socklen_t, uid_t, AF_INET, AF_INET6, SOCK_STREAM, SOL_SOCKET,
+    SO_LINGER, SO_REUSEADDR,
 };
 
 use super::super::socket_addr::socket_addr_trans;
 use super::TcpStream;
+use crate::Source;
 use crate::source::Fd;
 use crate::sys::unix::socket::socket_new;
 
@@ -80,6 +81,23 @@ impl TcpSocket {
             inner: unsafe { net::TcpStream::from_raw_fd(self.socket) },
         };
         let (raw_addr, addr_length) = socket_addr_trans(&addr);
+        match syscall!(connect(self.socket, raw_addr.as_ptr(), addr_length)) {
+            Err(err) if err.raw_os_error() != Some(libc::EINPROGRESS) => Err(err),
+            _ => Ok(stream),
+        }
+    }
+
+    pub(crate) fn connect_with_owner(
+        self,
+        addr: SocketAddr,
+        uid: uid_t,
+        gid: gid_t,
+    ) -> io::Result<TcpStream> {
+        let stream = TcpStream {
+            inner: unsafe { net::TcpStream::from_raw_fd(self.socket) },
+        };
+        let (raw_addr, addr_length) = socket_addr_trans(&addr);
+        syscall!(fchown(stream.get_fd(), uid, gid))?;
         match syscall!(connect(self.socket, raw_addr.as_ptr(), addr_length)) {
             Err(err) if err.raw_os_error() != Some(libc::EINPROGRESS) => Err(err),
             _ => Ok(stream),

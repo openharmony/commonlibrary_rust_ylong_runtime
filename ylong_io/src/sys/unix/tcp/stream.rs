@@ -16,6 +16,8 @@ use std::net::{self, Shutdown, SocketAddr};
 use std::os::unix::io::AsRawFd;
 use std::time::Duration;
 
+use libc::{gid_t, uid_t};
+
 use super::TcpSocket;
 use crate::source::Fd;
 use crate::sys::unix::tcp::socket::{get_sock_linger, set_sock_linger};
@@ -28,11 +30,18 @@ pub struct TcpStream {
 }
 
 impl TcpStream {
-    /// Create a new TCP stream and issue a non-blocking connect to the
+    /// Creates a new TCP stream and issues a non-blocking connection to the
     /// specified address.
     pub fn connect(addr: SocketAddr) -> io::Result<TcpStream> {
         let socket = TcpSocket::new_socket(addr)?;
         socket.connect(addr)
+    }
+
+    /// Creates a non-blocking TCP stream to address.
+    /// Sets the socket ownership to the provided uid/gid before connecting.
+    pub fn connect_with_owner(addr: SocketAddr, uid: uid_t, gid: gid_t) -> io::Result<TcpStream> {
+        let socket = TcpSocket::new_socket(addr)?;
+        socket.connect_with_owner(addr, uid, gid)
     }
 
     /// Creates a new `TcpStream` from a standard `net::TcpStream`.

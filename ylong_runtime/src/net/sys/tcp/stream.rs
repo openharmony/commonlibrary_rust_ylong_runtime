@@ -98,6 +98,49 @@ impl TcpStream {
         Self::connect_inner(stream).await
     }
 
+    /// Opens a TCP connection to a remote host asynchronously.
+    /// Sets the socket ownership to the provided uid/gid before connecting.
+    ///
+    /// # Note
+    ///
+    /// If there are multiple addresses in SocketAddr, it will attempt to
+    /// connect them in sequence until one of the addrs returns success. If
+    /// all connections fail, it returns the error of the last connection.
+    /// This behavior is consistent with std.
+    ///
+    /// # Panic
+    /// Calling this method outside of a Ylong Runtime could cause panic.
+    ///
+    /// # Example
+    /// ```rust
+    /// use std::io;
+    ///
+    /// use ylong_runtime::net::TcpStream;
+    ///
+    /// async fn io_func() -> io::Result<()> {
+    ///     let addr = "127.0.0.1:8080";
+    ///     let uid = 1;
+    ///     let gid = 1;
+    ///     let mut stream = TcpStream::connect_with_owner(addr, uid, gid).await?;
+    ///     Ok(())
+    /// }
+    /// ```
+    #[cfg(target_os = "linux")]
+    pub async fn connect_with_owner<A: ToSocketAddrs>(
+        addr: A,
+        uid: uid_t,
+        gid: gid_t,
+    ) -> io::Result<Self> {
+        let stream = super::super::addr::each_addr_with_owner(
+            uid,
+            gid,
+            addr,
+            ylong_io::TcpStream::connect_with_owner,
+        )
+        .await?;
+        Self::connect_inner(stream).await
+    }
+
     async fn connect_inner(stream: ylong_io::TcpStream) -> io::Result<Self> {
         let stream = TcpStream::new(stream)?;
         stream
@@ -664,7 +707,12 @@ impl AsRawFd for TcpStream {
 #[cfg(test)]
 mod test {
     use std::net::Ipv4Addr;
+    #[cfg(target_os = "linux")]
+    use std::os::unix::io::AsRawFd;
     use std::time::Duration;
+
+    #[cfg(target_os = "linux")]
+    use libc::{gid_t, uid_t};
 
     use crate::io::AsyncWriteExt;
     use crate::net::{TcpListener, TcpStream};
@@ -691,6 +739,68 @@ mod test {
                     stream = TcpStream::connect(addr).await;
                 }
                 let stream = stream.unwrap();
+                assert_eq!(stream.peer_addr().unwrap(), addr);
+                assert_eq!(
+                    stream.local_addr().unwrap().ip(),
+                    Ipv4Addr::new(127, 0, 0, 1)
+                );
+                stream.set_ttl(101).unwrap();
+                assert_eq!(stream.ttl().unwrap(), 101);
+                stream.set_nodelay(true).unwrap();
+                assert!(stream.nodelay().unwrap());
+                assert!(stream.linger().unwrap().is_none());
+                stream.set_linger(Some(Duration::from_secs(1))).unwrap();
+                assert_eq!(stream.linger().unwrap(), Some(Duration::from_secs(1)));
+                assert!(stream.take_error().unwrap().is_none());
+            });
+
+            listener.accept().await.unwrap();
+
+            handle.await.unwrap();
+        });
+    }
+
+    #[cfg(target_os = "linux")]
+    fn verify_socket_ownership(stream: &TcpStream, expected_uid: uid_t, expected_gid: gid_t) -> std::io::Result<bool> {
+        let fd = stream.as_raw_fd();
+        let mut stat = std::mem::MaybeUninit::<libc::stat>::uninit();
+        
+        unsafe {
+            if libc::fstat(fd, stat.as_mut_ptr()) != 0 {
+                return Err(std::io::Error::last_os_error());
+            }
+            
+            let stat = stat.assume_init();
+            Ok(stat.st_uid == expected_uid && stat.st_gid == expected_gid)
+        }
+    }
+
+    /// UT test cases for `TcpStream`.
+    ///
+    /// # Brief
+    /// 1. Bind `TcpListener` and wait for `accept()`.
+    /// 2. `TcpStream` connect to listener with owner credentials (UID/GID).
+    /// 3. Check uid/gid and call peer_addr(), local_addr(), set_ttl(), ttl(), set_nodelay(),
+    ///    nodelay(), take_error().
+    /// 4. Check result is correct.
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn ut_tcp_stream_with_owner_basic() {
+        crate::block_on(async {
+            let uid = unsafe { libc::getuid() };
+            let gid = unsafe { libc::getgid() };
+            let listener = TcpListener::bind(ADDR).await.unwrap();
+            let addr = listener.local_addr().unwrap();
+
+            let handle = crate::spawn(async move {
+                let mut stream = TcpStream::connect_with_owner(addr, uid, gid).await;
+                while stream.is_err() {
+                    stream = TcpStream::connect_with_owner(addr, uid, gid).await;
+                }
+                let stream = stream.unwrap();
+                let res = verify_socket_ownership(&stream, uid, gid).unwrap();
+                assert!(res);
+                
                 assert_eq!(stream.peer_addr().unwrap(), addr);
                 assert_eq!(
                     stream.local_addr().unwrap().ip(),
